@@ -38,6 +38,9 @@ yarn-error.log*
 /contracts/**/target/
 .stellar/
 
+# agent worktrees
+/.worktrees/
+
 # playwright
 /test-results/
 /playwright-report/
