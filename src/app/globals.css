@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+/* Tailwind v4 cấu hình token ngay trong CSS, thay cho tailwind.config. */
+:root {
+  --paper: #fbf8f3;
+  --surface: #f2ede4;
+  --ink: #14213d;
+  --primary: #0f8b6d;
+  --primary-strong: #0b6f57;
+  --amber: #f2a541;
+  --amber-ink: #7a4a05;
+  --brick: #c8553d;
+  --brick-ink: #9c3a26;
+  --line: rgb(20 33 61 / 0.12);
+  --nav-glass: rgb(251 248 243 / 0.6);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-amber: var(--amber);
+  --color-amber-ink: var(--amber-ink);
+  --color-brick: var(--brick);
+  --color-brick-ink: var(--brick-ink);
+  --color-line: var(--line);
+  --font-sans: var(--font-be-vietnam), system-ui, sans-serif;
+  --radius-card: 1.5rem;
+  --radius-panel: 2rem;
+  --shadow-soft: 0 18px 50px -24px rgb(20 33 61 / 0.28);
+  --text-display: clamp(3.25rem, 9vw, 8rem);
+  --text-section: clamp(2.25rem, 5vw, 4.5rem);
+}
+
+html {
+  font-size: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 1.125rem;
+  line-height: 1.7;
+}
+
+:focus-visible {
+  outline: 3px solid var(--primary-strong);
+  outline-offset: 3px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
