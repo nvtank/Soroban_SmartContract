@@ -26,6 +26,9 @@ Manager giữ: `src/domain/states.ts`, `contracts/rentflow/src/types.rs`, `docs/
 - `/api/jobs/flush-onchain` do **D** viết. `/api/jobs/overdue-scan` do **C** viết.
 - `src/app/page.tsx` là trang tạm. **F** xóa nó khi tạo `src/app/(marketing)/page.tsx`.
 - `/bang-chung` do **G** làm, `/minh-bach` do **F** làm.
+- `src/components/shared/**` do **F** sở hữu.
+- `src/app/api/recovery/**`, `src/app/api/demo/**`, `src/app/api/health/**` và `src/proxy.ts` do **B** viết.
+- `src/lib/api/**` và `src/domain/dto.ts` do Manager giữ.
 
 ## Yêu cầu đang mở
 

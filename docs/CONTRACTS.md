@@ -87,3 +87,50 @@ get_rent_period(id, period: u32) -> RentPeriodRecord                           /
 Mã lỗi: enum `Error` trong `types.rs`. Mỗi lần đổi trạng thái phát một event. Đủ điều kiện giải ngân thì phát `release_authorized`.
 
 **Cấm on-chain:** tên, SĐT, CCCD, địa chỉ, ảnh, văn bản hợp đồng, lý do dạng chữ, `room_label`.
+
+## 7. Giao diện nội bộ giữa các module
+
+Kiểu dữ liệu API nằm ở `src/domain/dto.ts`. Mọi route dùng `withApi`, `ok`, `parseJson`, `ApiError` từ `src/lib/api/http.ts`. `db` là Supabase admin client.
+
+```ts
+// B — src/lib/supabase/{server,browser,admin,session}.ts
+createServerSupabase(); createBrowserSupabase(); createAdminSupabase();
+requireUser(): Promise<SessionUser>;            // ném ApiError("UNAUTHENTICATED")
+getOptionalUser(): Promise<SessionUser | null>;
+
+// B — src/lib/crypto/custody.ts
+createCustodyWallet(db, userId): Promise<{ publicKey: string }>;
+getCustodyPublicKey(db, userId): Promise<string>;
+withCustodyKeypair<T>(db, userId, fn: (keypair: Keypair) => Promise<T>): Promise<T>;
+
+// B — src/lib/crypto/step-up.ts: Passkey hoặc OTP cho hành động quan trọng
+requireStepUp(request, userId, action: "SIGN_CONTRACT" | "APPROVE_REFUND" | "RESPOND_DEDUCTION" | "RESOLVE_DISPUTE"): Promise<void>;
+
+// D — src/lib/stellar/hash.ts
+canonicalizeContract(input): string; newSalt(): string; saltedHash(saltHex, data: string | Uint8Array): string;
+
+// D — src/lib/stellar/outbox.ts: action là tên hàm ABI, args không chứa PII
+type OnchainSigner = { kind: "USER"; userId: string } | { kind: "ORACLE" } | { kind: "PLATFORM" };
+enqueueOnchain(db, { contractId, action, args, signer: OnchainSigner }): Promise<{ id: string }>;
+flushOnchain(db, { limit?: number }): Promise<{ confirmed: number; failed: number }>;
+
+// C — src/domain/contracts/settlement.ts: idempotent, E gọi sau khi đã xác định trạng thái payment
+settlePayment(db, paymentId: string): Promise<void>;
+
+// E — src/domain/payments/rules.ts: hàm thuần
+classifyPayment(expected: bigint, paid: bigint): { status: "CONFIRMED" | "UNDERPAID" | "OVERPAID"; shortfall: bigint; excess: bigint };
+```
+
+`onchain_txs` có thêm cột `args jsonb` và `signer jsonb`.
+
+Component dùng chung do F viết ở `src/components/shared/`, G chỉ import:
+
+```ts
+JourneyStepper({ current: JourneyStep, disputed?: boolean, compact?: boolean })
+StatusBadge({ kind: "contract" | "deposit" | "rent" | "dispute" | "payment" | "deduction" | "onchain", status: string })
+MoneyAmount({ value: string | number, size?: "sm" | "md" | "lg" | "xl" })
+OnchainProofChip({ status: OnchainTxStatus, txHash?: string | null, explorerUrl?: string | null })
+MockBadge({ label?: string })
+```
+
+Chuỗi giao diện: mỗi agent thêm file riêng `src/i18n/sections/<khu-vực>.ts`, không sửa `src/i18n/vi.ts`.
