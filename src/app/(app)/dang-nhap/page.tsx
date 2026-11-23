@@ -9,38 +9,36 @@ import { MockBadge } from "@/components/shared";
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { loginAs, user } = useSession();
+  const { loginAs } = useSession();
 
-  const [role, setRoleTab] = useState<"LANDLORD" | "TENANT">("LANDLORD");
-  const [phone, setPhone] = useState("0901234567");
+  const demoParam = searchParams.get("demo");
+  const initialRole =
+    demoParam === "tenant" || demoParam === "tenant1" || demoParam === "tenant2" ? "TENANT" : "LANDLORD";
+  const initialPhone =
+    demoParam === "tenant2"
+      ? "0912345678"
+      : demoParam === "tenant" || demoParam === "tenant1"
+        ? "0987654321"
+        : "0901234567";
+
+  const [role, setRoleTab] = useState<"LANDLORD" | "TENANT">(initialRole);
+  const [phone, setPhone] = useState(initialPhone);
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [passkeyRegistered, setPasskeyRegistered] = useState(false);
 
-  // Check query parameters like ?demo=tenant&next=/app/hop-dong/...
+  // Auto-login and redirect when ?demo=... is present
   useEffect(() => {
-    const demoParam = searchParams.get("demo");
+    const demo = searchParams.get("demo");
     const nextParam = searchParams.get("next");
 
-    if (demoParam === "tenant" || demoParam === "tenant1") {
-      setRoleTab("TENANT");
-      setPhone("0987654321");
-    } else if (demoParam === "tenant2") {
-      setRoleTab("TENANT");
-      setPhone("0912345678");
-    } else if (demoParam === "landlord") {
-      setRoleTab("LANDLORD");
-      setPhone("0901234567");
-    }
-
-    if (demoParam) {
-      // Auto-fill demo
+    if (demo) {
       const userKey =
-        demoParam === "landlord"
+        demo === "landlord"
           ? "landlord"
-          : demoParam === "tenant2"
+          : demo === "tenant2"
             ? "tenant2"
             : "tenant1";
       loginAs(userKey);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { AppNavbar } from "@/components/app/app-navbar";
 import { apiClient } from "@/components/app/api-client";
@@ -14,7 +14,7 @@ export default function PublicProofPage() {
   const [search, setSearch] = useState("");
   const [filterAction, setFilterAction] = useState<string>("ALL");
 
-  const loadTxs = async () => {
+  const loadTxs = useCallback(async () => {
     setLoading(true);
     try {
       const list = await apiClient.getOnchainTxs();
@@ -22,10 +22,19 @@ export default function PublicProofPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadTxs();
+    let ignore = false;
+    apiClient.getOnchainTxs().then((list) => {
+      if (!ignore) {
+        setTxs(list);
+        setLoading(false);
+      }
+    });
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const filtered = txs.filter((t) => {
@@ -191,7 +200,7 @@ export default function PublicProofPage() {
                             Stellar Expert ↗
                           </a>
                         ) : (
-                          "—"
+                          <span className="text-xs text-ink/40 italic">Dữ liệu mẫu</span>
                         )}
                       </td>
                     </tr>

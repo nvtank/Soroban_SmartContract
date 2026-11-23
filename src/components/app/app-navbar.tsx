@@ -6,10 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "./session-context";
 import { apiClient } from "./api-client";
 import type { NotificationDto } from "@/domain/dto";
-import { MockBadge } from "@/components/shared";
 
 export function AppNavbar() {
-  const { user, role, loginAs, logout, isMock } = useSession();
+  const { user, role, loginAs, logout } = useSession();
   const pathname = usePathname();
   const router = useRouter();
 

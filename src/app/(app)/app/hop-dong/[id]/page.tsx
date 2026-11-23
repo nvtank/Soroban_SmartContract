@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, use } from "react";
+import React, { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
 import { AppNavbar } from "@/components/app/app-navbar";
 import { useSession } from "@/components/app/session-context";
@@ -22,7 +22,7 @@ import type { ContractDetailDto, PaymentDto, OnchainTxDto } from "@/domain/dto";
 type TabKey = "tong-quan" | "tien-coc" | "tien-thue" | "hoan-coc" | "bang-chung";
 
 function ContractDetailContent({ id }: { id: string }) {
-  const { role, user } = useSession();
+  const { role } = useSession();
 
   const [contract, setContract] = useState<ContractDetailDto | null>(null);
   const [onchainTxs, setOnchainTxs] = useState<OnchainTxDto[]>([]);
@@ -47,7 +47,7 @@ function ContractDetailContent({ id }: { id: string }) {
   const [disputeNoteInput, setDisputeNoteInput] = useState("Hai bên không thống nhất chi phí sửa chữa");
   const [agreedAmountInput, setAgreedAmountInput] = useState("");
 
-  const loadContract = async () => {
+  const loadContract = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -62,10 +62,32 @@ function ContractDetailContent({ id }: { id: string }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, role]);
 
   useEffect(() => {
-    loadContract();
+    let ignore = false;
+    const fetchContract = async () => {
+      try {
+        const data = await apiClient.getContractById(id, role === "TENANT" ? "TENANT" : "LANDLORD");
+        const txs = await apiClient.getOnchainTxs(id);
+        if (!ignore) {
+          setContract(data);
+          setOnchainTxs(txs);
+          setRefundAmountInput(data.depositAmount);
+          setAgreedAmountInput(data.depositAmount);
+          setLoading(false);
+        }
+      } catch (err: unknown) {
+        if (!ignore) {
+          setError(err instanceof Error ? err.message : "Không tìm thấy hợp đồng");
+          setLoading(false);
+        }
+      }
+    };
+    fetchContract();
+    return () => {
+      ignore = true;
+    };
   }, [id, role]);
 
   // Deep-linking with URL hash
@@ -810,7 +832,7 @@ function ContractDetailContent({ id }: { id: string }) {
                           {new Date(tx.createdAt).toLocaleString("vi-VN")}
                         </td>
                         <td className="py-3 px-3 text-right">
-                          {tx.explorerUrl && (
+                          {tx.explorerUrl ? (
                             <a
                               href={tx.explorerUrl}
                               target="_blank"
@@ -819,6 +841,8 @@ function ContractDetailContent({ id }: { id: string }) {
                             >
                               Stellar Expert ↗
                             </a>
+                          ) : (
+                            <span className="text-ink/40 text-[11px] italic">Dữ liệu mẫu</span>
                           )}
                         </td>
                       </tr>

@@ -4,7 +4,6 @@ import type {
   NotificationDto,
   OnchainTxDto,
   PaymentDto,
-  SessionUser,
 } from "@/domain/dto";
 import {
   DEMO_USERS,
@@ -93,7 +92,7 @@ class MockService {
     this.resetDemo();
   }
 
-  public getContracts(role: "LANDLORD" | "TENANT", userPhone?: string): ContractSummaryDto[] {
+  public getContracts(role: "LANDLORD" | "TENANT"): ContractSummaryDto[] {
     this.init();
     return this.contracts.map((c) => ({
       id: c.id,
@@ -192,7 +191,7 @@ class MockService {
       payloadHash: docHash,
       status: "CONFIRMED",
       txHash,
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+      explorerUrl: null,
       error: null,
       retryCount: 0,
       createdAt: new Date().toISOString(),
@@ -211,13 +210,14 @@ class MockService {
     return newContract;
   }
 
-  public confirmContract(id: string, role: "LANDLORD" | "TENANT"): ContractDetailDto {
+  public confirmContract(id: string, role: "LANDLORD" | "TENANT" = "TENANT"): ContractDetailDto {
     this.init();
     const contract = this.contracts.find((c) => c.id === id);
     if (!contract) throw new Error("Contract not found");
 
     contract.status = "ACTIVE";
     contract.journeyStep = "DEPOSIT";
+    contract.myRole = role;
 
     const txId = `tx-mock-${Date.now()}`;
     const txHash = `mock_testnet_tx_tenant_confirm_${id}_${Math.random().toString(16).slice(2, 8)}`;
@@ -228,7 +228,7 @@ class MockService {
       payloadHash: `mock_auth_hash_tenant_confirm_${id}`,
       status: "CONFIRMED",
       txHash,
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+      explorerUrl: null,
       error: null,
       retryCount: 0,
       createdAt: new Date().toISOString(),
@@ -301,7 +301,7 @@ class MockService {
           payloadHash: `mock_payment_ref_deposit_${payment.id}`,
           status: "CONFIRMED",
           txHash,
-          explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+          explorerUrl: null,
           error: null,
           retryCount: 0,
           createdAt: new Date().toISOString(),
@@ -322,7 +322,7 @@ class MockService {
             payloadHash: `mock_payment_ref_rent_p${payment.periodNo}_${payment.id}`,
             status: "CONFIRMED",
             txHash,
-            explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+            explorerUrl: null,
             error: null,
             retryCount: 0,
             createdAt: new Date().toISOString(),
@@ -368,7 +368,7 @@ class MockService {
       payloadHash: `mock_reason_hash_${newDed.id}`,
       status: "CONFIRMED",
       txHash,
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+      explorerUrl: null,
       error: null,
       retryCount: 0,
       createdAt: new Date().toISOString(),
@@ -409,7 +409,7 @@ class MockService {
         payloadHash: `mock_deduction_accept_hash_${deductionId}`,
         status: "CONFIRMED",
         txHash,
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+        explorerUrl: null,
         error: null,
         retryCount: 0,
         createdAt: new Date().toISOString(),
@@ -436,7 +436,7 @@ class MockService {
         payloadHash: `mock_dispute_reason_hash_${deductionId}`,
         status: "CONFIRMED",
         txHash,
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+        explorerUrl: null,
         error: null,
         retryCount: 0,
         createdAt: new Date().toISOString(),
@@ -472,7 +472,7 @@ class MockService {
       payloadHash: `mock_dispute_note_hash_${Date.now()}`,
       status: "CONFIRMED",
       txHash,
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+      explorerUrl: null,
       error: null,
       retryCount: 0,
       createdAt: new Date().toISOString(),
@@ -524,7 +524,7 @@ class MockService {
         payloadHash: `mock_resolved_amount_hash_${agreedAmount}`,
         status: "CONFIRMED",
         txHash,
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+        explorerUrl: null,
         error: null,
         retryCount: 0,
         createdAt: new Date().toISOString(),
@@ -571,7 +571,7 @@ class MockService {
         payloadHash: `mock_refund_hash_${amount}`,
         status: "CONFIRMED",
         txHash,
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+        explorerUrl: null,
         error: null,
         retryCount: 0,
         createdAt: new Date().toISOString(),
@@ -597,7 +597,7 @@ class MockService {
     tx.retryCount += 1;
     tx.error = null;
     tx.txHash = `mock_testnet_tx_retried_${Math.random().toString(16).slice(2, 8)}`;
-    tx.explorerUrl = `https://stellar.expert/explorer/testnet/tx/${tx.txHash}`;
+    tx.explorerUrl = null;
 
     this.persist();
     return tx;
@@ -649,7 +649,7 @@ class MockService {
         t.error = null;
         if (!t.txHash) {
           t.txHash = `mock_testnet_tx_flushed_${Math.random().toString(16).slice(2, 8)}`;
-          t.explorerUrl = `https://stellar.expert/explorer/testnet/tx/${t.txHash}`;
+          t.explorerUrl = null;
         }
         count++;
       }

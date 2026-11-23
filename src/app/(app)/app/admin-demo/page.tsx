@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { AppNavbar } from "@/components/app/app-navbar";
 import { apiClient } from "@/components/app/api-client";
@@ -13,14 +13,23 @@ export default function AdminDemoPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setPaymentMode(apiClient.getPaymentMode());
     const recs = await apiClient.getPendingRecoveries();
     setRecoveries(recs);
-  };
+  }, []);
 
   useEffect(() => {
-    loadData();
+    let ignore = false;
+    apiClient.getPendingRecoveries().then((recs) => {
+      if (!ignore) {
+        setPaymentMode(apiClient.getPaymentMode());
+        setRecoveries(recs);
+      }
+    });
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleReset = async () => {

@@ -11,7 +11,6 @@ export default function AccountRecoveryPage() {
   const [phone, setPhone] = useState("0987654321");
   const [otp, setOtp] = useState("123456");
   const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [newPasskeyCreated, setNewPasskeyCreated] = useState(false);
 
   const handleStep1 = (e: React.FormEvent) => {
@@ -28,7 +27,6 @@ export default function AccountRecoveryPage() {
     setLoading(true);
     try {
       await apiClient.submitRecovery(phone);
-      setSubmitted(true);
       setStep(4);
     } finally {
       setLoading(false);

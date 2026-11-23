@@ -8,11 +8,10 @@ import { useSession } from "@/components/app/session-context";
 import { apiClient } from "@/components/app/api-client";
 import { HashPreview } from "@/components/app/hash-preview";
 import { StepUpModal } from "@/components/app/step-up-modal";
-import { MockBadge } from "@/components/shared";
 
 export default function NewContractPage() {
   const router = useRouter();
-  const { user, role, loginAs } = useSession();
+  const { role, loginAs } = useSession();
 
   const [formData, setFormData] = useState({
     roomLabel: "Phòng 401 - Căn hộ Studio Cầu Giấy",

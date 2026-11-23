@@ -18,30 +18,27 @@ interface SessionContextType {
 const SessionContext = createContext<SessionContextType | null>(null);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(DEMO_USERS.landlord);
   const [isMock, setIsMock] = useState<boolean>(true);
   const [mounted, setMounted] = useState<boolean>(false);
 
   useEffect(() => {
-    setMounted(true);
+    let saved: SessionUser | null = null;
+    let mockVal = true;
     try {
       const savedUser = localStorage.getItem("rentflow_active_user");
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      } else {
-        // Default demo user: Landlord
-        setUser(DEMO_USERS.landlord);
-      }
-
+      if (savedUser) saved = JSON.parse(savedUser);
       const mockFlag = localStorage.getItem("rentflow_ui_mock");
-      if (mockFlag !== null) {
-        setIsMock(mockFlag === "true");
-      } else {
-        setIsMock(process.env.NEXT_PUBLIC_UI_MOCK === "true" || true);
-      }
+      if (mockFlag !== null) mockVal = mockFlag === "true";
     } catch {
-      setUser(DEMO_USERS.landlord);
+      // ignore
     }
+    const timer = setTimeout(() => {
+      if (saved) setUser(saved);
+      setIsMock(mockVal);
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const loginAs = (userKey: "landlord" | "tenant1" | "tenant2" | "admin") => {

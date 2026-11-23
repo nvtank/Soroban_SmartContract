@@ -32,6 +32,10 @@ export const DEMO_USERS: Record<string, SessionUser> = {
   },
 };
 
+/**
+ * Fixture mock transactions:
+ * Theo quy tắc trung thực: Fixture mock KHÔNG được tạo link explorer và phải hiện rõ là dữ liệu mẫu.
+ */
 export const INITIAL_ONCHAIN_TXS: OnchainTxDto[] = [
   {
     id: "tx-init-001",
@@ -40,7 +44,7 @@ export const INITIAL_ONCHAIN_TXS: OnchainTxDto[] = [
     payloadHash: "mock_doc_hash_a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0",
     status: "CONFIRMED",
     txHash: "mock_testnet_tx_create_contract_ct001_8f9a2b",
-    explorerUrl: "https://stellar.expert/explorer/testnet/tx/mock_testnet_tx_create_contract_ct001_8f9a2b",
+    explorerUrl: null, // Fixture mock: Không có link explorer thật
     error: null,
     retryCount: 0,
     createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
@@ -52,7 +56,7 @@ export const INITIAL_ONCHAIN_TXS: OnchainTxDto[] = [
     payloadHash: "mock_doc_hash_b2c3d4e5f6a17890123456789abcdef0123456789abcdef0123456789abcdef1",
     status: "CONFIRMED",
     txHash: "mock_testnet_tx_create_contract_ct002_4c5e6d",
-    explorerUrl: "https://stellar.expert/explorer/testnet/tx/mock_testnet_tx_create_contract_ct002_4c5e6d",
+    explorerUrl: null,
     error: null,
     retryCount: 0,
     createdAt: new Date(Date.now() - 3600000 * 720).toISOString(),
@@ -64,7 +68,7 @@ export const INITIAL_ONCHAIN_TXS: OnchainTxDto[] = [
     payloadHash: "mock_auth_hash_tenant_confirm_ct002_c3d4e5f6a1b2",
     status: "CONFIRMED",
     txHash: "mock_testnet_tx_tenant_confirm_ct002_9a1b2c",
-    explorerUrl: "https://stellar.expert/explorer/testnet/tx/mock_testnet_tx_tenant_confirm_ct002_9a1b2c",
+    explorerUrl: null,
     error: null,
     retryCount: 0,
     createdAt: new Date(Date.now() - 3600000 * 718).toISOString(),
@@ -76,7 +80,7 @@ export const INITIAL_ONCHAIN_TXS: OnchainTxDto[] = [
     payloadHash: "mock_payment_ref_hash_deposit_ct002_d4e5f6a1b2c3",
     status: "CONFIRMED",
     txHash: "mock_testnet_tx_deposit_paid_ct002_3f4e5a",
-    explorerUrl: "https://stellar.expert/explorer/testnet/tx/mock_testnet_tx_deposit_paid_ct002_3f4e5a",
+    explorerUrl: null,
     error: null,
     retryCount: 0,
     createdAt: new Date(Date.now() - 3600000 * 715).toISOString(),
@@ -88,7 +92,7 @@ export const INITIAL_ONCHAIN_TXS: OnchainTxDto[] = [
     payloadHash: "mock_payment_ref_hash_rent_p1_ct002_e5f6a1b2c3d4",
     status: "CONFIRMED",
     txHash: "mock_testnet_tx_rent_paid_p1_ct002_6d7e8f",
-    explorerUrl: "https://stellar.expert/explorer/testnet/tx/mock_testnet_tx_rent_paid_p1_ct002_6d7e8f",
+    explorerUrl: null,
     error: null,
     retryCount: 0,
     createdAt: new Date(Date.now() - 3600000 * 680).toISOString(),
@@ -100,7 +104,7 @@ export const INITIAL_ONCHAIN_TXS: OnchainTxDto[] = [
     payloadHash: "mock_oracle_overdue_ct002_p2_f6a1b2c3d4e5",
     status: "CONFIRMED",
     txHash: "mock_testnet_tx_mark_overdue_ct002_1a2b3c",
-    explorerUrl: "https://stellar.expert/explorer/testnet/tx/mock_testnet_tx_mark_overdue_ct002_1a2b3c",
+    explorerUrl: null,
     error: null,
     retryCount: 0,
     createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
@@ -112,7 +116,7 @@ export const INITIAL_ONCHAIN_TXS: OnchainTxDto[] = [
     payloadHash: "mock_doc_hash_c3d4e5f6a1b27890123456789abcdef0123456789abcdef0123456789abcdef2",
     status: "CONFIRMED",
     txHash: "mock_testnet_tx_create_contract_ct003_2b3c4d",
-    explorerUrl: "https://stellar.expert/explorer/testnet/tx/mock_testnet_tx_create_contract_ct003_2b3c4d",
+    explorerUrl: null,
     error: null,
     retryCount: 0,
     createdAt: new Date(Date.now() - 3600000 * 1440).toISOString(),
@@ -124,7 +128,7 @@ export const INITIAL_ONCHAIN_TXS: OnchainTxDto[] = [
     payloadHash: "mock_payment_ref_hash_deposit_ct003_a1b2c3d4e5f6",
     status: "CONFIRMED",
     txHash: "mock_testnet_tx_deposit_paid_ct003_7e8f9a",
-    explorerUrl: "https://stellar.expert/explorer/testnet/tx/mock_testnet_tx_deposit_paid_ct003_7e8f9a",
+    explorerUrl: null,
     error: null,
     retryCount: 0,
     createdAt: new Date(Date.now() - 3600000 * 1430).toISOString(),
@@ -136,7 +140,7 @@ export const INITIAL_ONCHAIN_TXS: OnchainTxDto[] = [
     payloadHash: "mock_dispute_hash_ct003_b2c3d4e5f6a1",
     status: "CONFIRMED",
     txHash: "mock_testnet_tx_open_dispute_ct003_5a6b7c",
-    explorerUrl: "https://stellar.expert/explorer/testnet/tx/mock_testnet_tx_open_dispute_ct003_5a6b7c",
+    explorerUrl: null,
     error: null,
     retryCount: 0,
     createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),

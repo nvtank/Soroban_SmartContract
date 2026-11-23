@@ -25,11 +25,16 @@ export function OnchainDrawer({
 
   useEffect(() => {
     if (isOpen) {
-      setLoading(true);
-      apiClient
-        .getOnchainTxs(contractId)
-        .then((list) => setTxs(list))
-        .finally(() => setLoading(false));
+      let ignore = false;
+      apiClient.getOnchainTxs(contractId).then((list) => {
+        if (!ignore) {
+          setTxs(list);
+          setLoading(false);
+        }
+      });
+      return () => {
+        ignore = true;
+      };
     }
   }, [contractId, isOpen]);
 
@@ -134,8 +139,11 @@ export function OnchainDrawer({
                       />
                     </div>
 
-                    <div className="font-mono text-[11px] text-ink/60 truncate">
-                      Payload: {tx.payloadHash.slice(0, 24)}…
+                    <div className="font-mono text-[11px] text-ink/60 truncate flex items-center justify-between">
+                      <span>Payload: {tx.payloadHash.slice(0, 24)}…</span>
+                      {!tx.explorerUrl && (
+                        <span className="text-[10px] text-ink/40 italic">Dữ liệu mẫu</span>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-ink/50 pt-1 border-t border-line/40">

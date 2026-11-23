@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppNavbar } from "@/components/app/app-navbar";
 import { useSession } from "@/components/app/session-context";
 import { apiClient } from "@/components/app/api-client";
@@ -10,6 +11,7 @@ import { JourneyStepper, StatusBadge, MoneyAmount, MockBadge } from "@/component
 import type { ContractSummaryDto } from "@/domain/dto";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { user, role } = useSession();
   const [contracts, setContracts] = useState<ContractSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,7 +19,7 @@ export default function DashboardPage() {
   const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "PENDING" | "DISPUTE" | "ENDED">("ALL");
   const [search, setSearch] = useState("");
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -28,10 +30,28 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [role]);
 
   useEffect(() => {
-    loadData();
+    let ignore = false;
+    apiClient
+      .getContracts(role === "TENANT" ? "TENANT" : "LANDLORD")
+      .then((data) => {
+        if (!ignore) {
+          setContracts(data);
+          setLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!ignore) {
+          setError(err instanceof Error ? err.message : "Không thể tải danh sách hợp đồng");
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, [role]);
 
   // Filtered list
@@ -215,7 +235,7 @@ export default function DashboardPage() {
               title="Không tìm thấy hợp đồng nào"
               description="Bạn chưa có hợp đồng nào trong danh mục này hoặc từ khóa tìm kiếm không khớp."
               actionLabel={role === "LANDLORD" ? "+ Tạo hợp đồng đầu tiên" : undefined}
-              onAction={role === "LANDLORD" ? () => (window.location.href = "/app/hop-dong/moi") : undefined}
+              onAction={role === "LANDLORD" ? () => router.push("/app/hop-dong/moi") : undefined}
             />
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
