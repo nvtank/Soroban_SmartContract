@@ -8,14 +8,12 @@ import { createSupabaseDomainRepository } from "@/domain/supabase-repository";
 
 export const dynamic = "force-dynamic";
 
-const overdueScanSchema = z
-  .object({
-    asOfDate: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
-      .optional(),
-  })
-  .optional();
+const overdueScanSchema = z.object({
+  asOfDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
 
 export const POST = withApi(async (request: Request) => {
   // Kiểm tra quyền: CRON_SECRET hoặc DEMO_MODE với admin
@@ -38,7 +36,7 @@ export const POST = withApi(async (request: Request) => {
 
   let body: { asOfDate?: string } | undefined;
   try {
-    body = await parseJson(request, overdueScanSchema as any);
+    body = await parseJson(request, overdueScanSchema);
   } catch {
     body = undefined;
   }

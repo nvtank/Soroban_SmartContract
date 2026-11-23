@@ -3,12 +3,13 @@ import type {
   DeductionStatus,
   DepositStatus,
   DisputeStatus,
-  JourneyStep,
-  MoneyString,
-  PaymentKind,
-  PaymentProvider,
   PaymentStatus,
   RentStatus,
+} from "@/domain/states";
+import type {
+  JourneyStep,
+  PaymentKind,
+  PaymentProvider,
   UserRole,
 } from "@/domain/dto";
 

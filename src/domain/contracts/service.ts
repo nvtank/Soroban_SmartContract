@@ -3,9 +3,17 @@ import { assertTransition, CONTRACT_TRANSITIONS } from "@/domain/states";
 import type { ContractDetailDto, ContractSummaryDto, SessionUser } from "@/domain/dto";
 import { ApiError } from "@/lib/api/http";
 import { domainI18n } from "@/i18n/sections/domain";
-import { canonicalizeContract, hashContract, newSalt } from "../hashing";
+import { hashContract, newSalt } from "../hashing";
 import type { DomainRepository, EnqueueOnchainFn, RequireStepUpFn } from "../repository";
-import { computeJourneyStep, type ContractEntity, type DepositEntity, type RentPeriodEntity } from "../types";
+import {
+  computeJourneyStep,
+  type ContractEntity,
+  type DeductionEntity,
+  type DepositEntity,
+  type DisputeEntity,
+  type ProfileEntity,
+  type RentPeriodEntity,
+} from "../types";
 
 export type CreateContractInput = {
   roomLabel: string;
@@ -429,11 +437,11 @@ function assembleContractDetail(
   contract: ContractEntity,
   deposit: DepositEntity,
   periods: RentPeriodEntity[],
-  deductions: any[],
-  dispute: any,
+  deductions: DeductionEntity[],
+  dispute: DisputeEntity | null,
   currentUserId: string,
-  landlordProfile: any,
-  tenantProfile: any,
+  landlordProfile: ProfileEntity | null,
+  tenantProfile: ProfileEntity | null,
 ): ContractDetailDto {
   const depositStatus = deposit.status;
   const disputeStatus = dispute?.status ?? "NONE";

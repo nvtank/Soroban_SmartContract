@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ApiError, ok, parseJson, withApi } from "@/lib/api/http";
+import { ok, parseJson, withApi } from "@/lib/api/http";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/supabase/server";
 import { enqueueOnchain } from "@/lib/stellar/outbox";

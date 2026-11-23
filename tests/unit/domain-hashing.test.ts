@@ -27,6 +27,7 @@ describe("domain hashing & canonicalization", () => {
     expect(salt1).toHaveLength(64);
     expect(salt2).toHaveLength(64);
     expect(salt1).not.toBe(salt2);
+    expect(saltedHash(salt1, "test-data")).toHaveLength(64);
   });
 
   it("canonicalizes contract with byte-sorted keys, normalized line breaks and NFC", () => {

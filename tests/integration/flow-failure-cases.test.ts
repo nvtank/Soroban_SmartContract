@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { confirmContract, createContract, getContractDetail } from "@/domain/contracts/service";
+import { confirmContract, createContract } from "@/domain/contracts/service";
 import { settlePayment } from "@/domain/contracts/settlement";
 import { approveRefund, requestRefund } from "@/domain/deposits/service";
 import { proposeDeduction, respondDeduction } from "@/domain/deductions/service";

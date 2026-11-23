@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { assertDepositTransition, assertTransition, RENT_TRANSITIONS } from "@/domain/states";
 import { hashPaymentRef } from "../hashing";
 import type { DomainRepository, EnqueueOnchainFn } from "../repository";
@@ -13,9 +14,15 @@ export type SettlementDeps = {
  * Được Agent E gọi sau khi đã xác định trạng thái payment (CONFIRMED hoặc UNDERPAID).
  * db có thể là DomainRepository hoặc Supabase client.
  */
-export async function settlePayment(db: any, paymentId: string, deps?: SettlementDeps): Promise<void> {
+export async function settlePayment(
+  db: SupabaseClient | DomainRepository,
+  paymentId: string,
+  deps?: SettlementDeps,
+): Promise<void> {
   const repo: DomainRepository =
-    typeof db.contracts?.findById === "function" ? db : createSupabaseDomainRepository(db);
+    "contracts" in db && typeof (db as DomainRepository).contracts?.findById === "function"
+      ? (db as DomainRepository)
+      : createSupabaseDomainRepository(db as SupabaseClient);
 
   const payment = await repo.payments.findById(paymentId);
   if (!payment) {

@@ -10,6 +10,7 @@ import type { DisputeDto, SessionUser } from "@/domain/dto";
 import { ApiError } from "@/lib/api/http";
 import { domainI18n } from "@/i18n/sections/domain";
 import type { DomainRepository, EnqueueOnchainFn, RequireStepUpFn } from "../repository";
+import type { DisputeEntity } from "../types";
 
 export type DisputeServiceDeps = {
   enqueueOnchain?: EnqueueOnchainFn;
@@ -306,7 +307,7 @@ export async function resolveDispute(
   return formatDisputeDto(updatedDispute);
 }
 
-function formatDisputeDto(dispute: any): DisputeDto {
+function formatDisputeDto(dispute: DisputeEntity): DisputeDto {
   return {
     status: dispute.status,
     openedBy: dispute.opened_by,

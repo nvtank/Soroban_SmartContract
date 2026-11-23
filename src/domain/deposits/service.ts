@@ -9,6 +9,7 @@ import type { DepositDto, SessionUser } from "@/domain/dto";
 import { ApiError } from "@/lib/api/http";
 import { domainI18n } from "@/i18n/sections/domain";
 import type { DomainRepository, EnqueueOnchainFn, RequireStepUpFn } from "../repository";
+import type { DepositEntity } from "../types";
 
 export type DepositServiceDeps = {
   enqueueOnchain?: EnqueueOnchainFn;
@@ -312,7 +313,7 @@ export async function approveRefund(
   return formatDepositDto(updated);
 }
 
-function formatDepositDto(deposit: any): DepositDto {
+function formatDepositDto(deposit: DepositEntity): DepositDto {
   return {
     status: deposit.status,
     paidAmount: deposit.paid_amount.toString(),

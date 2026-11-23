@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { confirmContract, createContract, getContractDetail } from "@/domain/contracts/service";
 import { settlePayment } from "@/domain/contracts/settlement";
-import { approveRefund, requestRefund } from "@/domain/deposits/service";
 import { proposeDeduction, respondDeduction } from "@/domain/deductions/service";
-import { openDispute, resolveDispute } from "@/domain/disputes/service";
+import { resolveDispute } from "@/domain/disputes/service";
 import { scanOverdue } from "@/domain/jobs/overdue-scan";
 import type { SessionUser } from "@/domain/dto";
-import { FakeDomainRepository } from "@/domain/repository";
+import { FakeDomainRepository, type OnchainSigner } from "@/domain/repository";
 
 describe("5-step end-to-end contract journey integration", () => {
   const landlord: SessionUser = {
@@ -40,7 +39,12 @@ describe("5-step end-to-end contract journey integration", () => {
       created_at: new Date().toISOString(),
     });
 
-    const onchainTxs: any[] = [];
+    const onchainTxs: Array<{
+      contractId: string;
+      action: string;
+      args: unknown[];
+      signer: OnchainSigner;
+    }> = [];
     const enqueueMock = vi.fn().mockImplementation(async (_repo, payload) => {
       onchainTxs.push(payload);
       return { id: `tx-${onchainTxs.length}` };
