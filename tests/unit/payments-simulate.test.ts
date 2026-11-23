@@ -5,7 +5,6 @@ import {
   simulatePaymentConfirm,
   simulatePaymentFail,
 } from "@/domain/payments/service";
-import { ApiError } from "@/lib/api/http";
 
 describe("Payment Simulate Mode (TASK mục 5)", () => {
   let repo: InMemoryPaymentRepository;

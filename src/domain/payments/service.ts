@@ -28,7 +28,6 @@ import {
   type CreateDepositPaymentInput,
   type CreateRentPaymentInput,
   paymentRowToDto,
-  type PaymentRow,
   type SimulateConfirmInput,
   type SimulateFailInput,
 } from "./types";

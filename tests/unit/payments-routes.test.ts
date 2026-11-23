@@ -142,7 +142,7 @@ describe("Payments API Route Handlers", () => {
       body: JSON.stringify(webhookPayload),
     });
 
-    const response = await webhookPost(request, {} as any);
+    const response = await webhookPost(request, {} as Record<string, never>);
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data.success).toBe(true);

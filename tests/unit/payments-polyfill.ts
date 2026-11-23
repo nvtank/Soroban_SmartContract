@@ -1,8 +1,27 @@
 /**
  * Polyfill Map.groupBy và Object.groupBy cho Node.js 20 nếu thiếu.
  */
-if (typeof (Map as any).groupBy !== "function") {
-  (Map as any).groupBy = function <K, T>(
+
+export {};
+
+declare global {
+  interface MapConstructor {
+    groupBy<K, T>(
+      items: Iterable<T>,
+      keySelector: (item: T, index: number) => K,
+    ): Map<K, T[]>;
+  }
+
+  interface ObjectConstructor {
+    groupBy<K extends PropertyKey, T>(
+      items: Iterable<T>,
+      keySelector: (item: T, index: number) => K,
+    ): Record<K, T[]>;
+  }
+}
+
+if (typeof Map.groupBy !== "function") {
+  Map.groupBy = function <K, T>(
     items: Iterable<T>,
     keySelector: (item: T, index: number) => K,
   ): Map<K, T[]> {
@@ -21,8 +40,8 @@ if (typeof (Map as any).groupBy !== "function") {
   };
 }
 
-if (typeof (Object as any).groupBy !== "function") {
-  (Object as any).groupBy = function <K extends PropertyKey, T>(
+if (typeof Object.groupBy !== "function") {
+  Object.groupBy = function <K extends PropertyKey, T>(
     items: Iterable<T>,
     keySelector: (item: T, index: number) => K,
   ): Record<K, T[]> {

@@ -213,7 +213,7 @@ describe("Payment Service - recheckPayment (Đối soát payOS)", () => {
           status: "PAID",
         }),
       },
-    } as any);
+    } as unknown as payosClientModule.PayOS);
 
     const result = await recheckPayment(payment.id, { repo, settlePaymentFn: settleMock });
     expect(result.status).toBe("CONFIRMED");
@@ -248,7 +248,7 @@ describe("Payment Service - recheckPayment (Đối soát payOS)", () => {
           status: "UNDERPAID",
         }),
       },
-    } as any);
+    } as unknown as payosClientModule.PayOS);
 
     const result = await recheckPayment(payment.id, { repo, settlePaymentFn: settleMock });
     expect(result.status).toBe("UNDERPAID");
@@ -282,9 +282,32 @@ describe("Payment Service - recheckPayment (Đối soát payOS)", () => {
           status: "CANCELLED",
         }),
       },
-    } as any);
+    } as unknown as payosClientModule.PayOS);
 
     const result = await recheckPayment(payment.id, { repo, settlePaymentFn: settleMock });
     expect(result.status).toBe("FAILED");
+  });
+
+  it("lấy chi tiết payment thành công qua getPaymentById", async () => {
+    const payment = await repo.createPayment({
+      id: "pay-get-1",
+      contract_id: "contract-1",
+      kind: "DEPOSIT",
+      period_no: null,
+      business_amount: BigInt(5000000),
+      expected_amount: BigInt(2000),
+      paid_amount: BigInt(0),
+      provider: "SIMULATED",
+      order_code: BigInt(999005),
+      status: "PENDING",
+      qr_data: null,
+      checkout_url: null,
+      is_simulated: true,
+      payment_ref_salt: "salt",
+    });
+
+    const result = await getPaymentById(payment.id, { repo });
+    expect(result.id).toBe(payment.id);
+    expect(result.contractId).toBe("contract-1");
   });
 });

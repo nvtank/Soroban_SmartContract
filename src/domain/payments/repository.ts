@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PaymentProvider } from "@/domain/dto";
 import type {
   ContractRow,
@@ -107,7 +108,7 @@ export class InMemoryPaymentRepository implements PaymentRepository {
  * Kho lưu trữ Supabase (Postgres).
  */
 export class SupabasePaymentRepository implements PaymentRepository {
-  constructor(private readonly supabase: any) {}
+  constructor(private readonly supabase: SupabaseClient) {}
 
   async getContract(contractId: string): Promise<ContractRow | null> {
     const { data, error } = await this.supabase
@@ -352,8 +353,13 @@ export class SupabasePaymentRepository implements PaymentRepository {
  */
 export async function getDefaultPaymentRepository(injectedDb?: unknown): Promise<PaymentRepository> {
   if (injectedDb) {
-    if (typeof (injectedDb as any).from === "function") {
-      return new SupabasePaymentRepository(injectedDb);
+    if (
+      typeof injectedDb === "object" &&
+      injectedDb !== null &&
+      "from" in injectedDb &&
+      typeof (injectedDb as { from: unknown }).from === "function"
+    ) {
+      return new SupabasePaymentRepository(injectedDb as SupabaseClient);
     }
     return injectedDb as PaymentRepository;
   }

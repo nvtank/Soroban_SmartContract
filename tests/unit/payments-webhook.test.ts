@@ -2,7 +2,6 @@ import "./payments-polyfill";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InMemoryPaymentRepository } from "@/domain/payments/repository";
 import { processPayOSWebhook } from "@/domain/payments/service";
-import { ApiError } from "@/lib/api/http";
 import * as payosClientModule from "@/lib/payos/client";
 
 describe("payOS Webhook Processing (TASK mục 3 & 4)", () => {

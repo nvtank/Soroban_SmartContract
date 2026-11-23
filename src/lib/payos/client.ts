@@ -11,7 +11,7 @@ import type {
 } from "@payos/node/lib/resources/webhooks/webhook";
 import { WebhookError, PayOSError } from "@payos/node/lib/core/error";
 
-export { WebhookError, PayOSError };
+export { PayOS, WebhookError, PayOSError };
 export type {
   CreatePaymentLinkRequest,
   CreatePaymentLinkResponse,
