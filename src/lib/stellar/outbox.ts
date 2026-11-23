@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { Keypair, authorizeEntry } from "@stellar/stellar-sdk";
+import { Keypair, authorizeEntry, Transaction, FeeBumpTransaction } from "@stellar/stellar-sdk";
 import type { OnchainTxDto } from "@/domain/dto";
 import { ApiError } from "@/lib/api/http";
 import type { OnchainSigner, OnchainTxRecord, OutboxDeps } from "./types";
@@ -12,21 +12,57 @@ import { buildFeeBumpTx, isFeeBumpEnabled } from "./fee-bump";
 const MAX_RETRIES = 5;
 const DEFAULT_POLL_TIMEOUT_MS = 6000;
 
-/**
- * Tạo khóa nền tảng mẫu nếu chưa có biến môi trường
- */
+type GenericDb = {
+  from?: (table: string) => {
+    insert: (record: unknown) => Promise<{ error: unknown }>;
+    select: (columns: string) => {
+      in: (
+        column: string,
+        values: string[],
+      ) => {
+        order: (
+          column: string,
+          opts: { ascending: boolean },
+        ) => {
+          limit: (n: number) => Promise<{ data: OnchainTxRecord[] | null; error: unknown }>;
+        };
+      };
+      eq: (
+        column: string,
+        value: string,
+      ) => {
+        maybeSingle: () => Promise<{ data: OnchainTxRecord | null; error: unknown }>;
+        order: (
+          column: string,
+          opts: { ascending: boolean },
+        ) => Promise<{ data: OnchainTxRecord[] | null; error: unknown }>;
+      };
+    };
+    update: (updates: unknown) => {
+      eq: (
+        column: string,
+        val: string,
+      ) => {
+        eq: (
+          col2: string,
+          val2: string,
+        ) => {
+          select: (col3: string) => Promise<{ data: Array<{ id: string }> | null; error: unknown }>;
+        };
+      } & Promise<{ error: unknown }>;
+    };
+  };
+  onchain_txs?: OnchainTxRecord[];
+};
+
 function resolvePlatformKeypair(): Keypair {
   const secret = process.env.STELLAR_PLATFORM_SECRET;
   if (secret && secret.startsWith("S") && secret.length === 56) {
     return Keypair.fromSecret(secret);
   }
-  // Khóa ngẫu nhiên cố định theo seed môi trường hoặc random
   return Keypair.random();
 }
 
-/**
- * Tạo khóa oracle mẫu nếu chưa có biến môi trường
- */
 function resolveOracleKeypair(platformKeypair: Keypair): Keypair {
   const secret = process.env.STELLAR_ORACLE_SECRET;
   if (secret && secret.startsWith("S") && secret.length === 56) {
@@ -40,7 +76,7 @@ function resolveOracleKeypair(platformKeypair: Keypair): Keypair {
  * Kiểm tra PII nghiêm ngặt trước khi ghi nhận.
  */
 export async function enqueueOnchain(
-  db: any,
+  db: unknown,
   params: {
     contractId: string;
     action: string;
@@ -81,14 +117,14 @@ export async function enqueueOnchain(
     created_at: now,
   };
 
-  // Hỗ trợ cả Supabase client lẫn in-memory mock db trong tests
-  if (typeof db?.from === "function") {
-    const { error } = await db.from("onchain_txs").insert(record);
+  const genericDb = db as GenericDb | null | undefined;
+  if (genericDb && typeof genericDb.from === "function") {
+    const { error } = await genericDb.from("onchain_txs").insert(record);
     if (error) {
       throw new ApiError("INTERNAL_ERROR", error, "Lỗi khi lưu giao dịch on-chain vào outbox");
     }
-  } else if (Array.isArray(db?.onchain_txs)) {
-    db.onchain_txs.push(record);
+  } else if (genericDb && Array.isArray(genericDb.onchain_txs)) {
+    genericDb.onchain_txs.push(record);
   }
 
   return { id };
@@ -97,13 +133,14 @@ export async function enqueueOnchain(
 /**
  * Xử lý hàng đợi onchain_txs:
  * - Claim chống xử lý trùng (chỉ claim các bản ghi PENDING)
- * - Giữ thứ tự FIFO nghiêm ngặt theo từng contract_id
+ * - Giữ thứ tự FIFO theo từng hợp đồng
+ * - Thiếu cấu hình STELLAR_CONTRACT_ID: đánh dấu FAILED ngay, không có tx_hash, giữ nguyên nghiệp vụ off-chain
  * - Đối soát giao dịch đã SUBMITTED, không submit lại mù
  * - Bounded polling phù hợp với timeout Vercel
  * - Làm sạch lỗi, không log secret
  */
 export async function flushOnchain(
-  db: any,
+  db: unknown,
   options?: { limit?: number; pollTimeoutMs?: number },
   deps?: Partial<OutboxDeps>,
 ): Promise<{ confirmed: number; failed: number }> {
@@ -118,10 +155,11 @@ export async function flushOnchain(
   let confirmed = 0;
   let failed = 0;
 
-  // 1. Lấy danh sách giao dịch chưa hoàn tất
+  const genericDb = db as GenericDb | null | undefined;
   let records: OnchainTxRecord[] = [];
-  if (typeof db?.from === "function") {
-    const { data, error } = await db
+
+  if (genericDb && typeof genericDb.from === "function") {
+    const { data, error } = await genericDb
       .from("onchain_txs")
       .select("*")
       .in("status", ["PENDING", "SUBMITTED", "FAILED"])
@@ -130,8 +168,8 @@ export async function flushOnchain(
 
     if (error) throw new ApiError("INTERNAL_ERROR", error, "Không thể đọc hàng đợi onchain_txs");
     records = data || [];
-  } else if (Array.isArray(db?.onchain_txs)) {
-    records = [...db.onchain_txs]
+  } else if (genericDb && Array.isArray(genericDb.onchain_txs)) {
+    records = [...genericDb.onchain_txs]
       .filter((r: OnchainTxRecord) => ["PENDING", "SUBMITTED", "FAILED"].includes(r.status))
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
       .slice(0, limit);
@@ -151,28 +189,26 @@ export async function flushOnchain(
 
   // Helper cập nhật DB
   async function updateRecord(id: string, updates: Partial<OnchainTxRecord>) {
-    if (typeof db?.from === "function") {
-      await db.from("onchain_txs").update(updates).eq("id", id);
-    } else if (Array.isArray(db?.onchain_txs)) {
-      const idx = db.onchain_txs.findIndex((x: OnchainTxRecord) => x.id === id);
+    if (genericDb && typeof genericDb.from === "function") {
+      await genericDb.from("onchain_txs").update(updates).eq("id", id);
+    } else if (genericDb && Array.isArray(genericDb.onchain_txs)) {
+      const idx = genericDb.onchain_txs.findIndex((x: OnchainTxRecord) => x.id === id);
       if (idx !== -1) {
-        db.onchain_txs[idx] = { ...db.onchain_txs[idx], ...updates };
+        genericDb.onchain_txs[idx] = { ...genericDb.onchain_txs[idx], ...updates };
       }
     }
   }
 
   // 3. Xử lý từng hợp đồng
-  for (const [_contractId, queue] of contractQueues.entries()) {
-    // Luôn xử lý phần tử đầu tiên chưa hoàn tất của hợp đồng
+  for (const queue of contractQueues.values()) {
     const head = queue[0];
 
-    // TRƯỜNG HỢP 1: Đầu hàng đợi là FAILED
-    // Để giữ thứ tự FIFO, không submit các giao dịch sau của cùng hợp đồng cho đến khi lỗi được giải quyết
+    // TRƯỜNG HỢP 1: Đầu hàng đợi là FAILED -> Chặn các tx sau của cùng hợp đồng
     if (head.status === "FAILED") {
       continue;
     }
 
-    // TRƯỜNG HỢP 2: Đầu hàng đợi là SUBMITTED -> Đối soát (reconciliation), không submit lại mù
+    // TRƯỜNG HỢP 2: Đầu hàng đợi là SUBMITTED -> Đối soát, không submit lại mù
     if (head.status === "SUBMITTED" && head.tx_hash) {
       const checkRes = await client.getTransaction(head.tx_hash);
       if (checkRes.status === "SUCCESS") {
@@ -188,7 +224,7 @@ export async function flushOnchain(
         failed++;
         continue;
       }
-      // Vẫn đang PENDING: tiếp tục poll trong giới hạn thời gian
+      // Vẫn đang PENDING: poll có giới hạn thời gian
       const pollRes = await client.pollTransaction(head.tx_hash, pollTimeout, 1000);
       if (pollRes.status === "SUCCESS") {
         await updateRecord(head.id, { status: "CONFIRMED", error: null });
@@ -200,12 +236,23 @@ export async function flushOnchain(
         });
         failed++;
       }
-      // Nếu timeout hết mà vẫn PENDING: giữ nguyên trạng thái SUBMITTED, chờ lần flush tiếp theo
       continue;
     }
 
     // TRƯỜNG HỢP 3: Đầu hàng đợi là PENDING
     if (head.status === "PENDING") {
+      // Yêu cầu (2): Kiểm tra cấu hình Stellar. Nếu thiếu STELLAR_CONTRACT_ID -> đánh dấu FAILED,
+      // tuyệt đối không có tx_hash, giữ nguyên nghiệp vụ off-chain và cho phép retry sau.
+      if (!client.getContractId()) {
+        await updateRecord(head.id, {
+          status: "FAILED",
+          error: "Hệ thống blockchain chưa được cấu hình (thiếu STELLAR_CONTRACT_ID). Vui lòng thử lại sau.",
+          tx_hash: null,
+        });
+        failed++;
+        continue;
+      }
+
       // Kiểm tra số lần thử lại tối đa
       if (head.retry_count >= MAX_RETRIES) {
         await updateRecord(head.id, {
@@ -218,8 +265,8 @@ export async function flushOnchain(
 
       // Claim giao dịch để chống xử lý trùng (chỉ update khi status vẫn là PENDING)
       let claimSuccess = false;
-      if (typeof db?.from === "function") {
-        const { data, error } = await db
+      if (genericDb && typeof genericDb.from === "function") {
+        const { data, error } = await genericDb
           .from("onchain_txs")
           .update({
             status: "SUBMITTED",
@@ -234,7 +281,6 @@ export async function flushOnchain(
           claimSuccess = true;
         }
       } else {
-        // Mock in-memory
         if (head.status === "PENDING") {
           head.status = "SUBMITTED";
           head.retry_count += 1;
@@ -289,12 +335,11 @@ export async function flushOnchain(
         transaction.sign(platformKeypair);
 
         // Kiểm tra xem có bật Fee-Bump (CAP-0015, P1) hay không
-        let txToSubmit: any = transaction;
+        let txToSubmit: Transaction | FeeBumpTransaction = transaction;
         if (isFeeBumpEnabled()) {
           try {
             txToSubmit = buildFeeBumpTx(transaction, platformKeypair, client.getNetworkPassphrase());
           } catch {
-            // Fallback an toàn về transaction trực tiếp nếu fee-bump không áp dụng
             txToSubmit = transaction;
           }
         }
@@ -325,7 +370,6 @@ export async function flushOnchain(
           });
           failed++;
         }
-        // Nếu timeout: giữ trạng thái SUBMITTED để lần flush tiếp theo đối soát
       } catch (err) {
         await updateRecord(head.id, {
           status: "FAILED",
@@ -344,21 +388,22 @@ export async function flushOnchain(
  * Chuyển trạng thái từ FAILED về PENDING và xóa lỗi cũ.
  */
 export async function retryOnchainTx(
-  db: any,
+  db: unknown,
   txId: string,
   deps?: Partial<OutboxDeps>,
 ): Promise<OnchainTxDto> {
+  const genericDb = db as GenericDb | null | undefined;
   let record: OnchainTxRecord | null = null;
 
-  if (typeof db?.from === "function") {
-    const { data, error } = await db.from("onchain_txs").select("*").eq("id", txId).maybeSingle();
+  if (genericDb && typeof genericDb.from === "function") {
+    const { data, error } = await genericDb.from("onchain_txs").select("*").eq("id", txId).maybeSingle();
 
     if (error || !data) {
       throw new ApiError("NOT_FOUND", { txId }, "Không tìm thấy giao dịch on-chain");
     }
     record = data;
-  } else if (Array.isArray(db?.onchain_txs)) {
-    record = db.onchain_txs.find((x: OnchainTxRecord) => x.id === txId) || null;
+  } else if (genericDb && Array.isArray(genericDb.onchain_txs)) {
+    record = genericDb.onchain_txs.find((x: OnchainTxRecord) => x.id === txId) || null;
     if (!record) {
       throw new ApiError("NOT_FOUND", { txId }, "Không tìm thấy giao dịch on-chain");
     }
@@ -376,31 +421,29 @@ export async function retryOnchainTx(
     );
   }
 
-  // Đổi trạng thái sang PENDING để worker xử lý lại
   const updates: Partial<OnchainTxRecord> = {
     status: "PENDING",
     error: null,
   };
 
-  if (typeof db?.from === "function") {
-    const { error: updateErr } = await db.from("onchain_txs").update(updates).eq("id", txId);
+  if (genericDb && typeof genericDb.from === "function") {
+    const { error: updateErr } = await genericDb.from("onchain_txs").update(updates).eq("id", txId);
     if (updateErr) {
       throw new ApiError("INTERNAL_ERROR", updateErr, "Không thể cập nhật trạng thái thử lại");
     }
-  } else if (Array.isArray(db?.onchain_txs)) {
-    const idx = db.onchain_txs.findIndex((x: OnchainTxRecord) => x.id === txId);
+  } else if (genericDb && Array.isArray(genericDb.onchain_txs)) {
+    const idx = genericDb.onchain_txs.findIndex((x: OnchainTxRecord) => x.id === txId);
     if (idx !== -1) {
-      db.onchain_txs[idx] = { ...db.onchain_txs[idx], ...updates };
+      genericDb.onchain_txs[idx] = { ...genericDb.onchain_txs[idx], ...updates };
     }
   }
 
   record = { ...record, ...updates };
 
-  // Có thể kích hoạt flush nhanh
   try {
     await flushOnchain(db, { limit: 5, pollTimeoutMs: 3000 }, deps);
   } catch {
-    // Không chặn nếu flush nhanh chưa xong, worker nền sẽ xử lý tiếp
+    // Background worker sẽ tiếp tục xử lý
   }
 
   return {
@@ -420,15 +463,12 @@ export async function retryOnchainTx(
 /**
  * Lấy danh sách giao dịch on-chain của hợp đồng dưới dạng OnchainTxDto (đã khử PII và thêm explorerUrl).
  */
-export async function getContractOnchainTxs(
-  db: any,
-  contractId: string,
-  _deps?: Partial<OutboxDeps>,
-): Promise<OnchainTxDto[]> {
+export async function getContractOnchainTxs(db: unknown, contractId: string): Promise<OnchainTxDto[]> {
+  const genericDb = db as GenericDb | null | undefined;
   let list: OnchainTxRecord[] = [];
 
-  if (typeof db?.from === "function") {
-    const { data, error } = await db
+  if (genericDb && typeof genericDb.from === "function") {
+    const { data, error } = await genericDb
       .from("onchain_txs")
       .select("*")
       .eq("contract_id", contractId)
@@ -438,8 +478,8 @@ export async function getContractOnchainTxs(
       throw new ApiError("INTERNAL_ERROR", error, "Lỗi khi lấy danh sách giao dịch on-chain");
     }
     list = data || [];
-  } else if (Array.isArray(db?.onchain_txs)) {
-    list = db.onchain_txs
+  } else if (genericDb && Array.isArray(genericDb.onchain_txs)) {
+    list = genericDb.onchain_txs
       .filter((x: OnchainTxRecord) => x.contract_id === contractId)
       .sort((a: OnchainTxRecord, b: OnchainTxRecord) => a.created_at.localeCompare(b.created_at));
   }

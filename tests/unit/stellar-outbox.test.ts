@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Keypair } from "@stellar/stellar-sdk";
 import { enqueueOnchain, flushOnchain, retryOnchainTx, getContractOnchainTxs } from "@/lib/stellar/outbox";
-import { MockStellarRpcClient } from "@/lib/stellar/client";
+import { getStellarClient } from "@/lib/stellar/client";
+import { MockStellarRpcClient } from "../helpers/mock-rpc";
 import { ApiError } from "@/lib/api/http";
-import type { OnchainTxRecord } from "@/lib/stellar/types";
+import type { OnchainTxRecord, OutboxDeps } from "@/lib/stellar/types";
 
 describe("Stellar Outbox & Queue Manager", () => {
   let mockDb: { onchain_txs: OnchainTxRecord[] };
@@ -21,11 +22,15 @@ describe("Stellar Outbox & Queue Manager", () => {
     mockClient = new MockStellarRpcClient();
   });
 
-  const getDeps = () => ({
+  const getDeps = (): Partial<OutboxDeps> => ({
     stellarClient: mockClient,
     getPlatformKeypair: () => platformKey,
     getOracleKeypair: () => oracleKey,
-    withCustodyKeypair: async (_db: any, _userId: string, fn: (kp: Keypair) => Promise<any>) => {
+    withCustodyKeypair: async <T>(
+      _db: unknown,
+      _userId: string,
+      fn: (kp: Keypair) => Promise<T>,
+    ): Promise<T> => {
       return fn(Keypair.random());
     },
   });
@@ -221,6 +226,33 @@ describe("Stellar Outbox & Queue Manager", () => {
       expect(tx.error).not.toContain("SCQXYZAAABBBCCCDDDEEEFFFGGGHHHIIIJJJKKKLLLMMMNNNOOOPPPQQQ");
       expect(tx.error).toContain("[REDACTED_SECRET]");
     });
+
+    it("khi thiếu STELLAR_CONTRACT_ID thì flushOnchain đánh dấu FAILED, tx_hash là null, không bao giờ sang CONFIRMED", async () => {
+      const unconfiguredClient = getStellarClient({ contractId: "" });
+      await enqueueOnchain(mockDb, {
+        contractId: dummyUUID,
+        action: "tenant_confirm",
+        args: { id: dummyUUID, tenant: dummyAddrTenant },
+        signer: { kind: "USER", userId: "user-tenant" },
+      });
+
+      const res = await flushOnchain(mockDb, {}, { ...getDeps(), stellarClient: unconfiguredClient });
+      expect(res.confirmed).toBe(0);
+      expect(res.failed).toBe(1);
+
+      const tx = mockDb.onchain_txs[0];
+      expect(tx.status).toBe("FAILED");
+      expect(tx.tx_hash).toBeNull();
+      expect(tx.error).toContain("STELLAR_CONTRACT_ID");
+
+      // Thử lại giao dịch thành công (chuyển PENDING hoặc FAILED nếu flush nhanh chạy, không có tx_hash)
+      const retried = await retryOnchainTx(mockDb, tx.id, {
+        ...getDeps(),
+        stellarClient: unconfiguredClient,
+      });
+      expect(["PENDING", "FAILED"]).toContain(retried.status);
+      expect(retried.txHash).toBeNull();
+    });
   });
 
   describe("retryOnchainTx", () => {
@@ -284,8 +316,9 @@ describe("Stellar Outbox & Queue Manager", () => {
       expect(list[0].id).toBe("tx-1");
       expect(list[0].status).toBe("CONFIRMED");
       expect(list[0].explorerUrl).toContain("abc12345");
-      expect((list[0] as any).args).toBeUndefined(); // Không lộ args nội bộ
-      expect((list[0] as any).signer).toBeUndefined();
+      const first = list[0] as unknown as Record<string, unknown>;
+      expect(first.args).toBeUndefined(); // Không lộ args nội bộ
+      expect(first.signer).toBeUndefined();
     });
   });
 });

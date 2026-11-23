@@ -52,7 +52,7 @@ export const POST = withApi(async (request: Request) => {
   }
 
   // 3. Lấy db client
-  let db: any = null;
+  let db: unknown = null;
   try {
     const adminMod = await import("@/lib/supabase/admin");
     if (typeof adminMod.createAdminSupabase === "function") {

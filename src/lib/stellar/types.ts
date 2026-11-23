@@ -1,5 +1,4 @@
 import type { OnchainTxStatus } from "@/domain/states";
-import type { OnchainTxDto } from "@/domain/dto";
 import type { Keypair, Transaction, FeeBumpTransaction, xdr } from "@stellar/stellar-sdk";
 
 export type OnchainSigner = { kind: "USER"; userId: string } | { kind: "ORACLE" } | { kind: "PLATFORM" };
@@ -40,7 +39,6 @@ export type StellarRpcConfig = {
   adminSecret?: string;
   explorerTxUrl?: string;
   friendbotUrl?: string;
-  isMock?: boolean;
 };
 
 export type SubmitResult = {
@@ -57,7 +55,6 @@ export type TxStatusResult = {
 };
 
 export interface StellarRpcClient {
-  isMock(): boolean;
   getContractId(): string;
   getNetworkPassphrase(): string;
   buildAndSimulate(params: { action: string; args: xdr.ScVal[]; sourcePublicKey: string }): Promise<{
@@ -69,9 +66,15 @@ export interface StellarRpcClient {
   pollTransaction(txHash: string, timeoutMs?: number, intervalMs?: number): Promise<TxStatusResult>;
 }
 
+export type CustodySignerCallback = <T>(
+  db: unknown,
+  userId: string,
+  fn: (keypair: Keypair) => Promise<T>,
+) => Promise<T>;
+
 export type OutboxDeps = {
   stellarClient?: StellarRpcClient;
-  withCustodyKeypair?: <T>(db: any, userId: string, fn: (keypair: Keypair) => Promise<T>) => Promise<T>;
+  withCustodyKeypair?: CustodySignerCallback;
   getPlatformKeypair?: () => Keypair;
   getOracleKeypair?: () => Keypair;
   now?: () => Date;

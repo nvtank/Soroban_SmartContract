@@ -45,7 +45,7 @@ function hashToBytes32(hash: string, fieldName: string): xdr.ScVal {
 function addressToScVal(addr: string, fieldName: string): xdr.ScVal {
   try {
     return new Address(addr).toScVal();
-  } catch (err) {
+  } catch {
     throw new ApiError("VALIDATION_ERROR", { field: fieldName }, `Invalid Stellar address: ${addr}`);
   }
 }
@@ -76,7 +76,7 @@ function u64ToScVal(num: bigint | number | string, fieldName: string): xdr.ScVal
   }
 }
 
-function boolToScVal(b: boolean | string | number, fieldName: string): xdr.ScVal {
+function boolToScVal(b: boolean | string | number): xdr.ScVal {
   const val = Boolean(b);
   return nativeToScVal(val, { type: "bool" });
 }
@@ -229,7 +229,7 @@ export function encodeContractArgs(
       const id = Array.isArray(args) ? args[0] : args.id;
       const tenant = Array.isArray(args) ? args[1] : args.tenant;
       const accept = Array.isArray(args) ? args[2] : args.accept;
-      return [uuidToBytes16(id), addressToScVal(tenant, "tenant"), boolToScVal(accept, "accept")];
+      return [uuidToBytes16(id), addressToScVal(tenant, "tenant"), boolToScVal(accept)];
     }
 
     case "open_dispute": {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { encodeContractArgs, getRequiredSignerKind, SOROBAN_ACTIONS } from "@/lib/stellar/abi";
+import { encodeContractArgs, getRequiredSignerKind } from "@/lib/stellar/abi";
 import { ApiError } from "@/lib/api/http";
 
 describe("Stellar ABI Argument Encoding", () => {

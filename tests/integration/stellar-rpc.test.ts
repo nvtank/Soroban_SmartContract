@@ -1,17 +1,30 @@
 import { describe, it, expect } from "vitest";
-import { getStellarClient, MockStellarRpcClient } from "@/lib/stellar/client";
+import { getStellarClient } from "@/lib/stellar/client";
+import { MockStellarRpcClient } from "../helpers/mock-rpc";
 import { getExplorerTxUrl, fundWithFriendbot } from "@/lib/stellar/explorer";
 import { encodeContractArgs } from "@/lib/stellar/abi";
 
 describe("Stellar RPC Client & Explorer Integration", () => {
-  describe("getStellarClient fallback behavior", () => {
-    it("tự động dùng MockStellarRpcClient khi chưa có STELLAR_CONTRACT_ID", () => {
-      const client = getStellarClient({ isMock: true });
-      expect(client.isMock()).toBe(true);
-      expect(client.getContractId()).toBeDefined();
+  describe("getStellarClient configuration behavior", () => {
+    it("báo lỗi khi build giao dịch mà chưa có STELLAR_CONTRACT_ID", async () => {
+      const client = getStellarClient({ contractId: "" });
+      expect(client.getContractId()).toBe("");
+
+      const scVals = encodeContractArgs("tenant_confirm", {
+        id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        tenant: "GAH4YJWAPLQUY6KXV6CBFEQLK7GN4VKBQ6RMKY26UTEPDTNV7EIZDOFK",
+      });
+
+      await expect(
+        client.buildAndSimulate({
+          action: "tenant_confirm",
+          args: scVals,
+          sourcePublicKey: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+        }),
+      ).rejects.toThrow("Chưa cấu hình STELLAR_CONTRACT_ID");
     });
 
-    it("Mock client hỗ trợ build, simulate, submit và poll giao dịch", async () => {
+    it("Mock client hỗ trợ build, simulate, submit và poll giao dịch trong tests", async () => {
       const client = new MockStellarRpcClient();
       const scVals = encodeContractArgs("tenant_confirm", {
         id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",

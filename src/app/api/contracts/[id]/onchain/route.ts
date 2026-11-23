@@ -1,6 +1,22 @@
 import { withApi, ok, ApiError } from "@/lib/api/http";
 import { getContractOnchainTxs } from "@/lib/stellar";
-import type { SessionUser } from "@/domain/dto";
+import type { SessionUser, UserRole } from "@/domain/dto";
+
+type ContractCheckDb = {
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (
+        column: string,
+        value: string,
+      ) => {
+        maybeSingle: () => Promise<{
+          data: { id: string; landlord_id: string; tenant_id: string } | null;
+          error: unknown;
+        }>;
+      };
+    };
+  };
+};
 
 export const GET = withApi(async (request: Request, context: { params: Promise<{ id: string }> }) => {
   const { id } = await context.params;
@@ -18,7 +34,7 @@ export const GET = withApi(async (request: Request, context: { params: Promise<{
   } catch {
     // Fallback cho test / mock nếu module Agent B chưa merge trên nhánh này
     const testUserId = request.headers.get("x-test-user-id");
-    const testUserRole = (request.headers.get("x-test-user-role") || "LANDLORD") as any;
+    const testUserRole = (request.headers.get("x-test-user-role") || "LANDLORD") as UserRole;
     if (testUserId) {
       user = {
         id: testUserId,
@@ -34,7 +50,7 @@ export const GET = withApi(async (request: Request, context: { params: Promise<{
   }
 
   // Lấy admin database client
-  let db: any = null;
+  let db: ContractCheckDb | unknown = null;
   try {
     const adminMod = await import("@/lib/supabase/admin");
     if (typeof adminMod.createAdminSupabase === "function") {
@@ -45,8 +61,9 @@ export const GET = withApi(async (request: Request, context: { params: Promise<{
   }
 
   // Kiểm tra quyền trên hợp đồng
-  if (db && typeof db.from === "function") {
-    const { data: contract, error } = await db
+  const contractDb = db as ContractCheckDb | null;
+  if (contractDb && typeof contractDb.from === "function") {
+    const { data: contract, error } = await contractDb
       .from("rental_contracts")
       .select("id, landlord_id, tenant_id")
       .eq("id", id)

@@ -63,18 +63,18 @@ describe("Stellar On-chain Route Handlers", () => {
   });
 
   describe("POST /api/jobs/flush-onchain", () => {
-    const originalCronSecret = process.env.CRON_SECRET;
-
     beforeEach(() => {
       process.env.CRON_SECRET = "super-secret-cron-key";
     });
+
+    const dummyContext = {} as unknown as { params: Promise<Record<string, string>> };
 
     it("trả về 403 khi gọi job mà không có CRON_SECRET hợp lệ", async () => {
       const req = new Request("http://localhost/api/jobs/flush-onchain", {
         method: "POST",
       });
 
-      const res = await flushOnchainJob(req, {} as any);
+      const res = await flushOnchainJob(req, dummyContext);
       expect(res.status).toBe(403);
     });
 
@@ -86,7 +86,7 @@ describe("Stellar On-chain Route Handlers", () => {
         },
       });
 
-      const res = await flushOnchainJob(req, {} as any);
+      const res = await flushOnchainJob(req, dummyContext);
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.data).toHaveProperty("confirmed");
@@ -101,7 +101,7 @@ describe("Stellar On-chain Route Handlers", () => {
         },
       });
 
-      const res = await flushOnchainJob(req, {} as any);
+      const res = await flushOnchainJob(req, dummyContext);
       expect(res.status).toBe(200);
     });
   });

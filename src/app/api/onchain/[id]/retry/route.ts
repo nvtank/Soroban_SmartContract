@@ -1,6 +1,6 @@
 import { withApi, ok, ApiError } from "@/lib/api/http";
 import { retryOnchainTx } from "@/lib/stellar";
-import type { SessionUser } from "@/domain/dto";
+import type { SessionUser, UserRole } from "@/domain/dto";
 
 export const POST = withApi(async (request: Request, context: { params: Promise<{ id: string }> }) => {
   const { id } = await context.params;
@@ -17,7 +17,7 @@ export const POST = withApi(async (request: Request, context: { params: Promise<
     }
   } catch {
     const testUserId = request.headers.get("x-test-user-id");
-    const testUserRole = (request.headers.get("x-test-user-role") || "LANDLORD") as any;
+    const testUserRole = (request.headers.get("x-test-user-role") || "LANDLORD") as UserRole;
     if (testUserId) {
       user = {
         id: testUserId,
@@ -33,7 +33,7 @@ export const POST = withApi(async (request: Request, context: { params: Promise<
   }
 
   // Lấy admin database client
-  let db: any = null;
+  let db: unknown = null;
   try {
     const adminMod = await import("@/lib/supabase/admin");
     if (typeof adminMod.createAdminSupabase === "function") {
