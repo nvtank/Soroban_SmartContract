@@ -66,4 +66,6 @@ pub enum Error {
     DisputeAmountMismatch = 14,
     InvalidDueDay = 15,
     Overflow = 16,
+    DuplicatePaymentRef = 17,
+    SamePartyNotAllowed = 18,
 }
