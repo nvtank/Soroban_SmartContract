@@ -58,7 +58,7 @@ export function MagneticButton({
   };
 
   const commonProps = {
-    ref: (node: any) => {
+    ref: (node: HTMLButtonElement | HTMLAnchorElement | null) => {
       containerRef.current = node;
     },
     onMouseMove: handleMouseMove,

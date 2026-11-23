@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { marketingVi } from "@/i18n/sections/marketing";
 import { FACTS } from "@/content/facts";
 import { vi } from "@/i18n/vi";

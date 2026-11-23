@@ -1,6 +1,6 @@
 import { OnchainProofChip } from "@/components/shared/OnchainProofChip";
 import { marketingVi } from "@/i18n/sections/marketing";
-import { ExternalLink, DatabaseZap } from "lucide-react";
+import { DatabaseZap } from "lucide-react";
 import type { OnchainTxStatus } from "@/domain/states";
 
 export type OnchainTxItem = {

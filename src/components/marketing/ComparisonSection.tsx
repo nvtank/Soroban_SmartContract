@@ -1,5 +1,5 @@
 import { marketingVi } from "@/i18n/sections/marketing";
-import { Check, ShieldCheck, Sparkles } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
 
 export function ComparisonSection() {
   const comparison = marketingVi.chapter05;

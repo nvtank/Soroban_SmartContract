@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { marketingVi } from "@/i18n/sections/marketing";
-import { vi } from "@/i18n/vi";
 import { HeroKeyAnimation } from "@/components/motion/HeroKeyAnimation";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { ArrowRight, ShieldCheck, PlayCircle } from "lucide-react";

@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { MockBadge } from "@/components/shared/MockBadge";
 import { MoneyAmount } from "@/components/shared/MoneyAmount";
-import { KeyRound, Lock, Unlock, AlertOctagon, ShieldCheck } from "lucide-react";
+import { Lock, Unlock, AlertOctagon, ShieldCheck } from "lucide-react";
 
 export type DepositSafeState = "UNPAID" | "RECORDED" | "REFUNDED" | "DISPUTE";
 

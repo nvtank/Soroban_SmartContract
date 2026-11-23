@@ -98,11 +98,8 @@ export function Navbar() {
 
   // Cập nhật vị trí gạch chân trượt (sliding underline indicator)
   useEffect(() => {
-    if (pathname === "/minh-bach") {
-      setActiveSection("minh-bach");
-    }
-
-    const activeEl = document.querySelector<HTMLElement>(`[data-nav-id="${activeSection}"]`);
+    const currentActive = pathname === "/minh-bach" ? "minh-bach" : activeSection;
+    const activeEl = document.querySelector<HTMLElement>(`[data-nav-id="${currentActive}"]`);
     const indicator = indicatorRef.current;
     if (activeEl && indicator) {
       indicator.style.width = `${activeEl.offsetWidth}px`;
@@ -202,7 +199,8 @@ export function Navbar() {
           {/* Desktop Navigation Links */}
           <nav className="relative hidden items-center gap-1 lg:flex" aria-label="Điều hướng chính">
             {NAV_ITEMS.map((item) => {
-              const isCurrent = activeSection === item.id;
+              const currentActive = pathname === "/minh-bach" ? "minh-bach" : activeSection;
+              const isCurrent = currentActive === item.id;
               return (
                 <Link
                   key={item.id}

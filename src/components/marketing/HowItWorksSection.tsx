@@ -5,7 +5,7 @@ import Link from "next/link";
 import { marketingVi } from "@/i18n/sections/marketing";
 import { JourneyStepper } from "@/components/shared/JourneyStepper";
 import { DepositSafe, type DepositSafeState } from "@/components/motion/DepositSafe";
-import { ArrowRight, ExternalLink, ShieldAlert, Sparkles, Check } from "lucide-react";
+import { ArrowRight, ShieldAlert } from "lucide-react";
 import type { JourneyStep } from "@/domain/dto";
 
 export function HowItWorksSection() {

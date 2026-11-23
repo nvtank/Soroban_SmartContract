@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { marketingVi } from "@/i18n/sections/marketing";
 import { vi } from "@/i18n/vi";
-import { ShieldCheck, ArrowUpRight, ExternalLink } from "lucide-react";
+import { ShieldCheck, ArrowUpRight } from "lucide-react";
 
 export function Footer() {
   return (

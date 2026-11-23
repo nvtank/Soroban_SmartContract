@@ -9,11 +9,9 @@ import {
   Database,
   Blocks,
   FileCheck,
-  AlertTriangle,
   Info,
   ArrowLeft,
   Cpu,
-  HelpCircle,
 } from "lucide-react";
 
 export default function TransparencyPage() {

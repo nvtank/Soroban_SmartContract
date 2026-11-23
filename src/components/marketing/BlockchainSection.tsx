@@ -4,7 +4,7 @@ import { marketingVi } from "@/i18n/sections/marketing";
 import { DataSortGame } from "@/components/motion/DataSortGame";
 import { TestnetMarquee, type OnchainTxItem } from "@/components/motion/TestnetMarquee";
 import { OnchainStamp } from "@/components/motion/OnchainStamp";
-import { Blocks, ShieldCheck, Cpu, ArrowUpRight } from "lucide-react";
+import { Cpu } from "lucide-react";
 
 export type BlockchainSectionProps = {
   transactions?: readonly OnchainTxItem[];
