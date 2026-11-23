@@ -1,10 +1,12 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vitest/config";
+import "./tests/polyfill.js";
 
 export default defineConfig({
   resolve: { alias: { "@": resolve(import.meta.dirname, "src") } },
   test: {
     environment: "node",
+    setupFiles: ["./tests/polyfill.js", "./tests/setup.ts"],
     include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"],
   },
 });
