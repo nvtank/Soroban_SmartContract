@@ -4,6 +4,9 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import type { SessionUser, UserRole } from "@/domain/dto";
 import { DEMO_USERS } from "./mock/mock-data";
 
+// Mock chỉ bật bằng biến môi trường lúc build, người dùng không tự bật được từ trình duyệt.
+const UI_MOCK = process.env.NEXT_PUBLIC_UI_MOCK === "true";
+
 interface SessionContextType {
   user: SessionUser | null;
   role: UserRole;
@@ -12,50 +15,40 @@ interface SessionContextType {
   setRole: (role: UserRole) => void;
   logout: () => void;
   isMock: boolean;
-  toggleMock: () => void;
 }
 
 const SessionContext = createContext<SessionContextType | null>(null);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(DEMO_USERS.landlord);
-  const [isMock, setIsMock] = useState<boolean>(true);
-  const [mounted, setMounted] = useState<boolean>(false);
+  const [user, setUser] = useState<SessionUser | null>(UI_MOCK ? DEMO_USERS.landlord : null);
 
   useEffect(() => {
+    if (!UI_MOCK) return;
     let saved: SessionUser | null = null;
-    let mockVal = true;
     try {
       const savedUser = localStorage.getItem("rentflow_active_user");
       if (savedUser) saved = JSON.parse(savedUser);
-      const mockFlag = localStorage.getItem("rentflow_ui_mock");
-      if (mockFlag !== null) mockVal = mockFlag === "true";
     } catch {
       // ignore
     }
     const timer = setTimeout(() => {
       if (saved) setUser(saved);
-      setIsMock(mockVal);
-      setMounted(true);
     }, 0);
     return () => clearTimeout(timer);
   }, []);
 
   const loginAs = (userKey: "landlord" | "tenant1" | "tenant2" | "admin") => {
+    if (!UI_MOCK) return;
     const selected = DEMO_USERS[userKey];
     setUser(selected);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("rentflow_active_user", JSON.stringify(selected));
-    }
+    localStorage.setItem("rentflow_active_user", JSON.stringify(selected));
   };
 
   const setRole = (newRole: UserRole) => {
-    if (!user) return;
+    if (!UI_MOCK || !user) return;
     const updated = { ...user, role: newRole };
     setUser(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("rentflow_active_user", JSON.stringify(updated));
-    }
+    localStorage.setItem("rentflow_active_user", JSON.stringify(updated));
   };
 
   const logout = () => {
@@ -65,46 +58,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const toggleMock = () => {
-    const nextVal = !isMock;
-    setIsMock(nextVal);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("rentflow_ui_mock", nextVal ? "true" : "false");
-    }
-  };
-
-  const currentRole = user?.role || "LANDLORD";
-
-  if (!mounted) {
-    return (
-      <SessionContext.Provider
-        value={{
-          user: DEMO_USERS.landlord,
-          role: "LANDLORD",
-          isLoggedIn: true,
-          loginAs,
-          setRole,
-          logout,
-          isMock: true,
-          toggleMock,
-        }}
-      >
-        {children}
-      </SessionContext.Provider>
-    );
-  }
-
   return (
     <SessionContext.Provider
       value={{
         user,
-        role: currentRole,
+        role: user?.role || "LANDLORD",
         isLoggedIn: !!user,
         loginAs,
         setRole,
         logout,
-        isMock,
-        toggleMock,
+        isMock: UI_MOCK,
       }}
     >
       {children}

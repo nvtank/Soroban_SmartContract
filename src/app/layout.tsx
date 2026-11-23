@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
+import { SiteProviders } from "@/components/layout/SiteProviders";
 import { vi } from "@/i18n/vi";
 import "./globals.css";
 
@@ -22,7 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div role="note" className="bg-ink px-4 py-2 text-center text-base text-paper">
           {vi.demo.banner}
         </div>
-        {children}
+        <SiteProviders>{children}</SiteProviders>
       </body>
     </html>
   );

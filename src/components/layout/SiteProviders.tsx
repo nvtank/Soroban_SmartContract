@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { SmoothScrollProvider } from "./SmoothScrollProvider";
 import { CustomCursor } from "@/components/motion/CustomCursor";
 import { PageTransitionOverlay } from "@/components/motion/PageTransitionOverlay";
@@ -19,7 +19,9 @@ export function SiteProviders({ children }: SiteProvidersProps) {
   return (
     <SmoothScrollProvider>
       <CustomCursor />
-      <PageTransitionOverlay />
+      <Suspense fallback={null}>
+        <PageTransitionOverlay />
+      </Suspense>
       {children}
     </SmoothScrollProvider>
   );

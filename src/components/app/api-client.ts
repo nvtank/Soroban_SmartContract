@@ -8,17 +8,7 @@ import type {
 import { mockService, type PendingRecovery } from "./mock/mock-service";
 
 export function isMockEnabled(): boolean {
-  if (process.env.NEXT_PUBLIC_UI_MOCK === "true") return true;
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("rentflow_ui_mock") === "true";
-  }
-  return false;
-}
-
-export function setMockEnabled(enabled: boolean): void {
-  if (typeof window !== "undefined") {
-    localStorage.setItem("rentflow_ui_mock", enabled ? "true" : "false");
-  }
+  return process.env.NEXT_PUBLIC_UI_MOCK === "true";
 }
 
 class ApiClient {

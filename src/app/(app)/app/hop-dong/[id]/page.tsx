@@ -891,20 +891,23 @@ function ContractDetailContent({ id }: { id: string }) {
   );
 }
 
-export default function ContractDetailPage({ params }: { params: Promise<{ id: string }> }) {
+function ResolvedContractDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  return <ContractDetailContent id={id} />;
+}
+
+export default function ContractDetailPage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <React.Suspense
       fallback={
         <div className="min-h-screen bg-paper flex flex-col">
-          <AppNavbar />
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6">
             <LoadingSkeleton lines={6} />
           </main>
         </div>
       }
     >
-      <ContractDetailContent id={id} />
+      <ResolvedContractDetail params={params} />
     </React.Suspense>
   );
 }
