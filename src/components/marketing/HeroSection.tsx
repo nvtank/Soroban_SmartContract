@@ -71,24 +71,25 @@ export function HeroSection() {
       className="relative flex min-h-[90vh] flex-col justify-center pt-32 pb-20 overflow-hidden"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
-          {/* Cột trái: Tiêu đề khổng lồ & CTA */}
+        {/* Tiêu đề khổng lồ chiếm trọn chiều ngang để không bị ngắt thành quá nhiều dòng */}
+        <div className="flex flex-col items-start">
+          <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary-strong">
+            <ShieldCheck className="h-4 w-4" />
+            <span>{marketingVi.hero.badgeIdeathon}</span>
+          </div>
+
+          <h1
+            ref={headlineRef}
+            className="mt-6 text-[length:var(--text-display)] font-extrabold leading-[1.05] tracking-tight text-ink"
+          >
+            <span>{marketingVi.hero.titleLine1}</span>{" "}
+            <span className="text-primary-strong">{marketingVi.hero.titleLine2}</span>
+          </h1>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
+          {/* Cột trái: mô tả & CTA */}
           <div className="flex flex-col items-start lg:col-span-7">
-            {/* Tagline / Track Badge */}
-            <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary-strong">
-              <ShieldCheck className="h-4 w-4" />
-              <span>{marketingVi.hero.badgeIdeathon}</span>
-            </div>
-
-            {/* H1 Chữ khổng lồ */}
-            <h1
-              ref={headlineRef}
-              className="mt-6 text-[length:var(--text-display)] font-extrabold leading-[1.05] tracking-tight text-ink"
-            >
-              <span>{marketingVi.hero.titleLine1}</span>{" "}
-              <span className="text-primary-strong">{marketingVi.hero.titleLine2}</span>
-            </h1>
-
             {/* Mô tả giải pháp */}
             <p
               ref={descRef}

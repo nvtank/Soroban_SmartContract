@@ -44,7 +44,7 @@ export function ContinuousThread() {
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-0 bottom-0 z-0 overflow-hidden opacity-40 md:opacity-60"
+      className="pointer-events-none absolute inset-x-0 top-[100vh] bottom-0 z-0 overflow-hidden opacity-40 md:opacity-60"
       aria-hidden="true"
     >
       <svg

@@ -36,7 +36,7 @@ export function JourneyStepper({ current, disputed = false, compact = false, cla
 
   if (compact) {
     return (
-      <nav aria-label="Tiến trình hợp đồng (rút gọn)" className={`flex items-center gap-1.5 ${className}`}>
+      <nav aria-label="Tiến trình hợp đồng (rút gọn)" className={`flex flex-wrap items-center gap-1.5 ${className}`}>
         {STEPS.map((step, idx) => {
           const isCurrent = step.id === current;
           const isPast = idx < currentIndex && current !== "DISPUTE";
@@ -58,7 +58,7 @@ export function JourneyStepper({ current, disputed = false, compact = false, cla
               title={`${step.stepNumber}: ${step.label}`}
             >
               <span>{step.stepNumber}</span>
-              <span className="hidden sm:inline">{step.label}</span>
+              <span className={isCurrent ? "whitespace-nowrap" : "sr-only"}>{step.label}</span>
             </div>
           );
         })}

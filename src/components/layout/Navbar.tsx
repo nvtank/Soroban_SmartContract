@@ -146,7 +146,7 @@ export function Navbar() {
     <>
       <header
         ref={navRef}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-out ${
+        className={`fixed top-[var(--demo-banner-h,2.75rem)] left-0 right-0 z-50 transition-all duration-300 ease-out ${
           isCompact ? "py-2.5 shadow-sm" : "py-4 sm:py-5"
         }`}
         style={{
@@ -190,14 +190,11 @@ export function Navbar() {
               >
                 {vi.brand.name}
               </span>
-              <span className="hidden text-[10px] font-semibold text-primary-strong sm:inline tracking-wider uppercase">
-                Custody & Soroban
-              </span>
             </div>
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="relative hidden items-center gap-1 lg:flex" aria-label="Điều hướng chính">
+          <nav className="relative hidden items-center gap-1 xl:flex" aria-label="Điều hướng chính">
             {NAV_ITEMS.map((item) => {
               const currentActive = pathname === "/minh-bach" ? "minh-bach" : activeSection;
               const isCurrent = currentActive === item.id;
@@ -206,7 +203,7 @@ export function Navbar() {
                   key={item.id}
                   href={item.href}
                   data-nav-id={item.id}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-semibold transition-colors ${
                     isCurrent ? "text-primary-strong font-bold" : "text-ink/75 hover:text-ink"
                   }`}
                   data-cursor-hover="true"
@@ -227,7 +224,7 @@ export function Navbar() {
           <div className="flex items-center gap-3">
             <MagneticButton
               href="/dang-nhap?demo=landlord"
-              className="hidden sm:inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-bold text-paper shadow-sm transition-colors hover:bg-primary-strong focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              className="hidden sm:inline-flex whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-bold text-paper shadow-sm transition-colors hover:bg-primary-strong focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               ariaLabel={marketingVi.nav.tryDemo}
             >
               <span>{marketingVi.nav.tryDemo}</span>
@@ -238,7 +235,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface/80 text-ink lg:hidden focus-visible:ring-2 focus-visible:ring-primary"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface/80 text-ink xl:hidden focus-visible:ring-2 focus-visible:ring-primary"
               aria-label={mobileMenuOpen ? marketingVi.nav.closeMenu : marketingVi.nav.openMenu}
               aria-expanded={mobileMenuOpen}
               data-cursor-hover="true"
@@ -260,7 +257,7 @@ export function Navbar() {
       {/* Fullscreen Glass Mobile Menu */}
       <div
         ref={mobileMenuRef}
-        className="fixed inset-0 z-40 hidden flex-col justify-between px-6 pt-28 pb-10 text-ink lg:hidden"
+        className="fixed inset-0 z-40 hidden flex-col justify-between px-6 pt-44 pb-10 text-ink xl:hidden"
         style={{
           backgroundColor: "rgba(251, 248, 243, 0.94)",
           backdropFilter: "blur(24px)",

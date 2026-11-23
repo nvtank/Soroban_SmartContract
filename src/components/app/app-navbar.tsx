@@ -37,7 +37,7 @@ export function AppNavbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-[rgba(251,248,243,0.85)] border-b border-line shadow-xs">
+    <header className="sticky top-[var(--demo-banner-h,2.75rem)] z-40 w-full backdrop-blur-xl bg-[rgba(251,248,243,0.85)] border-b border-line shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Left: Brand & Links */}
         <div className="flex items-center gap-6">
@@ -50,7 +50,7 @@ export function AppNavbar() {
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-4 text-sm font-medium">
+          <nav className="hidden xl:flex items-center gap-1 whitespace-nowrap text-sm font-medium">
             <Link
               href="/app"
               className={`px-3 py-1.5 rounded-lg transition-colors ${
@@ -196,7 +196,7 @@ export function AppNavbar() {
           {/* Mobile hamburger */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg text-ink/70 hover:bg-surface"
+            className="xl:hidden p-2 rounded-lg text-ink/70 hover:bg-surface"
             aria-label="Mở menu di động"
           >
             ☰
@@ -206,7 +206,7 @@ export function AppNavbar() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-line bg-paper px-4 py-3 space-y-2">
+        <div className="xl:hidden border-t border-line bg-paper px-4 py-3 space-y-2">
           <Link
             href="/app"
             onClick={() => setMobileMenuOpen(false)}

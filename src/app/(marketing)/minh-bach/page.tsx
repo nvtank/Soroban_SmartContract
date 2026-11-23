@@ -36,9 +36,9 @@ export default function TransparencyPage() {
 
       {/* Header trang Minh bạch */}
       <div className="mt-8">
-        <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1 text-xs font-bold text-primary-strong w-max">
-          <ShieldCheck className="h-4 w-4" />
-          <span>Tiêu chuẩn Đạo đức Blockchain & AI (40% tiêu chí chấm)</span>
+        <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1 text-xs font-bold text-primary-strong w-fit max-w-full">
+          <ShieldCheck className="h-4 w-4 shrink-0" />
+          <span>Tiêu chuẩn Đạo đức Blockchain & AI</span>
         </div>
         <h1 className="mt-4 text-[length:var(--text-section)] font-extrabold leading-tight text-ink">
           {trans.pageTitle}

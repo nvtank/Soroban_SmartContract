@@ -124,7 +124,7 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {role === "LANDLORD" && (
               <Link
                 href="/app/hop-dong/moi"

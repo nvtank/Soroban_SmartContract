@@ -209,7 +209,7 @@ export const INITIAL_CONTRACTS: ContractDetailDto[] = [
     myRole: "LANDLORD",
     lateFeeBpsPerDay: 20, // 0.2%/ngày
     termsText:
-      "Tiền điện nước theo giá nhà nước. Cọc bảo chứng 12.000.000 ₫ được giữ trung lập trên RentFlow. Chậm nộp tiền thuê tính phí phạt 0.2%/ngày.",
+      "Tiền điện nước theo giá nhà nước. Cọc bảo chứng 12.000.000 ₫ được giữ trung lập (mô phỏng) trên RentFlow. Chậm nộp tiền thuê tính phí phạt 0.2%/ngày.",
     docHash: "mock_doc_hash_b2c3d4e5f6a17890123456789abcdef0123456789abcdef0123456789abcdef1",
     deposit: {
       status: "RECORDED",

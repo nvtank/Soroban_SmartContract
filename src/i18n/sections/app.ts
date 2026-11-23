@@ -1,4 +1,5 @@
 export const appI18n = {
+  mockPreview: "Bản xem trước giao diện: toàn bộ dữ liệu là mẫu, chưa kết nối máy chủ và chưa ghi lên blockchain.",
   nav: {
     dashboard: "Bảng điều khiển",
     newContract: "Tạo hợp đồng mới",
