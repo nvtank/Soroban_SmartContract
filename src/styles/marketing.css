@@ -1,0 +1,135 @@
+/* CSS cho khu vực Marketing & Landing của RentFlow */
+
+/* Hiệu ứng hạt giấy (Paper Noise / Subtle Grain) */
+.paper-grain {
+  background-image: radial-gradient(rgba(20, 33, 61, 0.04) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+/* Con trỏ tùy biến (Custom Cursor) */
+.custom-cursor-follower {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background-color: var(--primary);
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              height 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.25s ease,
+              opacity 0.25s ease;
+  mix-blend-mode: multiply;
+}
+
+.custom-cursor-dot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: var(--ink);
+  pointer-events: none;
+  z-index: 10000;
+  transform: translate(-50%, -50%);
+}
+
+.custom-cursor-hover {
+  width: 56px;
+  height: 56px;
+  opacity: 0.2;
+  background-color: var(--primary-strong);
+}
+
+@media (hover: none) or (pointer: coarse) {
+  .custom-cursor-follower,
+  .custom-cursor-dot {
+    display: none !important;
+  }
+}
+
+/* Băng chạy Marquee */
+@keyframes marqueeScroll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marqueeScroll 28s linear infinite;
+}
+
+.animate-marquee-track:hover {
+  animation-play-state: paused;
+}
+
+/* 3D Perspective cho thẻ Nỗi đau */
+.perspective-card-container {
+  perspective: 1000px;
+}
+
+.tilt-card {
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.2s ease;
+  will-change: transform;
+}
+
+/* Con dấu ON-CHAIN Stamp Animation */
+@keyframes stampDrop {
+  0% {
+    opacity: 0;
+    transform: scale(2.2) rotate(-14deg);
+  }
+  60% {
+    opacity: 0.95;
+    transform: scale(0.92) rotate(-8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-8deg);
+  }
+}
+
+.animate-stamp {
+  animation: stampDrop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Két cọc (Deposit Safe) */
+.safe-door {
+  transform-origin: left center;
+  transition: transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.safe-door.open {
+  transform: rotateY(-75deg);
+}
+
+/* Sợi chỉ Continuous Thread */
+.thread-glow {
+  filter: drop-shadow(0 0 6px rgba(15, 139, 109, 0.3));
+}
+
+/* Hỗ trợ Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee-track {
+    animation: none !important;
+    overflow-x: auto;
+  }
+  .tilt-card {
+    transform: none !important;
+  }
+  .animate-stamp {
+    animation: none !important;
+    transform: rotate(-6deg);
+    opacity: 1;
+  }
+}
