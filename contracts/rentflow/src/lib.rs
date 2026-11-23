@@ -475,6 +475,11 @@ impl RentFlowContract {
             return Err(Error::DisputeActive);
         }
 
+        let proposal_key = DataKey::DeductionProposal(id.clone());
+        if env.storage().persistent().has(&proposal_key) {
+            return Err(Error::InvalidTransition);
+        }
+
         let other_party = if is_landlord {
             contract.tenant.clone()
         } else {
@@ -568,6 +573,11 @@ impl RentFlowContract {
         env.storage().persistent().set(&contract_key, &contract);
         extend_persistent_ttl(&env, &contract_key);
 
+        let landlord_app_key = DataKey::RefundApproval(id.clone(), contract.landlord.clone());
+        let tenant_app_key = DataKey::RefundApproval(id.clone(), contract.tenant.clone());
+        env.storage().persistent().remove(&landlord_app_key);
+        env.storage().persistent().remove(&tenant_app_key);
+
         let proposal_key = DataKey::DeductionProposal(id.clone());
         let proposal = DeductionProposal {
             amount,
@@ -645,6 +655,11 @@ impl RentFlowContract {
             contract.deposit_status = DepositStatus::PendingDispute;
             contract.dispute_status = DisputeStatus::InProgress;
 
+            let landlord_app_key = DataKey::RefundApproval(id.clone(), contract.landlord.clone());
+            let tenant_app_key = DataKey::RefundApproval(id.clone(), contract.tenant.clone());
+            env.storage().persistent().remove(&landlord_app_key);
+            env.storage().persistent().remove(&tenant_app_key);
+
             env.storage().persistent().set(&contract_key, &contract);
             extend_persistent_ttl(&env, &contract_key);
             extend_instance_ttl(&env);
@@ -683,6 +698,13 @@ impl RentFlowContract {
 
         contract.deposit_status = DepositStatus::PendingDispute;
         contract.dispute_status = DisputeStatus::InProgress;
+
+        let proposal_key = DataKey::DeductionProposal(id.clone());
+        env.storage().persistent().remove(&proposal_key);
+        let landlord_app_key = DataKey::RefundApproval(id.clone(), contract.landlord.clone());
+        let tenant_app_key = DataKey::RefundApproval(id.clone(), contract.tenant.clone());
+        env.storage().persistent().remove(&landlord_app_key);
+        env.storage().persistent().remove(&tenant_app_key);
 
         env.storage().persistent().set(&contract_key, &contract);
         extend_persistent_ttl(&env, &contract_key);

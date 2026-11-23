@@ -521,3 +521,68 @@ fn test_regression_p1_late_fee_bps_cap_and_period_validation() {
     let res_get0 = client.try_get_rent_period(&id, &0u32);
     assert_eq!(res_get0, Err(Ok(Error::PeriodNotFound)));
 }
+
+// ==================== REVIEW-2 REGRESSION TESTS ====================
+
+#[test]
+fn test_regression_review2_landlord_approval_cleared_on_propose_deduction() {
+    let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+
+    let id = sample_id(&env, 18);
+    let deposit = 5_000_000i128;
+
+    client.create_contract(&id, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &3_000_000, &5, &50);
+    client.tenant_confirm(&id, &tenant);
+    client.record_deposit_paid(&id, &sample_hash(&env, 2), &deposit);
+
+    // Landlord approves refund of full deposit
+    client.approve_refund(&id, &landlord, &deposit);
+
+    // Landlord changes mind and proposes deduction of 1_500_000
+    let reason_hash = sample_hash(&env, 7);
+    client.propose_deduction(&id, &landlord, &1_500_000, &reason_hash);
+
+    // Tenant tries to call approve_refund(5_000_000) while deduction proposal is active
+    // Must be rejected with InvalidTransition because proposal is active
+    let res = client.try_approve_refund(&id, &tenant, &deposit);
+    assert_eq!(res, Err(Ok(Error::InvalidTransition)));
+
+    // Tenant rejects deduction -> transitions to PendingDispute and clears approvals
+    client.respond_deduction(&id, &tenant, &false);
+    assert_eq!(client.get_contract(&id).deposit_status, DepositStatus::PendingDispute);
+
+    // Tenant calling approve_refund in dispute fails
+    let res2 = client.try_approve_refund(&id, &tenant, &deposit);
+    assert_eq!(res2, Err(Ok(Error::InvalidTransition)));
+}
+
+#[test]
+fn test_regression_review2_open_dispute_clears_proposal_and_approvals() {
+    let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+
+    let id = sample_id(&env, 19);
+    let deposit = 5_000_000i128;
+
+    client.create_contract(&id, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &3_000_000, &5, &50);
+    client.tenant_confirm(&id, &tenant);
+    client.record_deposit_paid(&id, &sample_hash(&env, 2), &deposit);
+
+    // Landlord approves refund and proposes deduction
+    client.approve_refund(&id, &landlord, &deposit);
+    client.propose_deduction(&id, &landlord, &1_000_000, &sample_hash(&env, 8));
+
+    // Party opens dispute while proposal is active
+    client.open_dispute(&id, &tenant);
+    let contract = client.get_contract(&id);
+    assert_eq!(contract.deposit_status, DepositStatus::PendingDispute);
+    assert_eq!(contract.dispute_status, DisputeStatus::InProgress);
+
+    // Tenant trying to respond to the previous proposal fails (proposal was removed)
+    let res_resp = client.try_respond_deduction(&id, &tenant, &true);
+    assert_eq!(res_resp, Err(Ok(Error::InvalidTransition)));
+
+    // Tenant trying to approve refund fails (in dispute)
+    let res_app = client.try_approve_refund(&id, &tenant, &deposit);
+    assert_eq!(res_app, Err(Ok(Error::InvalidTransition)));
+}
+
