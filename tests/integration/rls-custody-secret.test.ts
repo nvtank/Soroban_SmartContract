@@ -1,5 +1,5 @@
 import "@/../tests/setup";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Keypair } from "@stellar/stellar-sdk";
 import {
   createTestAdminClient,
@@ -145,5 +145,16 @@ describe("RLS: Custody Wallets & Encrypted Secret Protection", () => {
 
     const decrypted = decryptSecret(data!.encrypted_secret);
     expect(decrypted).toBe(pairA.secret());
+  });
+
+  afterAll(async () => {
+    // Clean up test wallets, profiles, and users
+    for (const id of [userAId, userBId]) {
+      if (id) {
+        await admin.from("custody_wallets").delete().eq("user_id", id);
+        await admin.from("profiles").delete().eq("id", id);
+        await admin.auth.admin.deleteUser(id);
+      }
+    }
   });
 });

@@ -7,7 +7,7 @@ export default defineConfig({
   test: {
     environment: "node",
     fileParallelism: false,
-    setupFiles: ["./tests/polyfill.js", "./tests/setup.ts"],
+    setupFiles: ["./tests/polyfill.js", "./tests/setup.ts", "./tests/safety.ts"],
     include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"],
   },
 });

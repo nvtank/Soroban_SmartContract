@@ -1,5 +1,5 @@
 import "@/../tests/setup";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { GET as healthGet } from "@/app/api/health/route";
 import { POST as demoSeedPost } from "@/app/api/demo/seed/route";
 import { POST as demoResetPost } from "@/app/api/demo/reset/route";
@@ -135,5 +135,13 @@ describe("API Routes & Step-Up Security", () => {
 
     // 4. Token cannot be reused (consumed)
     await expect(requireStepUp(reqWithRealToken, userId, "APPROVE_REFUND")).rejects.toThrow();
+  });
+
+  afterAll(async () => {
+    const admin = createAdminSupabase();
+    // Clean up test data created during test
+    await admin.from("auth_otps").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await admin.from("auth_challenges").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await admin.from("recovery_requests").delete().neq("id", "00000000-0000-0000-0000-000000000000");
   });
 });

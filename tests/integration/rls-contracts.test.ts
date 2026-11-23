@@ -1,5 +1,5 @@
 import "@/../tests/setup";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   createTestAdminClient,
   createTestUserSessionClient,
@@ -137,5 +137,17 @@ describe("RLS: Contract Isolation between Users", () => {
     expect(error).toBeNull();
     expect(data?.map((c) => c.id)).toContain(contractAB);
     expect(data?.map((c) => c.id)).toContain(contractCB);
+  });
+
+  afterAll(async () => {
+    // Clean up test contracts and users
+    if (contractAB) await admin.from("rental_contracts").delete().eq("id", contractAB);
+    if (contractCB) await admin.from("rental_contracts").delete().eq("id", contractCB);
+    for (const id of [userAId, userBId, userCId]) {
+      if (id) {
+        await admin.from("profiles").delete().eq("id", id);
+        await admin.auth.admin.deleteUser(id);
+      }
+    }
   });
 });
