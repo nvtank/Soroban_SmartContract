@@ -28,6 +28,8 @@ export type OnchainTxRecord = {
   retry_count: number;
   created_at: string;
   updated_at?: string;
+  locked_at?: string | null;
+  locked_by?: string | null;
 };
 
 export type StellarRpcConfig = {

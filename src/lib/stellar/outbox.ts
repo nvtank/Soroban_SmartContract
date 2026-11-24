@@ -13,6 +13,10 @@ const MAX_RETRIES = 5;
 const DEFAULT_POLL_TIMEOUT_MS = 6000;
 
 type GenericDb = {
+  rpc?: (
+    name: string,
+    params?: unknown,
+  ) => Promise<{ data: OnchainTxRecord[] | null; error: unknown }>;
   from?: (table: string) => {
     insert: (record: unknown) => Promise<{ error: unknown }>;
     select: (columns: string) => {
@@ -55,18 +59,47 @@ type GenericDb = {
   onchain_txs?: OnchainTxRecord[];
 };
 
-function resolvePlatformKeypair(): Keypair {
-  const secret = process.env.STELLAR_PLATFORM_SECRET;
-  if (secret && secret.startsWith("S") && secret.length === 56) {
-    return Keypair.fromSecret(secret);
+class PlatformSequenceMutex {
+  private queue: Promise<void> = Promise.resolve();
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    let release: () => void;
+    const wait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const prev = this.queue;
+    this.queue = this.queue.then(() => wait);
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release!();
+    }
   }
-  return Keypair.random();
 }
 
-function resolveOracleKeypair(platformKeypair: Keypair): Keypair {
+const platformSequenceMutex = new PlatformSequenceMutex();
+
+function resolvePlatformKeypair(): Keypair | null {
+  const secret = process.env.STELLAR_PLATFORM_SECRET;
+  if (secret && secret.startsWith("S") && secret.length === 56) {
+    try {
+      return Keypair.fromSecret(secret);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function resolveOracleKeypair(platformKeypair: Keypair | null): Keypair | null {
   const secret = process.env.STELLAR_ORACLE_SECRET;
   if (secret && secret.startsWith("S") && secret.length === 56) {
-    return Keypair.fromSecret(secret);
+    try {
+      return Keypair.fromSecret(secret);
+    } catch {
+      return null;
+    }
   }
   return platformKeypair;
 }
@@ -141,11 +174,12 @@ export async function enqueueOnchain(
  */
 export async function flushOnchain(
   db: unknown,
-  options?: { limit?: number; pollTimeoutMs?: number },
+  options?: { limit?: number; pollTimeoutMs?: number; workerId?: string },
   deps?: Partial<OutboxDeps>,
 ): Promise<{ confirmed: number; failed: number }> {
   const limit = options?.limit ?? 20;
   const pollTimeout = options?.pollTimeoutMs ?? DEFAULT_POLL_TIMEOUT_MS;
+  const workerId = options?.workerId || `worker-${crypto.randomUUID()}`;
   const client = deps?.stellarClient ?? getStellarClient();
   const platformKeypair = deps?.getPlatformKeypair ? deps.getPlatformKeypair() : resolvePlatformKeypair();
   const oracleKeypair = deps?.getOracleKeypair
@@ -157,34 +191,47 @@ export async function flushOnchain(
 
   const genericDb = db as GenericDb | null | undefined;
   let records: OnchainTxRecord[] = [];
+  let claimedViaRpc = false;
 
-  if (genericDb && typeof genericDb.from === "function") {
-    const { data, error } = await genericDb
-      .from("onchain_txs")
-      .select("*")
-      .in("status", ["PENDING", "SUBMITTED", "FAILED"])
-      .order("created_at", { ascending: true })
-      .limit(limit);
+  // 1. Thử claim nguyên tử qua RPC function (claim_onchain_txs)
+  if (genericDb && typeof genericDb.rpc === "function") {
+    try {
+      const { data, error } = await genericDb.rpc("claim_onchain_txs", {
+        p_worker_id: workerId,
+        p_limit: limit,
+        p_lock_timeout_seconds: 60,
+      });
+      if (!error && Array.isArray(data)) {
+        records = data;
+        claimedViaRpc = true;
+      }
+    } catch {
+      // Fallback cho môi trường test hoặc khi RPC chưa tạo
+    }
+  }
 
-    if (error) throw new ApiError("INTERNAL_ERROR", error, "Không thể đọc hàng đợi onchain_txs");
-    records = data || [];
-  } else if (genericDb && Array.isArray(genericDb.onchain_txs)) {
-    records = [...genericDb.onchain_txs]
-      .filter((r: OnchainTxRecord) => ["PENDING", "SUBMITTED", "FAILED"].includes(r.status))
-      .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      .slice(0, limit);
+  // 2. Fallback query thông thường nếu chưa claim qua RPC
+  if (!claimedViaRpc) {
+    if (genericDb && typeof genericDb.from === "function") {
+      const { data, error } = await genericDb
+        .from("onchain_txs")
+        .select("*")
+        .in("status", ["PENDING", "SUBMITTED", "FAILED"])
+        .order("created_at", { ascending: true })
+        .limit(limit);
+
+      if (error) throw new ApiError("INTERNAL_ERROR", error, "Không thể đọc hàng đợi onchain_txs");
+      records = data || [];
+    } else if (genericDb && Array.isArray(genericDb.onchain_txs)) {
+      records = [...genericDb.onchain_txs]
+        .filter((r: OnchainTxRecord) => ["PENDING", "SUBMITTED", "FAILED"].includes(r.status))
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+        .slice(0, limit);
+    }
   }
 
   if (records.length === 0) {
     return { confirmed: 0, failed: 0 };
-  }
-
-  // 2. Gom nhóm theo contract_id để giữ thứ tự FIFO
-  const contractQueues = new Map<string, OnchainTxRecord[]>();
-  for (const r of records) {
-    const list = contractQueues.get(r.contract_id) || [];
-    list.push(r);
-    contractQueues.set(r.contract_id, list);
   }
 
   // Helper cập nhật DB
@@ -199,20 +246,38 @@ export async function flushOnchain(
     }
   }
 
-  // 3. Xử lý từng hợp đồng
-  for (const queue of contractQueues.values()) {
-    const head = queue[0];
+  // 3. Gom nhóm theo contract_id để giữ thứ tự FIFO
+  const candidateQueues: OnchainTxRecord[] = claimedViaRpc
+    ? records
+    : (() => {
+        const contractQueues = new Map<string, OnchainTxRecord[]>();
+        for (const r of records) {
+          const list = contractQueues.get(r.contract_id) || [];
+          list.push(r);
+          contractQueues.set(r.contract_id, list);
+        }
+        const heads: OnchainTxRecord[] = [];
+        for (const q of contractQueues.values()) {
+          const head = q[0];
+          // Nếu tx đầu tiên của hợp đồng là FAILED -> Chặn toàn bộ các tx sau của hợp đồng đó
+          if (head.status !== "FAILED") {
+            heads.push(head);
+          }
+        }
+        return heads;
+      })();
 
-    // TRƯỜNG HỢP 1: Đầu hàng đợi là FAILED -> Chặn các tx sau của cùng hợp đồng
+  // 4. Xử lý từng giao dịch đầu hàng đợi hợp đồng
+  for (const head of candidateQueues) {
     if (head.status === "FAILED") {
       continue;
     }
 
-    // TRƯỜNG HỢP 2: Đầu hàng đợi là SUBMITTED -> Đối soát, không submit lại mù
+    // TRƯỜNG HỢP A: Giao dịch là SUBMITTED -> Đối soát theo hash, không submit lại mù
     if (head.status === "SUBMITTED" && head.tx_hash) {
       const checkRes = await client.getTransaction(head.tx_hash);
       if (checkRes.status === "SUCCESS") {
-        await updateRecord(head.id, { status: "CONFIRMED", error: null });
+        await updateRecord(head.id, { status: "CONFIRMED", error: null, locked_at: null, locked_by: null });
         confirmed++;
         continue;
       }
@@ -220,34 +285,43 @@ export async function flushOnchain(
         await updateRecord(head.id, {
           status: "FAILED",
           error: sanitizeError(checkRes.error || "Giao dịch thất bại trên ledger"),
+          locked_at: null,
+          locked_by: null,
         });
         failed++;
         continue;
       }
-      // Vẫn đang PENDING: poll có giới hạn thời gian
+      // Vẫn đang PENDING trên ledger: poll có giới hạn thời gian phù hợp Vercel
       const pollRes = await client.pollTransaction(head.tx_hash, pollTimeout, 1000);
       if (pollRes.status === "SUCCESS") {
-        await updateRecord(head.id, { status: "CONFIRMED", error: null });
+        await updateRecord(head.id, { status: "CONFIRMED", error: null, locked_at: null, locked_by: null });
         confirmed++;
       } else if (pollRes.status === "FAILED") {
         await updateRecord(head.id, {
           status: "FAILED",
           error: sanitizeError(pollRes.error || "Giao dịch thất bại khi kiểm tra"),
+          locked_at: null,
+          locked_by: null,
         });
         failed++;
+      } else {
+        // Hết timeout vẫn PENDING: nhả lock để worker lần sau đối soát tiếp
+        await updateRecord(head.id, { locked_at: null, locked_by: null });
       }
       continue;
     }
 
-    // TRƯỜNG HỢP 3: Đầu hàng đợi là PENDING
+    // TRƯỜNG HỢP B: Giao dịch là PENDING
     if (head.status === "PENDING") {
-      // Yêu cầu (2): Kiểm tra cấu hình Stellar. Nếu thiếu STELLAR_CONTRACT_ID -> đánh dấu FAILED,
-      // tuyệt đối không có tx_hash, giữ nguyên nghiệp vụ off-chain và cho phép retry sau.
-      if (!client.getContractId()) {
+      // Kiểm tra cấu hình Stellar. Nếu thiếu STELLAR_CONTRACT_ID hoặc PLATFORM secret:
+      // Đánh dấu FAILED ngay, tuyệt đối không có tx_hash, giữ nguyên nghiệp vụ off-chain
+      if (!client.getContractId() || !platformKeypair) {
         await updateRecord(head.id, {
           status: "FAILED",
-          error: "Hệ thống blockchain chưa được cấu hình (thiếu STELLAR_CONTRACT_ID). Vui lòng thử lại sau.",
+          error: "Hệ thống blockchain chưa được cấu hình (thiếu STELLAR_CONTRACT_ID hoặc STELLAR_PLATFORM_SECRET). Vui lòng thử lại sau.",
           tx_hash: null,
+          locked_at: null,
+          locked_by: null,
         });
         failed++;
         continue;
@@ -258,122 +332,140 @@ export async function flushOnchain(
         await updateRecord(head.id, {
           status: "FAILED",
           error: "Giao dịch đã vượt quá số lần thử lại tối đa (5).",
+          locked_at: null,
+          locked_by: null,
         });
         failed++;
         continue;
       }
 
-      // Claim giao dịch để chống xử lý trùng (chỉ update khi status vẫn là PENDING)
-      let claimSuccess = false;
-      if (genericDb && typeof genericDb.from === "function") {
-        const { data, error } = await genericDb
-          .from("onchain_txs")
-          .update({
-            status: "SUBMITTED",
-            retry_count: head.retry_count + 1,
-            error: null,
-          })
-          .eq("id", head.id)
-          .eq("status", "PENDING")
-          .select("id");
+      // Claim giao dịch nếu chưa qua RPC (chống xử lý trùng giữa 2 worker)
+      if (!claimedViaRpc) {
+        let claimSuccess = false;
+        if (genericDb && typeof genericDb.from === "function") {
+          const { data, error } = await genericDb
+            .from("onchain_txs")
+            .update({
+              status: "SUBMITTED",
+              retry_count: head.retry_count + 1,
+              error: null,
+              locked_at: new Date().toISOString(),
+              locked_by: workerId,
+            })
+            .eq("id", head.id)
+            .eq("status", "PENDING")
+            .select("id");
 
-        if (!error && data && data.length > 0) {
-          claimSuccess = true;
+          if (!error && data && data.length > 0) {
+            claimSuccess = true;
+          }
+        } else {
+          if (head.status === "PENDING") {
+            head.status = "SUBMITTED";
+            head.retry_count += 1;
+            head.locked_by = workerId;
+            claimSuccess = true;
+          }
         }
-      } else {
-        if (head.status === "PENDING") {
-          head.status = "SUBMITTED";
-          head.retry_count += 1;
-          claimSuccess = true;
-        }
-      }
 
-      if (!claimSuccess) {
-        continue; // Bị worker khác claim trước
+        if (!claimSuccess) {
+          continue; // Bị worker khác claim trước
+        }
       }
 
       try {
-        // Encode tham số theo ABI
-        const scVals = encodeContractArgs(head.action, head.args);
+        // Quản lý Sequence của PLATFORM account: khóa mutex tránh đụng sequence khi chạy đồng thời
+        const subRes = await platformSequenceMutex.run(async () => {
+          const scVals = encodeContractArgs(head.action, head.args);
 
-        // Build & Simulate giao dịch Soroban
-        const { transaction, authEntries } = await client.buildAndSimulate({
-          action: head.action,
-          args: scVals,
-          sourcePublicKey: platformKeypair.publicKey(),
+          const { transaction, authEntries } = await client.buildAndSimulate({
+            action: head.action,
+            args: scVals,
+            sourcePublicKey: platformKeypair.publicKey(),
+          });
+
+          // Ký Auth Entries
+          if (authEntries.length > 0) {
+            if (head.signer.kind === "USER") {
+              const userId = head.signer.userId;
+              if (deps?.withCustodyKeypair) {
+                await deps.withCustodyKeypair(db, userId, async (custodyKeypair) => {
+                  for (let i = 0; i < authEntries.length; i++) {
+                    authEntries[i] = await authorizeEntry(
+                      authEntries[i],
+                      custodyKeypair,
+                      1000,
+                      client.getNetworkPassphrase(),
+                    );
+                  }
+                });
+              }
+            } else if (head.signer.kind === "ORACLE") {
+              const oracleSigner = oracleKeypair || platformKeypair;
+              for (let i = 0; i < authEntries.length; i++) {
+                authEntries[i] = await authorizeEntry(
+                  authEntries[i],
+                  oracleSigner,
+                  1000,
+                  client.getNetworkPassphrase(),
+                );
+              }
+            }
+          }
+
+          // Ký phong bì giao dịch bằng khóa PLATFORM
+          transaction.sign(platformKeypair);
+
+          // Kiểm tra xem có bật Fee-Bump (CAP-0015, P1) hay không
+          let txToSubmit: Transaction | FeeBumpTransaction = transaction;
+          if (isFeeBumpEnabled()) {
+            try {
+              txToSubmit = buildFeeBumpTx(transaction, platformKeypair, client.getNetworkPassphrase());
+            } catch {
+              txToSubmit = transaction;
+            }
+          }
+
+          return await client.submitTransaction(txToSubmit);
         });
 
-        // Ký Auth Entries nếu cần
-        if (authEntries.length > 0) {
-          if (head.signer.kind === "USER") {
-            const userId = head.signer.userId;
-            if (deps?.withCustodyKeypair) {
-              await deps.withCustodyKeypair(db, userId, async (custodyKeypair) => {
-                for (let i = 0; i < authEntries.length; i++) {
-                  authEntries[i] = await authorizeEntry(
-                    authEntries[i],
-                    custodyKeypair,
-                    1000,
-                    client.getNetworkPassphrase(),
-                  );
-                }
-              });
-            }
-          } else if (head.signer.kind === "ORACLE") {
-            for (let i = 0; i < authEntries.length; i++) {
-              authEntries[i] = await authorizeEntry(
-                authEntries[i],
-                oracleKeypair,
-                1000,
-                client.getNetworkPassphrase(),
-              );
-            }
-          }
-        }
-
-        // Ký phong bì giao dịch bằng khóa PLATFORM
-        transaction.sign(platformKeypair);
-
-        // Kiểm tra xem có bật Fee-Bump (CAP-0015, P1) hay không
-        let txToSubmit: Transaction | FeeBumpTransaction = transaction;
-        if (isFeeBumpEnabled()) {
-          try {
-            txToSubmit = buildFeeBumpTx(transaction, platformKeypair, client.getNetworkPassphrase());
-          } catch {
-            txToSubmit = transaction;
-          }
-        }
-
-        // Submit giao dịch
-        const subRes = await client.submitTransaction(txToSubmit);
         if (subRes.status === "FAILED") {
           await updateRecord(head.id, {
             status: "FAILED",
             error: sanitizeError(subRes.error || "Giao dịch bị từ chối khi submit"),
+            locked_at: null,
+            locked_by: null,
           });
           failed++;
           continue;
         }
 
         const txHash = subRes.txHash;
-        await updateRecord(head.id, { tx_hash: txHash });
+        await updateRecord(head.id, { tx_hash: txHash, status: "SUBMITTED" });
 
         // Poll có giới hạn thời gian phù hợp với serverless
         const pollRes = await client.pollTransaction(txHash, pollTimeout, 1000);
         if (pollRes.status === "SUCCESS") {
-          await updateRecord(head.id, { status: "CONFIRMED", error: null });
+          await updateRecord(head.id, { status: "CONFIRMED", error: null, locked_at: null, locked_by: null });
           confirmed++;
         } else if (pollRes.status === "FAILED") {
           await updateRecord(head.id, {
             status: "FAILED",
             error: sanitizeError(pollRes.error || "Giao dịch thất bại trên ledger"),
+            locked_at: null,
+            locked_by: null,
           });
           failed++;
+        } else {
+          // Vẫn SUBMITTED khi hết thời gian chờ: nhả lock để background worker tiếp tục đối soát
+          await updateRecord(head.id, { locked_at: null, locked_by: null });
         }
       } catch (err) {
         await updateRecord(head.id, {
           status: "FAILED",
           error: sanitizeError(err),
+          locked_at: null,
+          locked_by: null,
         });
         failed++;
       }

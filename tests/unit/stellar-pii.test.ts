@@ -80,6 +80,18 @@ describe("Stellar PII Guard & Sanitizer", () => {
       expect(sanitizeError("Error(Contract, #13)")).toBe(
         "Hợp đồng đang có tranh chấp trên blockchain, các thao tác giải ngân bị khóa.",
       );
+      expect(sanitizeError("Error(Contract, #17)")).toBe(
+        "Mã tham chiếu thanh toán đã được ghi nhận trước đó trên blockchain.",
+      );
+      expect(sanitizeError("HostError: DuplicatePaymentRef")).toBe(
+        "Mã tham chiếu thanh toán đã được ghi nhận trước đó trên blockchain.",
+      );
+      expect(sanitizeError("Error(Contract, #18)")).toBe(
+        "Chủ nhà và người thuê không được là cùng một tài khoản.",
+      );
+      expect(sanitizeError("HostError: SamePartyNotAllowed")).toBe(
+        "Chủ nhà và người thuê không được là cùng một tài khoản.",
+      );
     });
 
     it("rút ngắn thông báo lỗi nếu quá dài", () => {

@@ -158,9 +158,12 @@ export function sanitizeError(error: unknown): string {
   // Xóa hex dài có thể là secret/key
   raw = raw.replace(/\b[0-9a-fA-F]{64}\b/g, "[HASH]");
 
-  // Ánh xạ lỗi Soroban phổ biến
+  // Ánh xạ lỗi Soroban theo contracts/rentflow/src/types.rs (1 đến 18)
   if (raw.includes("AlreadyInitialized") || raw.includes("Error(Contract, #1)")) {
     return "Hợp đồng đã được khởi tạo trên blockchain.";
+  }
+  if (raw.includes("NotInitialized") || raw.includes("Error(Contract, #2)")) {
+    return "Hợp đồng chưa được khởi tạo trên blockchain.";
   }
   if (raw.includes("Unauthorized") || raw.includes("Error(Contract, #3)")) {
     return "Tài khoản không có quyền thực hiện giao dịch này trên blockchain.";
@@ -186,6 +189,9 @@ export function sanitizeError(error: unknown): string {
   if (raw.includes("DeductionExceedsDeposit") || raw.includes("Error(Contract, #10)")) {
     return "Số tiền khấu trừ vượt quá số tiền cọc hiện có.";
   }
+  if (raw.includes("DeductionNotFound") || raw.includes("Error(Contract, #11)")) {
+    return "Không tìm thấy đề xuất khấu trừ trên blockchain.";
+  }
   if (raw.includes("RefundAmountMismatch") || raw.includes("Error(Contract, #12)")) {
     return "Số tiền hoàn cọc của hai bên chưa thống nhất.";
   }
@@ -194,6 +200,18 @@ export function sanitizeError(error: unknown): string {
   }
   if (raw.includes("DisputeAmountMismatch") || raw.includes("Error(Contract, #14)")) {
     return "Số tiền giải quyết tranh chấp của hai bên không khớp.";
+  }
+  if (raw.includes("InvalidDueDay") || raw.includes("Error(Contract, #15)")) {
+    return "Ngày thanh toán hàng tháng không hợp lệ (phải từ 1 đến 31).";
+  }
+  if (raw.includes("Overflow") || raw.includes("Error(Contract, #16)")) {
+    return "Lỗi tràn số khi tính toán trên blockchain.";
+  }
+  if (raw.includes("DuplicatePaymentRef") || raw.includes("Error(Contract, #17)")) {
+    return "Mã tham chiếu thanh toán đã được ghi nhận trước đó trên blockchain.";
+  }
+  if (raw.includes("SamePartyNotAllowed") || raw.includes("Error(Contract, #18)")) {
+    return "Chủ nhà và người thuê không được là cùng một tài khoản.";
   }
 
   // Cắt ngắn nếu thông báo quá dài
