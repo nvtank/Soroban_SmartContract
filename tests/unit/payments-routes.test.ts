@@ -1,5 +1,5 @@
 import "./payments-polyfill";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as depositPayPost } from "@/app/api/contracts/[id]/deposit/pay/route";
 import { POST as rentPayPost } from "@/app/api/contracts/[id]/rent/[period]/pay/route";
 import { POST as webhookPost } from "@/app/api/payments/payos/webhook/route";
@@ -8,13 +8,69 @@ import { POST as simulateFailPost } from "@/app/api/payments/[id]/simulate-fail/
 import { POST as recheckPost } from "@/app/api/payments/[id]/recheck/route";
 import { GET as paymentGet } from "@/app/api/payments/[id]/route";
 import * as serviceModule from "@/domain/payments/service";
+import { setInjectedAuth } from "@/domain/payments/auth-helper";
 
 describe("Payments API Route Handlers", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    setInjectedAuth(null);
   });
 
-  it("POST /api/contracts/[id]/deposit/pay - tạo thanh toán cọc thành công", async () => {
+  afterEach(() => {
+    setInjectedAuth(null);
+  });
+
+  it("P0 BẢO MẬT: từ chối 401 khi header x-user-id giả mạo được gửi mà không có phiên đăng nhập", async () => {
+    // Không tiêm auth (setInjectedAuth(null)), cố tình gửi header x-user-id giả
+    const request = new Request("http://localhost:3000/api/contracts/contract-123/deposit/pay", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": "attacker-user-id",
+        "x-user-role": "ADMIN_DEMO",
+      },
+      body: JSON.stringify({ provider: "SIMULATED" }),
+    });
+
+    const response = await depositPayPost(request, {
+      params: Promise.resolve({ id: "contract-123" }),
+    });
+
+    // Header x-user-id BỊ BỎ HOÀN TOÀN, bắt buộc trả về 401 UNAUTHENTICATED
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body.error.code).toBe("UNAUTHENTICATED");
+  });
+
+  it("P0 BẢO MẬT: simulate-confirm từ chối 401 khi không có phiên đăng nhập dù có header x-user-id", async () => {
+    const request = new Request("http://localhost:3000/api/payments/pay-123/simulate-confirm", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": "fake-tenant-id",
+      },
+      body: JSON.stringify({ scenario: "FULL" }),
+    });
+
+    const response = await simulateConfirmPost(request, {
+      params: Promise.resolve({ id: "pay-123" }),
+    });
+
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body.error.code).toBe("UNAUTHENTICATED");
+  });
+
+  it("POST /api/contracts/[id]/deposit/pay - tạo thanh toán cọc thành công khi xác thực qua DI", async () => {
+    setInjectedAuth({
+      requireUser: async () => ({
+        id: "tenant-1",
+        role: "TENANT",
+        fullName: "Người thuê hợp pháp",
+        phone: "0901234567",
+      }),
+    });
+
     vi.spyOn(serviceModule, "createDepositPayment").mockResolvedValue({
       id: "pay-deposit-1",
       contractId: "contract-123",
@@ -34,7 +90,6 @@ describe("Payments API Route Handlers", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-user-id": "user-1",
       },
       body: JSON.stringify({ provider: "SIMULATED" }),
     });
@@ -50,7 +105,16 @@ describe("Payments API Route Handlers", () => {
     expect(body.data.status).toBe("PENDING");
   });
 
-  it("POST /api/contracts/[id]/rent/[period]/pay - tạo thanh toán tiền thuê thành công", async () => {
+  it("POST /api/contracts/[id]/rent/[period]/pay - tạo thanh toán tiền thuê thành công khi xác thực qua DI", async () => {
+    setInjectedAuth({
+      requireUser: async () => ({
+        id: "tenant-1",
+        role: "TENANT",
+        fullName: "Người thuê hợp pháp",
+        phone: "0901234567",
+      }),
+    });
+
     vi.spyOn(serviceModule, "createRentPayment").mockResolvedValue({
       id: "pay-rent-1",
       contractId: "contract-123",
@@ -85,6 +149,15 @@ describe("Payments API Route Handlers", () => {
   });
 
   it("POST /api/contracts/[id]/rent/[period]/pay - từ chối khi số kỳ thuê không hợp lệ", async () => {
+    setInjectedAuth({
+      requireUser: async () => ({
+        id: "tenant-1",
+        role: "TENANT",
+        fullName: "Người thuê",
+        phone: "0901",
+      }),
+    });
+
     const request = new Request("http://localhost:3000/api/contracts/contract-123/rent/invalid/pay", {
       method: "POST",
     });
@@ -149,7 +222,16 @@ describe("Payments API Route Handlers", () => {
     expect(body.data.payment.status).toBe("CONFIRMED");
   });
 
-  it("POST /api/payments/[id]/simulate-confirm - giả lập xác nhận thành công", async () => {
+  it("POST /api/payments/[id]/simulate-confirm - giả lập xác nhận thành công với DI auth", async () => {
+    setInjectedAuth({
+      requireUser: async () => ({
+        id: "tenant-1",
+        role: "TENANT",
+        fullName: "Người thuê",
+        phone: "0901",
+      }),
+    });
+
     vi.spyOn(serviceModule, "simulatePaymentConfirm").mockResolvedValue({
       id: "pay-123",
       contractId: "c-1",
@@ -169,7 +251,6 @@ describe("Payments API Route Handlers", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-user-id": "user-1",
       },
       body: JSON.stringify({ scenario: "FULL" }),
     });
@@ -184,7 +265,16 @@ describe("Payments API Route Handlers", () => {
     expect(body.data.isSimulated).toBe(true);
   });
 
-  it("POST /api/payments/[id]/simulate-fail - giả lập thất bại", async () => {
+  it("POST /api/payments/[id]/simulate-fail - giả lập thất bại với DI auth", async () => {
+    setInjectedAuth({
+      requireUser: async () => ({
+        id: "tenant-1",
+        role: "TENANT",
+        fullName: "Người thuê",
+        phone: "0901",
+      }),
+    });
+
     vi.spyOn(serviceModule, "simulatePaymentFail").mockResolvedValue({
       id: "pay-123",
       contractId: "c-1",
@@ -204,7 +294,6 @@ describe("Payments API Route Handlers", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-user-id": "user-1",
       },
       body: JSON.stringify({ reason: "Lỗi ngân hàng" }),
     });
@@ -277,3 +366,4 @@ describe("Payments API Route Handlers", () => {
     expect(body.data.checkoutUrl).toBe("https://payos.vn/link");
   });
 });
+

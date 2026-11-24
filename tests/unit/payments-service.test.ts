@@ -118,6 +118,7 @@ describe("Payment Service - createDepositPayment & createRentPayment", () => {
       {
         contractId: "contract-1",
         periodNo: 1,
+        user: { id: "tenant-1", role: "TENANT", fullName: "Nguyễn Văn A", phone: "0901234567" },
         provider: "SIMULATED",
       },
       { repo },
@@ -146,12 +147,66 @@ describe("Payment Service - createDepositPayment & createRentPayment", () => {
         {
           contractId: "contract-1",
           periodNo: 2,
+          user: { id: "tenant-1", role: "TENANT", fullName: "Nguyễn Văn A", phone: "0901234567" },
           provider: "SIMULATED",
         },
         { repo },
       ),
     ).rejects.toMatchObject({ code: "INVALID_TRANSITION" });
   });
+
+  it("P0 QUYỀN (TASK mục 5): từ chối chủ nhà khi tạo thanh toán (chỉ người thuê được tạo)", async () => {
+    await expect(
+      createDepositPayment(
+        {
+          contractId: "contract-1",
+          user: { id: "landlord-1", role: "LANDLORD", fullName: "Chủ nhà B", phone: "0909999999" },
+          provider: "SIMULATED",
+        },
+        { repo },
+      ),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+    await expect(
+      createRentPayment(
+        {
+          contractId: "contract-1",
+          periodNo: 1,
+          user: { id: "landlord-1", role: "LANDLORD", fullName: "Chủ nhà B", phone: "0909999999" },
+          provider: "SIMULATED",
+        },
+        { repo },
+      ),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("TASK mục 6: không tạo trùng khi đang có payment PENDING, tái sử dụng payment hiện có", async () => {
+    const payment1 = await createDepositPayment(
+      {
+        contractId: "contract-1",
+        user: { id: "tenant-1", role: "TENANT", fullName: "Nguyễn Văn A", phone: "0901234567" },
+        provider: "SIMULATED",
+      },
+      { repo },
+    );
+
+    expect(payment1.status).toBe("PENDING");
+
+    // Gọi lần 2 khi payment cũ vẫn PENDING
+    const payment2 = await createDepositPayment(
+      {
+        contractId: "contract-1",
+        user: { id: "tenant-1", role: "TENANT", fullName: "Nguyễn Văn A", phone: "0901234567" },
+        provider: "SIMULATED",
+      },
+      { repo },
+    );
+
+    // Không sinh orderCode mới, tái sử dụng payment đang PENDING
+    expect(payment2.id).toBe(payment1.id);
+    expect(payment2.expectedAmount).toBe(payment1.expectedAmount);
+  });
+
 });
 
 describe("Payment Service - recheckPayment (Đối soát payOS)", () => {

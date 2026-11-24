@@ -40,7 +40,7 @@ export const POST = withApi<RouteContext>(async (request, context) => {
     }
   }
 
-  const user = await getSessionUser(request, false);
+  const user = await getSessionUser(request, true);
 
   const payment = await createRentPayment({
     contractId,

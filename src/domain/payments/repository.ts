@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PaymentProvider } from "@/domain/dto";
+import type { PaymentKind, PaymentProvider } from "@/domain/dto";
 import type {
   ContractRow,
   DepositRow,
@@ -15,6 +15,11 @@ export interface PaymentRepository {
   getRentPeriod(contractId: string, periodNo: number): Promise<RentPeriodRow | null>;
   getPaymentById(paymentId: string): Promise<PaymentRow | null>;
   getPaymentByOrderCode(orderCode: bigint | number): Promise<PaymentRow | null>;
+  getPendingPayment(
+    contractId: string,
+    kind: PaymentKind,
+    periodNo?: number | null,
+  ): Promise<PaymentRow | null>;
   createPayment(payment: Omit<PaymentRow, "created_at">): Promise<PaymentRow>;
   updatePayment(
     paymentId: string,
@@ -22,11 +27,13 @@ export interface PaymentRepository {
   ): Promise<PaymentRow>;
   hasPaymentEvent(provider: PaymentProvider, eventKey: string): Promise<boolean>;
   recordPaymentEvent(event: PaymentEventRow): Promise<boolean>;
+  deletePaymentEvent(provider: PaymentProvider, eventKey: string): Promise<boolean>;
   getUnderlyingDb(): unknown;
 }
 
 /**
  * Kho lưu trữ bộ nhớ (In-Memory) phục vụ kiểm thử đơn vị độc lập.
+ * KHÔNG BAO GIỜ được gọi trên đường chạy production.
  */
 export class InMemoryPaymentRepository implements PaymentRepository {
   contracts = new Map<string, ContractRow>();
@@ -56,6 +63,29 @@ export class InMemoryPaymentRepository implements PaymentRepository {
     for (const payment of this.payments.values()) {
       if (payment.order_code === codeBigInt) {
         return payment;
+      }
+    }
+    return null;
+  }
+
+  async getPendingPayment(
+    contractId: string,
+    kind: PaymentKind,
+    periodNo?: number | null,
+  ): Promise<PaymentRow | null> {
+    for (const payment of this.payments.values()) {
+      if (
+        payment.contract_id === contractId &&
+        payment.kind === kind &&
+        payment.status === "PENDING"
+      ) {
+        if (kind === "RENT") {
+          if (payment.period_no === (periodNo ?? null)) {
+            return payment;
+          }
+        } else {
+          return payment;
+        }
       }
     }
     return null;
@@ -99,6 +129,11 @@ export class InMemoryPaymentRepository implements PaymentRepository {
     return true;
   }
 
+  async deletePaymentEvent(provider: PaymentProvider, eventKey: string): Promise<boolean> {
+    const compositeKey = `${provider}:${eventKey}`;
+    return this.paymentEvents.delete(compositeKey);
+  }
+
   getUnderlyingDb(): unknown {
     return {};
   }
@@ -106,6 +141,7 @@ export class InMemoryPaymentRepository implements PaymentRepository {
 
 /**
  * Kho lưu trữ Supabase (Postgres).
+ * Đối chiếu khớp 1-1 với supabase/migrations/20261123000000_init_schema.sql.
  */
 export class SupabasePaymentRepository implements PaymentRepository {
   constructor(private readonly supabase: SupabaseClient) {}
@@ -201,6 +237,48 @@ export class SupabasePaymentRepository implements PaymentRepository {
       .from("payments")
       .select("*")
       .eq("order_code", codeStr)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+      id: data.id,
+      contract_id: data.contract_id,
+      kind: data.kind,
+      period_no: data.period_no,
+      business_amount: BigInt(data.business_amount),
+      expected_amount: BigInt(data.expected_amount),
+      paid_amount: BigInt(data.paid_amount || 0),
+      provider: data.provider,
+      order_code: BigInt(data.order_code),
+      status: data.status,
+      qr_data: data.qr_data,
+      checkout_url: data.checkout_url,
+      is_simulated: Boolean(data.is_simulated),
+      payment_ref_salt: data.payment_ref_salt,
+      created_at: data.created_at,
+    };
+  }
+
+  async getPendingPayment(
+    contractId: string,
+    kind: PaymentKind,
+    periodNo?: number | null,
+  ): Promise<PaymentRow | null> {
+    let query = this.supabase
+      .from("payments")
+      .select("*")
+      .eq("contract_id", contractId)
+      .eq("kind", kind)
+      .eq("status", "PENDING");
+
+    if (kind === "RENT" && periodNo !== undefined && periodNo !== null) {
+      query = query.eq("period_no", periodNo);
+    }
+
+    const { data, error } = await query
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (error || !data) return null;
@@ -342,6 +420,20 @@ export class SupabasePaymentRepository implements PaymentRepository {
     return true;
   }
 
+  async deletePaymentEvent(provider: PaymentProvider, eventKey: string): Promise<boolean> {
+    const { error } = await this.supabase
+      .from("payment_events")
+      .delete()
+      .eq("provider", provider)
+      .eq("event_key", eventKey);
+
+    if (error) {
+      console.warn(`[payments] Failed to delete payment event ${provider}:${eventKey}:`, error);
+      return false;
+    }
+    return true;
+  }
+
   getUnderlyingDb(): unknown {
     return this.supabase;
   }
@@ -349,7 +441,8 @@ export class SupabasePaymentRepository implements PaymentRepository {
 
 /**
  * Tạo repository mặc định.
- * Nếu không truyền db, thử nạp admin client từ @/lib/supabase/admin hoặc @/lib/supabase/server.
+ * BỎ HOÀN TOÀN InMemoryPaymentRepository khỏi đường chạy production (TASK mục 3).
+ * Chỉ trả về SupabasePaymentRepository hoặc ném lỗi nếu thiếu cấu hình Supabase.
  */
 export async function getDefaultPaymentRepository(injectedDb?: unknown): Promise<PaymentRepository> {
   if (injectedDb) {
@@ -369,19 +462,16 @@ export async function getDefaultPaymentRepository(injectedDb?: unknown): Promise
     if (typeof adminMod.createAdminSupabase === "function") {
       return new SupabasePaymentRepository(adminMod.createAdminSupabase());
     }
-  } catch {
-    // thử server supabase
+  } catch (error) {
+    throw new Error(
+      `Không thể khởi tạo SupabasePaymentRepository từ @/lib/supabase/admin: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
   }
 
-  try {
-    const serverMod = await import("@/lib/supabase/admin");
-    if (typeof serverMod.createAdminSupabase === "function") {
-      return new SupabasePaymentRepository(serverMod.createAdminSupabase());
-    }
-  } catch {
-    // Không có supabase client
-  }
-
-  // Fallback in-memory
-  return new InMemoryPaymentRepository();
+  throw new Error(
+    "Không thể khởi tạo SupabasePaymentRepository: thiếu cấu hình Supabase admin hợp lệ.",
+  );
 }
+
