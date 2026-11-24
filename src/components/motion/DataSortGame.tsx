@@ -14,11 +14,11 @@ const INITIAL_ITEMS: readonly DataItem[] = [
   { id: "name", label: "Họ và tên người thuê", correctZone: "offchain", description: "Dữ liệu cá nhân định danh (PII)" },
   { id: "phone", label: "Số điện thoại liên hệ", correctZone: "offchain", description: "Dữ liệu liên lạc cá nhân" },
   { id: "id_card", label: "Số CCCD / CMND", correctZone: "offchain", description: "Thông tin nhạy cảm bảo mật cao" },
-  { id: "room_images", label: "Ảnh hiện trạng bàn giao phòng", correctZone: "offchain", description: "Tệp tin media kích thước lớn" },
+  { id: "handover_notes", label: "Biên bản bàn giao phòng (Lộ trình: kèm ảnh)", correctZone: "offchain", description: "Văn bản hiện trạng off-chain (chưa có lưu trữ ảnh bàn giao)" },
   { id: "contract_terms", label: "Toàn văn hợp đồng thuê", correctZone: "offchain", description: "Văn bản chứa thông tin riêng tư" },
   { id: "doc_hash", label: "Mã băm SHA-256 hợp đồng", correctZone: "onchain", description: "Bằng chứng bất biến có kèm chuỗi muối" },
   { id: "deposit_status", label: "Trạng thái tiền cọc", correctZone: "onchain", description: "Máy trạng thái u32 kiểm tra quyền" },
-  { id: "money_amount", label: "Số tiền cọc & Phí trễ", correctZone: "onchain", description: "Số nguyên VND phục vụ giải ngân" },
+  { id: "money_amount", label: "Số tiền cọc & Phí trễ", correctZone: "onchain", description: "Số nguyên i128 VND ghi nhận tham số hợp đồng (không giữ VNĐ thật)" },
 ];
 
 export function DataSortGame() {

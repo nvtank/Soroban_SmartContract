@@ -96,7 +96,7 @@ export function Navbar() {
   const navPositionsRef = useRef<Record<string, { width: number; left: number }>>({});
 
   // Đo trước vị trí các mục nav trên desktop một lần khi mount và khi resize
-  // Tuyệt đối không đọc offsetWidth/offsetLeft trong frame cuộn!
+  // Tuyệt đối không đọc offsetWidth/offsetLeft trong frame cuộn hoặc khi đổi activeSection!
   useEffect(() => {
     const measureNav = () => {
       const positions: Record<string, { width: number; left: number }> = {};
@@ -122,7 +122,7 @@ export function Navbar() {
     measureNav();
     window.addEventListener("resize", measureNav, { passive: true });
     return () => window.removeEventListener("resize", measureNav);
-  }, [pathname, activeSection]);
+  }, [pathname]);
 
   // Cập nhật vị trí gạch chân trượt (sliding underline indicator) qua GPU transform
   useEffect(() => {
@@ -234,7 +234,7 @@ export function Navbar() {
             {/* Sliding underline indicator - using left-0 and transform */}
             <div
               ref={indicatorRef}
-              className="pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-primary transition-all duration-200 ease-out"
+              className="pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-primary transition-[transform,opacity] duration-200 ease-out"
               aria-hidden="true"
             />
           </nav>

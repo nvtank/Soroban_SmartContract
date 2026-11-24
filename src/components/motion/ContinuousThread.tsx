@@ -49,6 +49,7 @@ export function ContinuousThread() {
     <div
       ref={containerRef}
       className="hidden xl:block pointer-events-none absolute right-[max(1.5rem,calc(50%-44rem))] top-[100vh] bottom-0 z-0 w-8 overflow-hidden opacity-50"
+      style={{ contain: "strict" }}
       aria-hidden="true"
     >
       <svg

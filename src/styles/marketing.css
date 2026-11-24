@@ -62,6 +62,7 @@ html.lenis-scrolling header {
   transform-origin: left center;
   transform: scaleX(0);
   will-change: transform;
+  contain: strict;
 }
 
 /* Header ẩn/hiện và compact chỉ bằng transform qua data-* */

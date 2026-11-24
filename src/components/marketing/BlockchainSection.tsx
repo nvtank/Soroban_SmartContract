@@ -96,7 +96,7 @@ export function BlockchainSection({ transactions = [] }: BlockchainSectionProps)
 
           <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {techCards.map((tech) => {
-              const isImplemented = tech.status === "ĐÃ TRIỂN KHAI";
+              const isImplemented = !tech.status.includes("LỘ TRÌNH");
 
               return (
                 <div
