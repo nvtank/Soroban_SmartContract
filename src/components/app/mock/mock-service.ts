@@ -270,6 +270,11 @@ class MockService {
     return payment;
   }
 
+  public getPaymentById(paymentId: string): PaymentDto | undefined {
+    this.init();
+    return this.payments.find((p) => p.id === paymentId);
+  }
+
   public simulatePayment(
     paymentId: string,
     outcome: "CONFIRMED" | "UNDERPAID" | "OVERPAID" | "FAILED",

@@ -22,28 +22,39 @@ export function OnchainDrawer({
   const [txs, setTxs] = useState<OnchainTxDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      let ignore = false;
-      apiClient.getOnchainTxs(contractId).then((list) => {
+    if (!isOpen) return;
+    let ignore = false;
+    apiClient
+      .getOnchainTxs(contractId)
+      .then((list) => {
         if (!ignore) {
           setTxs(list);
           setLoading(false);
         }
+      })
+      .catch((err: unknown) => {
+        if (!ignore) {
+          setError(err instanceof Error ? err.message : "Không thể tải danh sách giao dịch on-chain");
+          setLoading(false);
+        }
       });
-      return () => {
-        ignore = true;
-      };
-    }
+    return () => {
+      ignore = true;
+    };
   }, [contractId, isOpen]);
 
   const handleRetry = async (txId: string) => {
     setRetryingId(txId);
+    setError(null);
     try {
       await apiClient.retryOnchainTx(txId);
       const updated = await apiClient.getOnchainTxs(contractId);
       setTxs(updated);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Thử lại giao dịch thất bại");
     } finally {
       setRetryingId(null);
     }
@@ -51,16 +62,16 @@ export function OnchainDrawer({
 
   if (!isOpen) return null;
 
-  const hasConfirmed = txs.some((t) => t.status === "CONFIRMED");
+  const confirmedTx = txs.find((t) => t.status === "CONFIRMED");
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-hidden bg-ink/50 backdrop-blur-xs flex justify-end"
+      className="fixed inset-0 z-50 overflow-hidden bg-ink/50 flex justify-end"
       role="dialog"
       aria-modal="true"
       aria-labelledby="onchain-drawer-title"
     >
-      <div className="w-full max-w-md sm:max-w-lg bg-paper h-full shadow-2xl border-l border-line flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="w-full max-w-md sm:max-w-lg bg-paper h-full shadow-lg border-l border-line flex flex-col">
         {/* Header */}
         <div className="p-5 border-b border-line flex items-center justify-between bg-surface/40">
           <div>
@@ -79,11 +90,17 @@ export function OnchainDrawer({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-6 text-sm">
-          {/* Stamp banner if confirmed */}
-          {hasConfirmed && (
+        <div className="flex-1 overflow-y-auto p-5 space-y-6 text-sm" data-lenis-prevent>
+          {/* Stamp banner only when truly CONFIRMED */}
+          {confirmedTx && (
             <div className="flex justify-center py-2">
-              <OnchainStamp timestamp={txs[0]?.createdAt} />
+              <OnchainStamp timestamp={confirmedTx.createdAt} />
+            </div>
+          )}
+
+          {error && (
+            <div role="alert" className="p-3 rounded-xl bg-brick/10 border border-brick/30 text-xs text-brick">
+              ⚠️ {error}
             </div>
           )}
 
@@ -142,7 +159,7 @@ export function OnchainDrawer({
                     <div className="font-mono text-[11px] text-ink/60 truncate flex items-center justify-between">
                       <span>Payload: {tx.payloadHash.slice(0, 24)}…</span>
                       {!tx.explorerUrl && (
-                        <span className="text-[10px] text-ink/40 italic">Dữ liệu mẫu</span>
+                        <span className="text-[10px] text-ink/40 italic">Chưa xác nhận explorer</span>
                       )}
                     </div>
 
@@ -152,7 +169,7 @@ export function OnchainDrawer({
                         <button
                           onClick={() => handleRetry(tx.id)}
                           disabled={retryingId === tx.id}
-                          className="px-2 py-0.5 rounded bg-brick text-paper text-xs font-bold hover:bg-brick-ink cursor-pointer"
+                          className="px-2 py-0.5 rounded bg-brick text-paper text-xs font-bold hover:bg-brick-ink cursor-pointer disabled:opacity-50"
                         >
                           {retryingId === tx.id ? "Đang thử lại…" : "Thử lại"}
                         </button>
