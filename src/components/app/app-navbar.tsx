@@ -1,12 +1,36 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ChevronDown } from "lucide-react";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useSession } from "./session-context";
 import { apiClient } from "./api-client";
 import type { NotificationDto } from "@/domain/dto";
+import { KeyMark, popIn, popOut, REDUCED, RollText } from "@/components/layout/island/island-motion";
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
+
+type Panel = "notifs" | "user" | null;
+
+function BellIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[18px] w-[18px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Z" strokeLinejoin="round" />
+      <path d="M10 20a2.2 2.2 0 0 0 4 0" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 export function AppNavbar() {
   const { user, role, loginAs, logout } = useSession();
@@ -14,20 +38,23 @@ export function AppNavbar() {
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
-  const [showNotifs, setShowNotifs] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [panel, setPanel] = useState<Panel>(null);
 
+  const barRef = useRef<HTMLDivElement>(null);
+  const ringRef = useRef<SVGCircleElement>(null);
+  const bellRef = useRef<HTMLSpanElement>(null);
+  const badgeRef = useRef<HTMLSpanElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const notifPanelRef = useRef<HTMLDivElement>(null);
+  const userPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let ignore = false;
     apiClient
       .getNotifications()
       .then((list) => {
-        if (!ignore) {
-          setNotifications(list);
-        }
+        if (!ignore) setNotifications(list);
       })
       .catch(() => {});
     return () => {
@@ -35,153 +62,240 @@ export function AppNavbar() {
     };
   }, [pathname]);
 
-  useEffect(() => {
-    if (!showNotifs && !showUserMenu) return;
+  const unreadCount = notifications.filter((n) => !n.readAt).length;
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setShowNotifs(false);
-        setShowUserMenu(false);
-      }
+  // Island xuất hiện, ẩn khi cuộn xuống và hiện lại khi cuộn lên; vòng logo là tiến độ đọc trang
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    if (!bar || window.matchMedia(REDUCED).matches) return;
+    gsap.fromTo(bar, { y: -30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: "back.out(1.4)" });
+    let hidden = false;
+    const hide = ScrollTrigger.create({
+      start: 0,
+      end: "max",
+      onUpdate: (self) => {
+        // Đang chạy hướng dẫn thì luôn hiện (bước cuối chỉ vào nút Hướng dẫn trên island)
+        const touring = document.querySelector('[data-tour-popup="1"]') !== null;
+        const shouldHide = !touring && self.direction === 1 && self.scroll() > 160;
+        if (shouldHide === hidden) return;
+        hidden = shouldHide;
+        gsap.to(bar, {
+          yPercent: shouldHide ? -140 : 0,
+          duration: 0.4,
+          ease: "power3.out",
+          overwrite: "auto",
+        });
+      },
+    });
+    const ring = ringRef.current;
+    const progress = ring
+      ? gsap.fromTo(
+          ring,
+          { strokeDashoffset: 1 },
+          { strokeDashoffset: 0, ease: "none", scrollTrigger: { start: 0, end: "max", scrub: 0.4 } },
+        )
+      : null;
+    return () => {
+      hide.kill();
+      progress?.scrollTrigger?.kill();
+      progress?.kill();
     };
+  }, [pathname]);
 
+  // Chuông lắc và huy hiệu bật lên khi có thông báo chưa đọc
+  useEffect(() => {
+    if (unreadCount === 0 || window.matchMedia(REDUCED).matches) return;
+    if (bellRef.current) {
+      gsap.fromTo(
+        bellRef.current,
+        { rotation: -18 },
+        { rotation: 0, duration: 1.4, ease: "elastic.out(1.2, 0.25)", transformOrigin: "50% 15%" },
+      );
+    }
+    if (badgeRef.current)
+      gsap.fromTo(badgeRef.current, { scale: 0 }, { scale: 1, duration: 0.5, ease: "back.out(3)" });
+  }, [unreadCount]);
+
+  // Hiệu ứng mở bảng
+  useLayoutEffect(() => {
+    if (panel === "notifs") popIn(notifPanelRef.current);
+    if (panel === "user") popIn(userPanelRef.current);
+  }, [panel]);
+
+  const closePanel = (then?: () => void) => {
+    const el = panel === "notifs" ? notifPanelRef.current : panel === "user" ? userPanelRef.current : null;
+    popOut(el, () => {
+      setPanel(null);
+      then?.();
+    });
+  };
+
+  const togglePanel = (next: Exclude<Panel, null>) => {
+    if (panel === next) closePanel();
+    else if (panel) closePanel(() => setPanel(next));
+    else setPanel(next);
+  };
+
+  useEffect(() => {
+    if (!panel) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closePanel();
+    };
     const onMouseDown = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (notifRef.current && !notifRef.current.contains(target)) {
-        setShowNotifs(false);
-      }
-      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
-        setShowUserMenu(false);
-      }
+      const host = panel === "notifs" ? notifRef.current : userMenuRef.current;
+      if (host && !host.contains(target)) closePanel();
     };
-
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("mousedown", onMouseDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("mousedown", onMouseDown);
     };
-  }, [showNotifs, showUserMenu]);
-
-  const unreadCount = notifications.filter((n) => !n.readAt).length;
+    // closePanel đọc panel hiện tại; chỉ cần gắn lại khi panel đổi
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panel]);
 
   const handleMarkAllRead = async () => {
     for (const n of notifications) {
       if (!n.readAt) await apiClient.markNotificationRead(n.id);
     }
-    const updated = await apiClient.getNotifications();
-    setNotifications(updated);
+    setNotifications(await apiClient.getNotifications());
   };
 
-  const handleQuickSwitch = async (val: "landlord" | "tenant1" | "tenant2") => {
-    setShowUserMenu(false);
-    await loginAs(val);
-    router.refresh();
+  const handleQuickSwitch = (val: "landlord" | "tenant1" | "tenant2") => {
+    closePanel(async () => {
+      await loginAs(val);
+      router.refresh();
+    });
   };
 
   const handleTourStart = () => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("rentflow:tour-start"));
-    }
+    window.dispatchEvent(new CustomEvent("rentflow:tour-start"));
   };
 
-  const roleLabel =
-    role === "LANDLORD" ? "Chủ nhà" : role === "ADMIN_DEMO" ? "Quản trị" : "Người thuê";
-
+  const roleLabel = role === "LANDLORD" ? "Chủ nhà" : role === "ADMIN_DEMO" ? "Quản trị" : "Người thuê";
   const cleanName = (user?.fullName || "Tài khoản").replace(/\s*\([^)]*\)\s*/g, "").trim();
+  const words = cleanName.split(/\s+/);
+  const initials = (
+    (words[0]?.[0] ?? "") + (words.length > 1 ? words[words.length - 1][0] : "")
+  ).toUpperCase();
+
+  const menuLink = (href: string, label: string) => (
+    <Link
+      href={href}
+      data-pop-item
+      onClick={() => closePanel()}
+      className={`block rounded-xl px-3 py-2 font-semibold transition-colors ${
+        pathname === href ? "bg-surface text-ink" : "text-ink/80 hover:bg-surface"
+      }`}
+    >
+      {label}
+    </Link>
+  );
 
   return (
     <header
-      className="sticky z-40 w-full px-3 sm:px-6 pt-2.5 pb-1"
+      className="sticky z-40 w-full px-3 pb-1 pt-2.5 sm:px-6"
       style={{ top: "var(--demo-banner-h, 1.75rem)" }}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 rounded-full border border-line bg-paper/90 px-3.5 py-1.5 sm:px-5 sm:py-2 shadow-soft backdrop-blur-md">
-        {/* Left: Brand & Current Role */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div
+        ref={barRef}
+        className="mx-auto flex max-w-6xl items-center justify-between gap-2 rounded-full bg-ink/95 p-1.5 pl-2 text-paper shadow-[0_20px_44px_-20px_rgba(10,18,40,0.7)] ring-1 ring-white/10"
+      >
+        {/* Trái: logo và vai trò */}
+        <div className="flex min-w-0 items-center gap-2">
           <Link
             href="/app"
-            className="font-sans text-sm sm:text-base font-extrabold tracking-tight text-ink hover:text-primary transition-colors shrink-0"
+            className="flex shrink-0 items-center gap-2 rounded-full py-0.5 pr-1"
+            aria-label="RentFlow - Bảng điều khiển"
           >
-            <span>Rent</span>
-            <span className="text-primary font-black">Flow</span>
+            <KeyMark ref={ringRef} className="h-8 w-8 text-paper" />
+            <span className="text-[15px] font-extrabold tracking-tight">
+              Rent<span className="text-primary">Flow</span>
+            </span>
           </Link>
-
           <span
-            className={`hidden sm:inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold shrink-0 ${
-              role === "LANDLORD"
-                ? "border-ink/15 bg-ink/6 text-ink"
-                : "border-primary/25 bg-primary/10 text-primary-strong"
+            className={`hidden shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex ${
+              role === "LANDLORD" ? "bg-white/10 text-paper/85" : "bg-primary/20 text-[#7fe0bd]"
             }`}
           >
             {roleLabel}
           </span>
         </div>
 
-        {/* Right: Tour trigger, Notifications, User menu */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {/* Phải: hướng dẫn, thông báo, tài khoản */}
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             data-tour="nav-tour"
             onClick={handleTourStart}
-            className="rounded-full border border-line bg-surface/60 px-2.5 sm:px-3 py-1 text-xs font-semibold text-ink transition-colors hover:border-ink/30 hover:bg-surface cursor-pointer"
+            className="rounded-full px-3 py-2 text-[13px] font-semibold text-paper/75 transition-colors hover:bg-white/10 hover:text-paper"
           >
-            Hướng dẫn
+            <RollText>Hướng dẫn</RollText>
           </button>
 
-          {/* Notifications */}
           <div ref={notifRef} className="relative">
             <button
               type="button"
-              onClick={() => {
-                setShowUserMenu(false);
-                setShowNotifs((v) => !v);
-              }}
-              className="relative flex h-8 w-8 items-center justify-center rounded-full text-ink/75 transition-colors hover:bg-surface hover:text-ink cursor-pointer"
+              onClick={() => togglePanel("notifs")}
+              className="relative flex h-9 w-9 items-center justify-center rounded-full text-paper/80 transition-colors hover:bg-white/10 hover:text-paper"
               aria-label="Thông báo"
-              aria-expanded={showNotifs}
+              aria-expanded={panel === "notifs"}
             >
-              <Bell className="h-4 w-4" />
+              <span ref={bellRef} className="inline-flex">
+                <BellIcon />
+              </span>
               {unreadCount > 0 && (
-                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brick px-1 text-[10px] font-bold text-paper">
+                <span
+                  ref={badgeRef}
+                  className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brick px-1 text-[10px] font-bold text-paper ring-2 ring-ink"
+                >
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
             </button>
 
-            {showNotifs && (
+            {panel === "notifs" && (
               <div
-                className="fixed sm:absolute right-3 sm:right-0 left-3 sm:left-auto mt-2 sm:w-88 rounded-2xl border border-line bg-paper p-4 shadow-soft z-50"
+                ref={notifPanelRef}
+                className="fixed left-3 right-3 z-50 mt-3 rounded-3xl bg-paper p-4 text-ink shadow-[0_30px_70px_-30px_rgba(10,18,40,0.55)] ring-1 ring-line sm:absolute sm:left-auto sm:right-0 sm:w-88"
                 data-lenis-prevent
               >
-                <div className="flex items-center justify-between border-b border-line pb-2.5 mb-2.5">
-                  <span className="text-xs font-bold text-ink">
+                <div className="mb-2.5 flex items-center justify-between border-b border-line pb-2.5">
+                  <span className="text-sm font-bold">
                     Thông báo {unreadCount > 0 ? `(${unreadCount} mới)` : ""}
                   </span>
                   {unreadCount > 0 && (
                     <button
                       type="button"
                       onClick={handleMarkAllRead}
-                      className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                      className="text-xs font-semibold text-primary hover:underline"
                     >
                       Đã đọc hết
                     </button>
                   )}
                 </div>
-                <div className="max-h-64 overflow-y-auto space-y-2" data-lenis-prevent>
+                <div className="max-h-72 space-y-2 overflow-y-auto" data-lenis-prevent>
                   {notifications.length === 0 ? (
-                    <p className="py-5 text-center text-xs text-ink/50">Chưa có thông báo mới.</p>
+                    <p className="py-6 text-center text-xs text-ink/50">Chưa có thông báo mới.</p>
                   ) : (
                     notifications.slice(0, 8).map((n) => (
                       <div
                         key={n.id}
-                        className={`rounded-xl border p-2.5 text-xs ${
-                          n.readAt
-                            ? "border-line/60 bg-surface/25 text-ink/65"
-                            : "border-primary/20 bg-primary/6 text-ink"
-                        }`}
+                        data-pop-item
+                        className={`rounded-2xl p-3 text-xs ${n.readAt ? "bg-surface/50 text-ink/60" : "bg-primary/8 text-ink"}`}
                       >
-                        <div className="font-semibold">{n.title}</div>
-                        <div className="mt-0.5 text-ink/70 line-clamp-2">{n.body}</div>
+                        <div className="flex items-center gap-2 font-semibold">
+                          {!n.readAt && (
+                            <span
+                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+                              aria-hidden="true"
+                            />
+                          )}
+                          {n.title}
+                        </div>
+                        <div className="mt-1 line-clamp-2 text-ink/65">{n.body}</div>
                       </div>
                     ))
                   )}
@@ -190,100 +304,75 @@ export function AppNavbar() {
             )}
           </div>
 
-          {/* User Menu */}
           <div ref={userMenuRef} className="relative">
             <button
               type="button"
-              onClick={() => {
-                setShowNotifs(false);
-                setShowUserMenu((v) => !v);
-              }}
-              className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-2.5 py-1 text-xs font-semibold text-ink transition-colors hover:bg-surface cursor-pointer"
+              onClick={() => togglePanel("user")}
+              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 transition-colors hover:bg-white/10 sm:pr-3"
               aria-label="Menu người dùng"
-              aria-expanded={showUserMenu}
+              aria-expanded={panel === "user"}
             >
-              <span className="max-w-28 truncate hidden sm:inline">{cleanName}</span>
-              <span className="sm:hidden font-bold">{cleanName.split(" ").pop()?.slice(0, 6) || "Tài khoản"}</span>
-              <ChevronDown className="h-3.5 w-3.5 text-ink/60" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[12px] font-extrabold text-paper">
+                {initials || "?"}
+              </span>
+              <span className="hidden max-w-28 truncate text-[13px] font-semibold sm:inline">
+                {cleanName}
+              </span>
             </button>
 
-            {showUserMenu && (
+            {panel === "user" && (
               <div
-                className="absolute right-0 mt-2 w-60 rounded-2xl border border-line bg-paper p-2 shadow-soft z-50 text-xs"
+                ref={userPanelRef}
+                className="absolute right-0 z-50 mt-3 w-64 rounded-3xl bg-paper p-2 text-xs text-ink shadow-[0_30px_70px_-30px_rgba(10,18,40,0.55)] ring-1 ring-line"
                 data-lenis-prevent
               >
-                <div className="px-3 py-2 border-b border-line/60">
-                  <div className="font-bold text-ink truncate">{cleanName}</div>
-                  <div className="text-[11px] text-ink/55 font-mono">
-                    {user?.phone || "—"} · {roleLabel}
-                  </div>
+                <div data-pop-item className="flex items-center gap-3 border-b border-line/60 px-3 py-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-[12px] font-extrabold text-paper">
+                    {initials || "?"}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold">{cleanName}</span>
+                    <span className="block font-mono text-[11px] text-ink/55">
+                      {user?.phone || "—"} · {roleLabel}
+                    </span>
+                  </span>
                 </div>
 
-                <div className="py-1 space-y-0.5">
-                  <Link
-                    href="/app"
-                    onClick={() => setShowUserMenu(false)}
-                    className={`block rounded-xl px-3 py-2 font-semibold transition-colors ${
-                      pathname === "/app" ? "bg-surface text-ink" : "text-ink/80 hover:bg-surface"
-                    }`}
-                  >
-                    Bảng điều khiển
-                  </Link>
-                  <Link
-                    href="/bang-chung"
-                    onClick={() => setShowUserMenu(false)}
-                    className={`block rounded-xl px-3 py-2 font-semibold transition-colors ${
-                      pathname === "/bang-chung" ? "bg-surface text-ink" : "text-ink/80 hover:bg-surface"
-                    }`}
-                  >
-                    Bằng chứng on-chain
-                  </Link>
-                  <Link
-                    href="/app/khoi-phuc"
-                    onClick={() => setShowUserMenu(false)}
-                    className={`block rounded-xl px-3 py-2 font-semibold transition-colors ${
-                      pathname === "/app/khoi-phuc" ? "bg-surface text-ink" : "text-ink/80 hover:bg-surface"
-                    }`}
-                  >
-                    Khôi phục tài khoản
-                  </Link>
+                <div className="space-y-0.5 py-1.5">
+                  {menuLink("/app", "Bảng điều khiển")}
+                  {menuLink("/bang-chung", "Bằng chứng on-chain")}
+                  {menuLink("/app/khoi-phuc", "Khôi phục tài khoản")}
                 </div>
 
-                <div className="border-t border-line/60 pt-1.5 mt-1">
+                <div className="mt-1 border-t border-line/60 pt-1.5">
                   <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-ink/45">
                     Đổi vai demo
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickSwitch("landlord")}
-                    className="w-full text-left rounded-xl px-3 py-1.5 font-medium text-ink/80 hover:bg-surface cursor-pointer"
-                  >
-                    Chủ nhà · Nguyễn Văn An
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickSwitch("tenant1")}
-                    className="w-full text-left rounded-xl px-3 py-1.5 font-medium text-ink/80 hover:bg-surface cursor-pointer"
-                  >
-                    Người thuê 1 · Trần Thị Bình
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickSwitch("tenant2")}
-                    className="w-full text-left rounded-xl px-3 py-1.5 font-medium text-ink/80 hover:bg-surface cursor-pointer"
-                  >
-                    Người thuê 2 · Lê Văn Cường
-                  </button>
+                  {(
+                    [
+                      ["landlord", "Chủ nhà · Nguyễn Văn An"],
+                      ["tenant1", "Người thuê 1 · Trần Thị Bình"],
+                      ["tenant2", "Người thuê 2 · Lê Văn Cường"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      data-pop-item
+                      onClick={() => handleQuickSwitch(key)}
+                      className="w-full rounded-xl px-3 py-1.5 text-left font-medium text-ink/80 hover:bg-surface"
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="border-t border-line/60 pt-1 mt-1">
+                <div className="mt-1 border-t border-line/60 pt-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      logout();
-                    }}
-                    className="w-full text-left rounded-xl px-3 py-2 font-semibold text-brick hover:bg-brick/10 transition-colors cursor-pointer"
+                    data-pop-item
+                    onClick={() => closePanel(() => logout())}
+                    className="w-full rounded-xl px-3 py-2 text-left font-semibold text-brick transition-colors hover:bg-brick/10"
                   >
                     Đăng xuất
                   </button>

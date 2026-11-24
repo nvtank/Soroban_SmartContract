@@ -1,355 +1,382 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, Suspense } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { Menu, X } from "lucide-react";
+import { KeyMark, REDUCED, RollText, useMagnetic } from "./island/island-motion";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-const CHAPTER_GROUPS: Record<"story" | "how", string[]> = {
-  story: ["mo-dau", "van-de", "giai-phap"],
-  how: ["hanh-trinh", "on-chain", "su-that", "dung-thu"],
-};
+const CHAPTERS: { id: string; name: string; group: "story" | "how" | null }[] = [
+  { id: "mo-dau", name: "Mở đầu", group: null },
+  { id: "van-de", name: "Khi niềm tin gãy", group: "story" },
+  { id: "giai-phap", name: "Hai chìa khóa", group: "story" },
+  { id: "hanh-trinh", name: "Năm bước", group: "how" },
+  { id: "on-chain", name: "Dấu vết on-chain", group: "how" },
+  { id: "su-that", name: "Thật và mô phỏng", group: "how" },
+  { id: "dung-thu", name: "Dùng thử", group: null },
+];
+
+const LINKS = [
+  { key: "story", hash: "#van-de", label: "Câu chuyện" },
+  { key: "how", hash: "#hanh-trinh", label: "Cách hoạt động" },
+  { key: "page", href: "/minh-bach", label: "Minh bạch" },
+] as const;
 
 function NavbarInner() {
   const pathname = usePathname();
   const isHome = pathname === "/";
 
-  const navAnimRef = useRef<HTMLDivElement>(null);
-  const hoverPillRef = useRef<HTMLDivElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const mobileMenuOpenRef = useRef(false);
+  const islandRef = useRef<HTMLDivElement>(null);
+  const linksRef = useRef<HTMLElement>(null);
+  const chapterBoxRef = useRef<HTMLDivElement>(null);
+  const chapterTextRef = useRef<HTMLSpanElement>(null);
+  const hoverRef = useRef<HTMLSpanElement>(null);
+  const ringRef = useRef<SVGCircleElement>(null);
+  const ctaRef = useRef<HTMLAnchorElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const barTopRef = useRef<HTMLSpanElement>(null);
+  const barBottomRef = useRef<HTMLSpanElement>(null);
 
-  const [activeSectionGroup, setActiveSectionGroup] = useState<"story" | "how" | null>(null);
-  const activeGroup = isHome ? activeSectionGroup : null;
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [chapter, setChapter] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const compactRef = useRef(false);
 
+  useMagnetic(ctaRef, 0.25);
+
+  // Island xuất hiện khi tải trang. Dùng context + revert để chạy hai lần (React dev) vẫn đúng.
+  useLayoutEffect(() => {
+    const island = islandRef.current;
+    if (!island || window.matchMedia(REDUCED).matches) return;
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+      tl.fromTo(
+        island,
+        { y: -36, opacity: 0, scale: 0.9 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.9, ease: "back.out(1.5)" },
+      ).fromTo(
+        island.querySelectorAll("[data-island-item]"),
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, stagger: 0.06 },
+        0.25,
+      );
+    }, island);
+    return () => ctx.revert();
+  }, []);
+
+  // Vòng tiến độ đọc quanh logo
   useEffect(() => {
-    mobileMenuOpenRef.current = mobileMenuOpen;
-  }, [mobileMenuOpen]);
-
-  // Close mobile menu on Escape key or outside click
-  useEffect(() => {
-    if (!mobileMenuOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setMobileMenuOpen(false);
-        menuButtonRef.current?.focus();
-      }
-    };
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(target) &&
-        menuButtonRef.current &&
-        !menuButtonRef.current.contains(target)
-      ) {
-        setMobileMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [mobileMenuOpen]);
-
-  // Entrance animation & Smart scroll hide/show with GSAP (runs once on mount)
-  useEffect(() => {
-    const navAnim = navAnimRef.current;
-    if (!navAnim) return;
-
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReducedMotion) return;
-
-    gsap.fromTo(
-      navAnim,
-      { y: -16, opacity: 0 },
-      { y: 0, opacity: 1, duration: 0.35, ease: "power2.out" }
+    const ring = ringRef.current;
+    if (!ring) return;
+    const tween = gsap.fromTo(
+      ring,
+      { strokeDashoffset: 1 },
+      {
+        strokeDashoffset: 0,
+        ease: "none",
+        scrollTrigger: { start: 0, end: "max", scrub: 0.4, invalidateOnRefresh: true },
+      },
     );
+    return () => {
+      tween.scrollTrigger?.kill();
+      tween.kill();
+    };
+  }, [pathname]);
 
-    let isHidden = false;
+  // Thu gọn khi cuộn xuống: ẩn liên kết, hiện tên chương hiện tại. Cuộn lên hoặc rê chuột thì nở ra.
+  useEffect(() => {
+    const links = linksRef.current;
+    const box = chapterBoxRef.current;
+    const island = islandRef.current;
+    if (!links || !island || window.matchMedia(REDUCED).matches) return;
+    const desktop = window.matchMedia("(min-width: 640px)");
 
+    const setCompact = (compact: boolean) => {
+      if (compactRef.current === compact || !desktop.matches) return;
+      compactRef.current = compact;
+      const ease = "power3.inOut";
+      if (compact) {
+        gsap.to(links, { width: 0, opacity: 0, duration: 0.45, ease, overwrite: true });
+        if (box && isHome) {
+          gsap.fromTo(
+            box,
+            { width: 0, opacity: 0 },
+            { width: "auto", opacity: 1, duration: 0.45, ease, overwrite: true },
+          );
+        }
+      } else {
+        gsap.to(links, {
+          width: links.scrollWidth,
+          opacity: 1,
+          duration: 0.45,
+          ease,
+          overwrite: true,
+          onComplete: () => {
+            gsap.set(links, { clearProps: "width" });
+          },
+        });
+        if (box) gsap.to(box, { width: 0, opacity: 0, duration: 0.35, ease, overwrite: true });
+      }
+    };
+
+    let hovering = false;
+    let scrolledDown = false;
     const st = ScrollTrigger.create({
       start: 0,
       end: "max",
       onUpdate: (self) => {
-        if (mobileMenuOpenRef.current || navAnim.contains(document.activeElement)) {
-          if (isHidden) {
-            isHidden = false;
-            gsap.to(navAnim, {
-              y: 0,
-              opacity: 1,
-              duration: 0.2,
-              ease: "power2.out",
-              overwrite: "auto",
-            });
-          }
-          return;
-        }
-
-        const shouldHide = self.direction === 1 && self.scroll() > 120;
-        if (shouldHide !== isHidden) {
-          isHidden = shouldHide;
-          gsap.to(navAnim, {
-            y: shouldHide ? -70 : 0,
-            opacity: shouldHide ? 0 : 1,
-            duration: shouldHide ? 0.2 : 0.25,
-            ease: "power2.out",
-            overwrite: "auto",
-          });
-        }
+        const y = self.scroll();
+        if (y < 140) scrolledDown = false;
+        else if (self.direction === 1) scrolledDown = true;
+        else if (self.direction === -1) scrolledDown = false;
+        setCompact(scrolledDown && !hovering);
       },
     });
-
-    return () => st.kill();
-  }, []);
-
-  // Active chapter tracking on homepage
-  useEffect(() => {
-    if (!isHome) return;
-
-    const allChapterIds = [...CHAPTER_GROUPS.story, ...CHAPTER_GROUPS.how];
-    const ctx = gsap.context(() => {
-      allChapterIds.forEach((id) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-
-        ScrollTrigger.create({
-          trigger: el,
-          start: "top center",
-          end: "bottom center",
-          onEnter: () => {
-            if (CHAPTER_GROUPS.story.includes(id)) {
-              setActiveSectionGroup("story");
-            } else if (CHAPTER_GROUPS.how.includes(id)) {
-              setActiveSectionGroup("how");
-            }
-          },
-          onEnterBack: () => {
-            if (CHAPTER_GROUPS.story.includes(id)) {
-              setActiveSectionGroup("story");
-            } else if (CHAPTER_GROUPS.how.includes(id)) {
-              setActiveSectionGroup("how");
-            }
-          },
-        });
-      });
-    });
-
-    return () => ctx.revert();
+    const enter = () => {
+      hovering = true;
+      setCompact(false);
+    };
+    const leave = () => {
+      hovering = false;
+      setCompact(scrolledDown);
+    };
+    island.addEventListener("pointerenter", enter);
+    island.addEventListener("pointerleave", leave);
+    return () => {
+      st.kill();
+      island.removeEventListener("pointerenter", enter);
+      island.removeEventListener("pointerleave", leave);
+      compactRef.current = false;
+      gsap.set([links, box].filter(Boolean), { clearProps: "width,opacity" });
+    };
   }, [isHome]);
 
-  // Hover sliding background for desktop links (uses GPU transform, no layout polling on scroll)
-  const handleLinkMouseEnter = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const pill = hoverPillRef.current;
-    const el = e.currentTarget;
-    if (!pill || !el) return;
+  // Theo dõi chương đang đọc trên trang chủ
+  useEffect(() => {
+    if (!isHome) return;
+    const triggers = CHAPTERS.map((c, i) => {
+      const el = document.getElementById(c.id);
+      if (!el) return null;
+      return ScrollTrigger.create({
+        trigger: el,
+        start: "top center",
+        end: "bottom center",
+        onToggle: (self) => {
+          if (self.isActive) setChapter(i);
+        },
+      });
+    });
+    return () => triggers.forEach((t) => t?.kill());
+  }, [isHome]);
 
+  // Tên chương đổi bằng hiệu ứng cuộn chữ
+  useEffect(() => {
+    const el = chapterTextRef.current;
+    if (!el || window.matchMedia(REDUCED).matches) return;
+    // Island đang thu gọn thì giãn theo độ dài tên chương mới
+    if (compactRef.current && chapterBoxRef.current) {
+      gsap.to(chapterBoxRef.current, { width: "auto", duration: 0.35, ease: "power3.out", overwrite: true });
+    }
+    gsap.fromTo(
+      el,
+      { yPercent: 100, opacity: 0 },
+      { yPercent: 0, opacity: 1, duration: 0.45, ease: "power3.out" },
+    );
+  }, [chapter]);
+
+  // Viên sáng trượt theo liên kết đang trỏ
+  const moveHover = (target: HTMLElement) => {
+    const pill = hoverRef.current;
+    if (!pill || window.matchMedia(REDUCED).matches) return;
     gsap.to(pill, {
-      x: el.offsetLeft,
-      width: el.offsetWidth,
+      x: target.offsetLeft,
+      width: target.offsetWidth,
       opacity: 1,
-      duration: 0.2,
-      ease: "power2.out",
+      duration: 0.35,
+      ease: "power3.out",
       overwrite: "auto",
     });
-  }, []);
+  };
+  const hideHover = () => {
+    if (hoverRef.current) gsap.to(hoverRef.current, { opacity: 0, duration: 0.25, overwrite: "auto" });
+  };
 
-  const handleNavMouseLeave = useCallback(() => {
-    const pill = hoverPillRef.current;
-    if (!pill) return;
-    gsap.to(pill, {
-      opacity: 0,
-      duration: 0.15,
-      ease: "power2.in",
-      overwrite: "auto",
+  // Menu điện thoại: nút hai vạch thành dấu X, bảng nở từ island
+  useEffect(() => {
+    const top = barTopRef.current;
+    const bottom = barBottomRef.current;
+    if (!top || !bottom) return;
+    const d = window.matchMedia(REDUCED).matches ? 0 : 0.35;
+    gsap.to(top, { y: menuOpen ? 3 : 0, rotation: menuOpen ? 45 : 0, duration: d, ease: "power3.inOut" });
+    gsap.to(bottom, {
+      y: menuOpen ? -3 : 0,
+      rotation: menuOpen ? -45 : 0,
+      duration: d,
+      ease: "power3.inOut",
     });
-  }, []);
+    const panel = panelRef.current;
+    if (menuOpen && panel && d > 0) {
+      gsap.fromTo(
+        panel,
+        { opacity: 0, y: -14, scale: 0.94, transformOrigin: "top center" },
+        { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: "power3.out" },
+      );
+      gsap.fromTo(
+        panel.querySelectorAll("[data-menu-item]"),
+        { yPercent: 70, opacity: 0, filter: "blur(6px)" },
+        {
+          yPercent: 0,
+          opacity: 1,
+          filter: "blur(0px)",
+          duration: 0.5,
+          stagger: 0.06,
+          ease: "power3.out",
+          delay: 0.08,
+          clearProps: "filter",
+        },
+      );
+    }
+  }, [menuOpen]);
 
-  const isTransparency = pathname === "/minh-bach";
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+
+  const activeGroup = isHome ? CHAPTERS[chapter]?.group : null;
+  const hrefOf = (l: (typeof LINKS)[number]) => ("href" in l ? l.href : isHome ? l.hash : `/${l.hash}`);
+  const isActive = (l: (typeof LINKS)[number]) =>
+    l.key === "page" ? pathname === l.href : activeGroup === l.key;
 
   return (
-    <>
-      <div
-        className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-3"
-        style={{
-          top: "calc(var(--demo-banner-h, 1.75rem) + 0.625rem)",
-        }}
-      >
-        <div ref={navAnimRef} className="pointer-events-auto max-w-full">
-          <header className="flex w-auto max-w-full items-center gap-2 sm:gap-3 rounded-full border border-line bg-paper/90 px-3.5 py-1.5 shadow-soft backdrop-blur-md">
-            {/* Logo chữ RentFlow */}
-            <Link
-              href="/"
-              className="font-sans text-sm sm:text-base font-extrabold tracking-tight text-ink hover:text-primary transition-colors px-1"
-              aria-label="RentFlow - Về trang chủ"
-            >
-              <span>Rent</span>
-              <span className="text-primary font-black">Flow</span>
-            </Link>
-
-            {/* Desktop Links (3 liên kết) */}
-            <nav
-              onMouseLeave={handleNavMouseLeave}
-              className="relative hidden sm:flex items-center gap-0.5"
-              aria-label="Điều hướng chính"
-            >
-              {/* Sliding hover pill */}
-              <div
-                ref={hoverPillRef}
-                className="pointer-events-none absolute inset-y-0.5 left-0 rounded-full bg-surface opacity-0"
-                aria-hidden="true"
-              />
-
-              {/* 1. Câu chuyện */}
-              <Link
-                href={isHome ? "#van-de" : "/#van-de"}
-                onMouseEnter={handleLinkMouseEnter}
-                className={`relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                  activeGroup === "story"
-                    ? "text-primary font-bold"
-                    : "text-ink/75 hover:text-ink"
-                }`}
-              >
-                {activeGroup === "story" && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-                )}
-                <span>Câu chuyện</span>
-              </Link>
-
-              {/* 2. Cách hoạt động */}
-              <Link
-                href={isHome ? "#hanh-trinh" : "/#hanh-trinh"}
-                onMouseEnter={handleLinkMouseEnter}
-                className={`relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                  activeGroup === "how"
-                    ? "text-primary font-bold"
-                    : "text-ink/75 hover:text-ink"
-                }`}
-              >
-                {activeGroup === "how" && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-                )}
-                <span>Cách hoạt động</span>
-              </Link>
-
-              {/* 3. Minh bạch */}
-              <Link
-                href="/minh-bach"
-                onMouseEnter={handleLinkMouseEnter}
-                className={`relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                  isTransparency
-                    ? "text-primary font-bold"
-                    : "text-ink/75 hover:text-ink"
-                }`}
-              >
-                {isTransparency && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-                )}
-                <span>Minh bạch</span>
-              </Link>
-            </nav>
-
-            {/* Nút Dùng thử (Desktop) */}
-            <Link
-              href="/dang-nhap"
-              className="hidden sm:inline-flex items-center rounded-full bg-primary px-3.5 py-1 text-xs font-bold text-paper shadow-xs transition-colors hover:bg-primary-strong focus-visible:outline-2 focus-visible:outline-primary"
-            >
-              Dùng thử
-            </Link>
-
-            {/* Nút Menu (Mobile) */}
-            <button
-              ref={menuButtonRef}
-              type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-ink sm:hidden hover:bg-surface focus-visible:outline-2 focus-visible:outline-primary"
-              aria-label={mobileMenuOpen ? "Đóng menu điều hướng" : "Mở menu điều hướng"}
-              aria-expanded={mobileMenuOpen}
-              aria-controls="mobile-nav-panel"
-            >
-              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </button>
-          </header>
-        </div>
-      </div>
-
-      {/* Bảng menu di động nhỏ dạng popover nổi (Mobile 390px) */}
-      {mobileMenuOpen && (
-        <div
-          className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4 sm:hidden"
-          style={{
-            top: "calc(var(--demo-banner-h, 1.75rem) + 3.25rem)",
-          }}
-        >
-          <div
-            ref={mobileMenuRef}
-            id="mobile-nav-panel"
-            role="dialog"
-            aria-label="Menu điều hướng di động"
-            className="pointer-events-auto w-full max-w-xs rounded-2xl border border-line bg-paper/95 p-3.5 shadow-soft backdrop-blur-md"
+    <div
+      className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-3"
+      style={{ top: "calc(var(--demo-banner-h, 1.75rem) + 0.625rem)" }}
+    >
+      <div ref={islandRef} className="pointer-events-auto relative max-w-full">
+        <header className="flex items-center gap-1 rounded-full bg-ink/95 p-1.5 text-paper shadow-[0_20px_44px_-20px_rgba(10,18,40,0.75)] ring-1 ring-white/10">
+          <Link
+            href="/"
+            data-island-item
+            className="flex items-center gap-2 rounded-full py-0.5 pl-1 pr-2.5"
+            aria-label="RentFlow - Về trang chủ"
           >
-            <nav className="flex flex-col gap-1" aria-label="Điều hướng di động">
+            <KeyMark ref={ringRef} className="h-8 w-8 text-paper" />
+            <span className="text-[15px] font-extrabold tracking-tight">
+              Rent<span className="text-primary">Flow</span>
+            </span>
+          </Link>
+
+          {/* Tên chương: chỉ hiện khi island thu gọn trên trang chủ */}
+          <div
+            ref={chapterBoxRef}
+            className="hidden w-0 overflow-hidden whitespace-nowrap opacity-0 sm:block"
+            aria-live="polite"
+          >
+            <span className="flex w-max items-center gap-2 border-l border-white/15 py-1 pl-3 pr-3 text-[13px] font-semibold text-paper/80">
+              <span className="font-mono text-[11px] text-primary">0{chapter + 1}</span>
+              <span className="inline-flex shrink-0 overflow-hidden">
+                <span ref={chapterTextRef} key={chapter} className="block">
+                  {CHAPTERS[chapter]?.name}
+                </span>
+              </span>
+            </span>
+          </div>
+
+          <nav
+            ref={linksRef}
+            onMouseLeave={hideHover}
+            className="relative hidden items-center overflow-hidden whitespace-nowrap sm:flex"
+            aria-label="Điều hướng chính"
+          >
+            <span
+              ref={hoverRef}
+              className="pointer-events-none absolute inset-y-0 left-0 w-0 rounded-full bg-white/10 opacity-0"
+              aria-hidden="true"
+            />
+            {LINKS.map((l) => (
               <Link
-                href={isHome ? "#van-de" : "/#van-de"}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                  activeGroup === "story" ? "bg-primary/10 text-primary font-bold" : "text-ink hover:bg-surface"
+                key={l.key}
+                href={hrefOf(l)}
+                data-island-item
+                onMouseEnter={(e) => moveHover(e.currentTarget)}
+                className={`relative z-10 flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-colors ${
+                  isActive(l) ? "text-paper" : "text-paper/65 hover:text-paper"
                 }`}
               >
-                <span>Câu chuyện</span>
-                {activeGroup === "story" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                <span
+                  className={`h-1.5 w-1.5 rounded-full bg-primary transition-transform duration-300 ${isActive(l) ? "scale-100" : "scale-0"}`}
+                  aria-hidden="true"
+                />
+                <RollText>{l.label}</RollText>
               </Link>
+            ))}
+          </nav>
 
-              <Link
-                href={isHome ? "#hanh-trinh" : "/#hanh-trinh"}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                  activeGroup === "how" ? "bg-primary/10 text-primary font-bold" : "text-ink hover:bg-surface"
-                }`}
-              >
-                <span>Cách hoạt động</span>
-                {activeGroup === "how" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-              </Link>
+          <Link
+            ref={ctaRef}
+            href="/dang-nhap"
+            data-island-item
+            className="ml-1 hidden items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-paper shadow-[0_8px_20px_-8px_rgba(20,140,100,0.8)] sm:inline-flex"
+          >
+            <RollText>Dùng thử</RollText>
+            <span aria-hidden="true">→</span>
+          </Link>
 
-              <Link
-                href="/minh-bach"
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                  isTransparency ? "bg-primary/10 text-primary font-bold" : "text-ink hover:bg-surface"
-                }`}
-              >
-                <span>Minh bạch</span>
-                {isTransparency && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-              </Link>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="ml-1 flex h-9 w-9 flex-col items-center justify-center gap-[5px] rounded-full bg-white/10 sm:hidden"
+            aria-label={menuOpen ? "Đóng menu điều hướng" : "Mở menu điều hướng"}
+            aria-expanded={menuOpen}
+            aria-controls="island-menu"
+          >
+            <span ref={barTopRef} className="block h-[2px] w-4 rounded-full bg-paper" />
+            <span ref={barBottomRef} className="block h-[2px] w-4 rounded-full bg-paper" />
+          </button>
+        </header>
 
-              <div className="pt-2 mt-1 border-t border-line/60">
+        {/* Lớp ngoài căn giữa bằng CSS, lớp trong để GSAP tạo hiệu ứng (tránh GSAP ghi đè translate) */}
+        {menuOpen && (
+          <div className="absolute left-1/2 top-full mt-2 w-[min(22rem,calc(100vw-24px))] -translate-x-1/2 sm:hidden">
+            <div
+              ref={panelRef}
+              id="island-menu"
+              className="rounded-[1.75rem] bg-ink p-3 text-paper shadow-[0_24px_60px_-24px_rgba(10,18,40,0.8)] ring-1 ring-white/10"
+            >
+              <nav className="flex flex-col" aria-label="Điều hướng di động">
+                {LINKS.map((l) => (
+                  <Link
+                    key={l.key}
+                    href={hrefOf(l)}
+                    onClick={() => setMenuOpen(false)}
+                    data-menu-item
+                    className="flex items-center justify-between rounded-2xl px-4 py-3.5 text-2xl font-extrabold tracking-tight hover:bg-white/5"
+                  >
+                    {l.label}
+                    {isActive(l) && <span className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />}
+                  </Link>
+                ))}
                 <Link
                   href="/dang-nhap"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center justify-center rounded-xl bg-primary py-2 text-sm font-bold text-paper shadow-xs hover:bg-primary-strong transition-colors"
+                  onClick={() => setMenuOpen(false)}
+                  data-menu-item
+                  className="mt-2 rounded-2xl bg-primary px-4 py-3.5 text-center text-base font-bold"
                 >
                   Dùng thử
                 </Link>
-              </div>
-            </nav>
+              </nav>
+            </div>
           </div>
-        </div>
-      )}
-    </>
+        )}
+      </div>
+    </div>
   );
 }
 
