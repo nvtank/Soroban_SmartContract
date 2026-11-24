@@ -21,11 +21,13 @@ export class SorobanRpcClient implements StellarRpcClient {
   private server: rpc.Server;
   private contractId: string;
   private networkPassphrase: string;
+  private friendbotUrl?: string;
 
   constructor(config: StellarRpcConfig) {
     this.server = new rpc.Server(config.rpcUrl || DEFAULT_RPC_URL);
     this.contractId = config.contractId || "";
     this.networkPassphrase = config.networkPassphrase || DEFAULT_NETWORK_PASSPHRASE;
+    this.friendbotUrl = config.friendbotUrl;
   }
 
   getContractId(): string {
@@ -98,11 +100,11 @@ export class SorobanRpcClient implements StellarRpcClient {
   }
 
   async submitTransaction(tx: Transaction | FeeBumpTransaction): Promise<SubmitResult> {
-    try {
-      // Mạng chỉ nhận một giao dịch chờ cho mỗi tài khoản nguồn. Khi đang bận, RPC trả TRY_AGAIN_LATER:
-      // giao dịch KHÔNG được nhận và sẽ không bao giờ lên ledger, nên phải gửi lại chứ không được coi là đã gửi.
-      const MAX_ATTEMPTS = 8;
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // Mạng chỉ nhận một giao dịch chờ cho mỗi tài khoản nguồn. Khi đang bận, RPC trả TRY_AGAIN_LATER:
+    // giao dịch KHÔNG được nhận và sẽ không bao giờ lên ledger, nên phải gửi lại chứ không được coi là đã gửi.
+    const MAX_ATTEMPTS = 8;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
         const response = await this.server.sendTransaction(tx);
         const txHash = response.hash;
         const status = response.status as string;
@@ -111,7 +113,11 @@ export class SorobanRpcClient implements StellarRpcClient {
           return {
             txHash,
             status: "FAILED",
-            error: sanitizeError(response.errorResult?.toXDR("hex") || "Submission error"),
+            error: sanitizeError(
+              response.errorResult?.toXDR("hex") ||
+                (response as unknown as { errorResultXdr?: string }).errorResultXdr ||
+                "Submission error",
+            ),
           };
         }
         if (status === "TRY_AGAIN_LATER") {
@@ -127,15 +133,18 @@ export class SorobanRpcClient implements StellarRpcClient {
         }
         // PENDING (đã nhận), DUPLICATE (đã nhận trước đó) hoặc SUCCESS
         return { txHash, status: status === "SUCCESS" ? "SUCCESS" : "PENDING" };
+      } catch (err) {
+        if (attempt === MAX_ATTEMPTS) {
+          return {
+            txHash: "",
+            status: "FAILED",
+            error: sanitizeError(err),
+          };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
-      return { txHash: "", status: "FAILED", error: "Không gửi được giao dịch." };
-    } catch (err) {
-      return {
-        txHash: "",
-        status: "FAILED",
-        error: sanitizeError(err),
-      };
     }
+    return { txHash: "", status: "FAILED", error: "Không gửi được giao dịch." };
   }
 
   async getTransaction(txHash: string): Promise<TxStatusResult> {
@@ -167,11 +176,93 @@ export class SorobanRpcClient implements StellarRpcClient {
         txHash,
       };
     } catch (err) {
+      // Lỗi mạng hoặc RPC timeout không được coi là FAILED trên ledger,
+      // mà giữ trạng thái PENDING để tiếp tục đối soát ở lượt sau mà không hủy giao dịch.
       return {
-        status: "FAILED",
+        status: "PENDING",
         txHash,
         error: sanitizeError(err),
       };
+    }
+  }
+
+  async accountExists(publicKey: string): Promise<boolean> {
+    try {
+      await this.server.getAccount(publicKey);
+      return true;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.toLowerCase().includes("not found")) {
+        return false;
+      }
+      // Thử đối soát qua Horizon Testnet nếu RPC lỗi khác
+      try {
+        const isTestnet =
+          this.networkPassphrase === Networks.TESTNET ||
+          this.networkPassphrase === "Test SDF Network ; September 2015";
+        const horizonBase = isTestnet
+          ? "https://horizon-testnet.stellar.org"
+          : "https://horizon.stellar.org";
+        const res = await fetch(`${horizonBase}/accounts/${publicKey}`, {
+          method: "GET",
+          signal: AbortSignal.timeout(4000),
+        });
+        if (res.status === 404) return false;
+        if (res.ok) return true;
+      } catch {
+        // Bỏ qua lỗi fallback
+      }
+      throw err;
+    }
+  }
+
+  async fundTestnetAccount(publicKey: string, maxAttempts = 3): Promise<boolean> {
+    const isTestnet =
+      this.networkPassphrase === Networks.TESTNET ||
+      this.networkPassphrase === "Test SDF Network ; September 2015";
+    // CHỈ nạp bằng Friendbot khi mạng là Testnet. Tuyệt đối không làm trên mạng khác.
+    if (!isTestnet) {
+      return false;
+    }
+
+    const friendbotBase =
+      this.friendbotUrl || process.env.STELLAR_FRIENDBOT_URL || "https://friendbot.stellar.org";
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const res = await fetch(`${friendbotBase}?addr=${encodeURIComponent(publicKey)}`, {
+          method: "GET",
+          signal: AbortSignal.timeout(8000),
+        });
+        if (res.ok) {
+          return true;
+        }
+        if (res.status === 400) {
+          const body = await res.text().catch(() => "");
+          if (body.includes("createAccountAlreadyExist") || body.includes("op_already_exists")) {
+            return true;
+          }
+        }
+      } catch {
+        // Lỗi mạng hoặc timeout
+      }
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
+      }
+    }
+    return false;
+  }
+
+  async getAccountBalanceXlm(publicKey: string): Promise<number> {
+    try {
+      const entry = await this.server.getAccountEntry(publicKey);
+      return Number(entry.balance) / 10_000_000;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.toLowerCase().includes("not found")) {
+        return 0;
+      }
+      throw err;
     }
   }
 

@@ -6,3 +6,4 @@ export * from "./abi";
 export * from "./fee-bump";
 export * from "./client";
 export * from "./outbox";
+export * from "./health";
