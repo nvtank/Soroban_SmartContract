@@ -162,7 +162,8 @@ export async function checkStellarHealth(options?: StellarHealthOptions): Promis
           .build();
 
         const sim = await server.simulateTransaction(tx);
-        const errStr = sim.error || "";
+        // Phản hồi lỗi mô phỏng có trường error; phản hồi thành công thì không
+        const errStr = (sim as { error?: string }).error || "";
 
         // Contract tồn tại khi và chỉ khi Soroban trả về lỗi ContractNotFound (Error(Contract, #5))
         if (errStr.includes("ContractNotFound") || errStr.includes("Error(Contract, #5)")) {
