@@ -10,6 +10,8 @@ import { requireStepUp, createStepUpSession } from "@/lib/crypto/step-up";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 describe("API Routes & Step-Up Security", () => {
+  let createdRecoveryId: string | null = null;
+  const testOtpPhone = "0900000099";
   it("GET /api/health returns database: ok", async () => {
     const res = await healthGet();
     const json = await res.json();
@@ -19,26 +21,16 @@ describe("API Routes & Step-Up Security", () => {
     expect(json.data.database).toBe("ok");
   });
 
-  it("POST /api/demo/seed seeds demo landlord, tenants and contracts", async () => {
-    const res = await demoSeedPost(new Request("http://localhost:3000/api/demo/seed", { method: "POST" }), {});
-    const json = await res.json();
-    if (res.status !== 200) console.log("SEED ERROR:", json.error);
+  it("POST /api/demo/{seed,reset} rejects unauthenticated requests with 403 in DEMO_MODE", async () => {
+    const resSeed = await demoSeedPost(new Request("http://localhost:3000/api/demo/seed", { method: "POST" }), {});
+    expect(resSeed.status).toBe(403);
+    const jsonSeed = await resSeed.json();
+    expect(jsonSeed.error.code).toBe("FORBIDDEN");
 
-    expect(res.status).toBe(200);
-    expect(json.data.seeded).toBe(true);
-    expect(json.data.landlord).toBe("0900000001");
-    expect(json.data.tenant1).toBe("0900000002");
-    expect(json.data.tenant2).toBe("0900000003");
-    expect(json.data.contractsCount).toBe(3);
-  });
-
-  it("POST /api/demo/reset resets data and re-seeds", async () => {
-    const res = await demoResetPost(new Request("http://localhost:3000/api/demo/reset", { method: "POST" }), {});
-    const json = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(json.data.reset).toBe(true);
-    expect(json.data.contractsCount).toBe(3);
+    const resReset = await demoResetPost(new Request("http://localhost:3000/api/demo/reset", { method: "POST" }), {});
+    expect(resReset.status).toBe(403);
+    const jsonReset = await resReset.json();
+    expect(jsonReset.error.code).toBe("FORBIDDEN");
   });
 
   it("POST /api/demo/{seed,reset} returns 404 when DEMO_MODE !== 'true'", async () => {
@@ -106,6 +98,7 @@ describe("API Routes & Step-Up Security", () => {
 
     expect(res.status).toBe(200);
     expect(json.data.requestId).toBeDefined();
+    createdRecoveryId = json.data.requestId;
     expect(json.data.status).toBe("PENDING");
     expect(json.data.isSimulated).toBe(true);
   });
@@ -118,11 +111,16 @@ describe("API Routes & Step-Up Security", () => {
     const reqWithoutToken = new Request("http://localhost:3000/api/test", { method: "POST" });
     await expect(requireStepUp(reqWithoutToken, userId, "SIGN_CONTRACT")).rejects.toThrow();
 
-    // 2. With demo bypass token in DEMO_MODE: should succeed
+    // 2. With demo bypass token: rejected by default when ALLOW_DEMO_STEP_UP_BYPASS is not true
     const reqWithDemoToken = new Request("http://localhost:3000/api/test", {
       method: "POST",
       headers: { "x-step-up-token": "demo-step-up" },
     });
+    delete process.env.ALLOW_DEMO_STEP_UP_BYPASS;
+    await expect(requireStepUp(reqWithDemoToken, userId, "SIGN_CONTRACT")).rejects.toThrow();
+
+    // 2b. Allowed only when ALLOW_DEMO_STEP_UP_BYPASS === "true"
+    process.env.ALLOW_DEMO_STEP_UP_BYPASS = "true";
     await expect(requireStepUp(reqWithDemoToken, userId, "SIGN_CONTRACT")).resolves.toBeUndefined();
 
     // 3. With real step-up session token: should succeed
@@ -139,9 +137,10 @@ describe("API Routes & Step-Up Security", () => {
 
   afterAll(async () => {
     const admin = createAdminSupabase();
-    // Clean up test data created during test
-    await admin.from("auth_otps").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    await admin.from("auth_challenges").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    await admin.from("recovery_requests").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    // Clean up ONLY the specific test data created in this suite (never delete shared tables)
+    await admin.from("auth_otps").delete().eq("phone", testOtpPhone);
+    if (createdRecoveryId) {
+      await admin.from("recovery_requests").delete().eq("id", createdRecoveryId);
+    }
   });
 });

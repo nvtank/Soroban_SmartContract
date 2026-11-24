@@ -5,7 +5,7 @@ import { assertRateLimit, getClientIp } from "@/lib/supabase/rate-limit";
 
 const RequestOtpSchema = z.object({
   phone: z.string().min(8).max(15).regex(/^[0-9+]+$/),
-  role: z.enum(["LANDLORD", "TENANT"]).optional(),
+  role: z.enum(["LANDLORD", "TENANT", "ADMIN_DEMO"]).optional(),
 });
 
 export const POST = withApi(async (request: Request) => {
@@ -47,7 +47,12 @@ export const POST = withApi(async (request: Request) => {
 
   // Generate 6-digit OTP code (in DEMO_MODE, fixed or random, but DO NOT log the OTP)
   const isDemo = process.env.DEMO_MODE === "true";
-  const code = isDemo && (phone === "0900000001" || phone === "0900000002" || phone === "0900000003")
+  const isFixedDemoNumber =
+    phone === "0900000001" ||
+    phone === "0900000002" ||
+    phone === "0900000003" ||
+    phone === "0900000004";
+  const code = isDemo && isFixedDemoNumber
     ? "123456"
     : Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -57,7 +62,7 @@ export const POST = withApi(async (request: Request) => {
   await admin.from("auth_otps").insert({
     phone,
     code,
-    role: body.role === "LANDLORD" ? "LANDLORD" : "TENANT",
+    role: phone === "0900000004" ? "ADMIN_DEMO" : (body.role === "LANDLORD" ? "LANDLORD" : "TENANT"),
     expires_at: expiresAt,
   });
 

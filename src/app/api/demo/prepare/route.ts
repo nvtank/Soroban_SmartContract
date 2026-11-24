@@ -1,12 +1,12 @@
-import { withApi, ok, ApiError } from "@/lib/api/http";
+import { withApi, ok } from "@/lib/api/http";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { prepareDemoScenario } from "@/lib/demo/scenario";
+import { assertDemoRouteAccess } from "@/lib/demo/auth";
 
 // Chuẩn bị kịch bản trình diễn bằng API nghiệp vụ thật (3 hợp đồng, ghi lên Testnet qua hàng đợi on-chain).
 export const POST = withApi(async (request: Request) => {
-  if (process.env.DEMO_MODE !== "true") {
-    throw new ApiError("NOT_FOUND");
-  }
+  await assertDemoRouteAccess(request);
+
   const origin = new URL(request.url).origin;
   try {
     const result = await prepareDemoScenario(createAdminSupabase(), origin);

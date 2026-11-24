@@ -9,7 +9,7 @@ import type { SessionUser } from "@/domain/dto";
 const VerifyOtpSchema = z.object({
   phone: z.string().min(8).max(15).regex(/^[0-9+]+$/),
   code: z.string().min(4).max(8),
-  role: z.enum(["LANDLORD", "TENANT"]).optional(),
+  role: z.enum(["LANDLORD", "TENANT", "ADMIN_DEMO"]).optional(),
   fullName: z.string().optional(),
 });
 
@@ -31,7 +31,10 @@ export const POST = withApi(async (request: Request) => {
 
   const isDemo = process.env.DEMO_MODE === "true";
   const isFixedDemoNumber =
-    phone === "0900000001" || phone === "0900000002" || phone === "0900000003";
+    phone === "0900000001" ||
+    phone === "0900000002" ||
+    phone === "0900000003" ||
+    phone === "0900000004";
 
   let isValid = false;
 
@@ -81,19 +84,38 @@ export const POST = withApi(async (request: Request) => {
     .eq("phone", phone)
     .maybeSingle();
 
+  // Vai trò do máy chủ quyết định: CHỈ 0900000004 mới nhận ADMIN_DEMO, client không tự chọn được
+  const serverAssignedRole: SessionUser["role"] =
+    phone === "0900000004"
+      ? "ADMIN_DEMO"
+      : body.role === "LANDLORD"
+        ? "LANDLORD"
+        : "TENANT";
+
   let user: SessionUser;
 
   if (existingProfile) {
+    let finalRole: SessionUser["role"] = existingProfile.role;
+    if (phone === "0900000004") {
+      finalRole = "ADMIN_DEMO";
+      if (existingProfile.role !== "ADMIN_DEMO") {
+        await admin.from("profiles").update({ role: "ADMIN_DEMO" }).eq("id", existingProfile.id);
+      }
+    } else if (existingProfile.role === "ADMIN_DEMO") {
+      // Số điện thoại không phải 0900000004 không bao giờ được giữ vai trò ADMIN_DEMO
+      finalRole = serverAssignedRole;
+      await admin.from("profiles").update({ role: finalRole }).eq("id", existingProfile.id);
+    }
+
     user = {
       id: existingProfile.id,
-      role: existingProfile.role,
+      role: finalRole,
       fullName: existingProfile.full_name,
       phone: existingProfile.phone,
     };
   } else {
     // Create new user via seed_demo_user RPC
     const email = `${phone.replace(/\+/g, "")}@rentflow.local`;
-    const userRole = body.role === "LANDLORD" ? "LANDLORD" : "TENANT";
     const fullName =
       body.fullName ||
       (phone === "0900000001"
@@ -102,7 +124,9 @@ export const POST = withApi(async (request: Request) => {
           ? "Trần Thị Bình"
           : phone === "0900000003"
             ? "Lê Văn Cường"
-            : "Người dùng");
+            : phone === "0900000004"
+              ? "Quản trị viên Demo"
+              : "Người dùng");
 
     const newUserId =
       isFixedDemoNumber && phone === "0900000001"
@@ -111,14 +135,16 @@ export const POST = withApi(async (request: Request) => {
           ? "00000000-0000-0000-0000-000000000002"
           : isFixedDemoNumber && phone === "0900000003"
             ? "00000000-0000-0000-0000-000000000003"
-            : crypto.randomUUID();
+            : isFixedDemoNumber && phone === "0900000004"
+              ? "00000000-0000-0000-0000-000000000004"
+              : crypto.randomUUID();
 
     const { error: seedError } = await admin.rpc("seed_demo_user", {
       p_id: newUserId,
       p_email: email,
       p_phone: phone,
       p_full_name: fullName,
-      p_role: userRole,
+      p_role: serverAssignedRole,
     });
 
     if (seedError) {
@@ -127,7 +153,7 @@ export const POST = withApi(async (request: Request) => {
 
     user = {
       id: newUserId,
-      role: userRole,
+      role: serverAssignedRole,
       fullName: fullName,
       phone: phone,
     };
