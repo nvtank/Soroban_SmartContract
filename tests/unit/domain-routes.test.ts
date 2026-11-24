@@ -5,6 +5,8 @@ import { POST as refundApprovePost } from "@/app/api/contracts/[id]/refund/appro
 import { POST as deductionProposePost } from "@/app/api/contracts/[id]/deduction/propose/route";
 import { POST as deductionRespondPost } from "@/app/api/deductions/[id]/respond/route";
 import { POST as disputeResolvePost } from "@/app/api/contracts/[id]/dispute/resolve/route";
+import { POST as contractChargePost } from "@/app/api/contracts/[id]/charges/route";
+import { POST as chargePaidPost } from "@/app/api/contracts/[id]/charges/[chargeId]/paid/route";
 import { POST as overdueScanPost } from "@/app/api/jobs/overdue-scan/route";
 import { GET as notificationsGet } from "@/app/api/notifications/route";
 import * as sessionModule from "@/lib/supabase/session";
@@ -12,6 +14,7 @@ import * as contractService from "@/domain/contracts/service";
 import * as depositService from "@/domain/deposits/service";
 import * as deductionService from "@/domain/deductions/service";
 import * as disputeService from "@/domain/disputes/service";
+import * as chargeService from "@/domain/charges/service";
 import * as overdueScanService from "@/domain/jobs/overdue-scan";
 import type { SessionUser } from "@/domain/dto";
 
@@ -67,6 +70,7 @@ describe("Domain Route Handlers & Server Permission Checks", () => {
       rentPeriods: [],
       deductions: [],
       dispute: null,
+      charges: [],
     });
 
     const request = new Request("http://localhost:3000/api/contracts", {
@@ -150,6 +154,7 @@ describe("Domain Route Handlers & Server Permission Checks", () => {
       rentPeriods: [],
       deductions: [],
       dispute: null,
+      charges: [],
     });
 
     const response = await contractConfirmPost(
@@ -271,6 +276,8 @@ describe("Domain Route Handlers & Server Permission Checks", () => {
     vi.spyOn(overdueScanService, "scanOverdue").mockResolvedValue({
       scannedCount: 2,
       overdueCount: 1,
+      dueSoonCount: 0,
+      remindedCount: 0,
       updatedPeriods: [
         { contractId: "contract-1", periodNo: 1, daysLate: 5, lateFee: "125000" },
       ],
@@ -302,5 +309,70 @@ describe("Domain Route Handlers & Server Permission Checks", () => {
 
     const response = await overdueScanPost(request, emptyContext);
     expect(response.status).toBe(403);
+  });
+
+  it("POST /api/contracts/[id]/charges - thêm khoản nợ thành công trả về 201 ChargeDto", async () => {
+    vi.spyOn(sessionModule, "requireUser").mockResolvedValue(landlord);
+    vi.spyOn(chargeService, "createCharge").mockResolvedValue({
+      id: "charge-123",
+      periodNo: 1,
+      kind: "ELECTRICITY",
+      amount: "350000",
+      note: "Điện tháng 1",
+      status: "UNPAID",
+      createdAt: "2026-03-01T00:00:00.000Z",
+      paidAt: null,
+    });
+
+    const request = new Request("http://localhost:3000/api/contracts/contract-123/charges", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "ELECTRICITY",
+        amount: "350000",
+        note: "Điện tháng 1",
+        periodNo: 1,
+      }),
+    });
+
+    const response = await contractChargePost(request, {
+      params: Promise.resolve({ id: "contract-123" }),
+    });
+
+    expect(response.status).toBe(201);
+    const json = await response.json();
+    expect(json.data.id).toBe("charge-123");
+    expect(json.data.amount).toBe("350000");
+    expect(json.data.status).toBe("UNPAID");
+  });
+
+  it("POST /api/contracts/[id]/charges/[chargeId]/paid - đánh dấu đã nhận trả về 200 ChargeDto", async () => {
+    vi.spyOn(sessionModule, "requireUser").mockResolvedValue(landlord);
+    vi.spyOn(chargeService, "markChargePaid").mockResolvedValue({
+      id: "charge-123",
+      periodNo: 1,
+      kind: "ELECTRICITY",
+      amount: "350000",
+      note: "Điện tháng 1",
+      status: "PAID",
+      createdAt: "2026-03-01T00:00:00.000Z",
+      paidAt: "2026-03-05T10:00:00.000Z",
+    });
+
+    const request = new Request("http://localhost:3000/api/contracts/contract-123/charges/charge-123/paid", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    const response = await chargePaidPost(request, {
+      params: Promise.resolve({ id: "contract-123", chargeId: "charge-123" }),
+    });
+
+    expect(response.status).toBe(200);
+    const json = await response.json();
+    expect(json.data.id).toBe("charge-123");
+    expect(json.data.status).toBe("PAID");
+    expect(json.data.paidAt).toBe("2026-03-05T10:00:00.000Z");
   });
 });

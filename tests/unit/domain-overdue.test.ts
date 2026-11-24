@@ -131,4 +131,113 @@ describe("overdue scan & late fee job", () => {
     const period = await repo.rentPeriods.findByPeriod(contractId, 1);
     expect(period?.late_fee).toBe(500000n); // Phí vẫn là 500k, không bị nhân đôi lên 1 triệu!
   });
+
+  it("sends RENT_DUE_SOON notification for AWAITING_PAYMENT periods due within 3 days", async () => {
+    const repo = new FakeDomainRepository();
+    const contractId = "contract-due-soon";
+
+    await repo.contracts.create({
+      id: contractId,
+      landlord_id: "landlord-ds",
+      tenant_id: "tenant-ds",
+      tenant_phone_invited: "0901",
+      room_label: "P.301",
+      rent_amount: 5000000n,
+      deposit_amount: 5000000n,
+      start_date: "2026-01-01",
+      end_date: "2026-06-30",
+      due_day: 5,
+      late_fee_bps_per_day: 50,
+      terms_text: "Terms",
+      doc_hash: "hash",
+      doc_salt: "salt",
+      status: "ACTIVE",
+      onchain_ref: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    // Kỳ 1 đến hạn vào 2026-01-05 (cách 3 ngày so với 2026-01-02)
+    await repo.rentPeriods.createMany([
+      {
+        contract_id: contractId,
+        period_no: 1,
+        due_date: "2026-01-05",
+        amount_due: 5000000n,
+        amount_paid: 0n,
+        late_days: 0,
+        late_fee: 0n,
+        status: "AWAITING_PAYMENT",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ]);
+
+    // Quét ngày 2026-01-02 (đến hạn trong đúng 3 ngày)
+    const result1 = await scanOverdue(repo, { asOfDate: "2026-01-02" });
+    expect(result1.overdueCount).toBe(0);
+    expect(result1.dueSoonCount).toBe(1);
+    expect(result1.remindedCount).toBe(1);
+
+    const notifications = await repo.notifications.listByUserId("tenant-ds");
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].type).toBe("RENT_DUE_SOON");
+    expect(notifications[0].title).toBe("Nhắc hạn thanh toán tiền thuê");
+    expect(notifications[0].body).toContain("Kỳ thuê số 1 phòng P.301 sẽ đến hạn vào ngày 2026-01-05");
+
+    // Idempotent: chạy lại lần 2 trong cùng ngày không tạo thông báo trùng
+    const result2 = await scanOverdue(repo, { asOfDate: "2026-01-02" });
+    expect(result2.dueSoonCount).toBe(0);
+    expect(result2.remindedCount).toBe(0);
+
+    const notificationsAfterSecondRun = await repo.notifications.listByUserId("tenant-ds");
+    expect(notificationsAfterSecondRun).toHaveLength(1);
+  });
+
+  it("does not send RENT_DUE_SOON if due date is more than 3 days away or contract not ACTIVE", async () => {
+    const repo = new FakeDomainRepository();
+    const contractId = "contract-far-due";
+
+    await repo.contracts.create({
+      id: contractId,
+      landlord_id: "landlord-far",
+      tenant_id: "tenant-far",
+      tenant_phone_invited: "0901",
+      room_label: "P.302",
+      rent_amount: 5000000n,
+      deposit_amount: 5000000n,
+      start_date: "2026-01-01",
+      end_date: "2026-06-30",
+      due_day: 10,
+      late_fee_bps_per_day: 50,
+      terms_text: "Terms",
+      doc_hash: "hash",
+      doc_salt: "salt",
+      status: "ACTIVE",
+      onchain_ref: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    // Kỳ 1 đến hạn vào 2026-01-10 (cách 8 ngày so với 2026-01-02)
+    await repo.rentPeriods.createMany([
+      {
+        contract_id: contractId,
+        period_no: 1,
+        due_date: "2026-01-10",
+        amount_due: 5000000n,
+        amount_paid: 0n,
+        late_days: 0,
+        late_fee: 0n,
+        status: "AWAITING_PAYMENT",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ]);
+
+    const result = await scanOverdue(repo, { asOfDate: "2026-01-02" });
+    expect(result.dueSoonCount).toBe(0);
+    const notifications = await repo.notifications.listByUserId("tenant-far");
+    expect(notifications).toHaveLength(0);
+  });
 });

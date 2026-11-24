@@ -177,6 +177,7 @@ class MockService {
       ],
       deductions: [],
       dispute: null,
+      charges: [],
     };
 
     this.contracts.unshift(newContract);

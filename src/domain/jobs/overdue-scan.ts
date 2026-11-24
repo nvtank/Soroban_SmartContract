@@ -9,6 +9,8 @@ export type OverdueScanDeps = {
 export type OverdueScanResult = {
   scannedCount: number;
   overdueCount: number;
+  dueSoonCount: number;
+  remindedCount: number;
   updatedPeriods: {
     contractId: string;
     periodNo: number;
@@ -131,9 +133,55 @@ export async function scanOverdue(
     }
   }
 
+  // --- Quét nhắc trước hạn cho kỳ AWAITING_PAYMENT đến hạn trong vòng 3 ngày ---
+  let dueSoonCount = 0;
+  let dueSoonCandidates: typeof candidates = [];
+  if (repo.rentPeriods.findDueSoonCandidates) {
+    dueSoonCandidates = await repo.rentPeriods.findDueSoonCandidates(asOf, options?.contractId);
+  } else if (options?.contractId) {
+    const periods = await repo.rentPeriods.listByContractId(options.contractId);
+    const [y, m, d] = asOf.split("-").map(Number);
+    const maxDate = new Date(Date.UTC(y, m - 1, d + 3)).toISOString().slice(0, 10);
+    dueSoonCandidates = periods.filter(
+      (p) => p.status === "AWAITING_PAYMENT" && p.due_date >= asOf && p.due_date <= maxDate,
+    );
+  }
+
+  for (const period of dueSoonCandidates) {
+    const contract = await repo.contracts.findById(period.contract_id);
+    if (!contract || contract.status !== "ACTIVE" || !contract.tenant_id) continue;
+
+    // Idempotent trong ngày: kiểm tra đã có thông báo RENT_DUE_SOON cho kỳ này trong ngày quét chưa
+    const existingNotifs = await repo.notifications.listByUserId(contract.tenant_id);
+    const alreadyNotified = existingNotifs.some((n) => {
+      if (n.type !== "RENT_DUE_SOON") return false;
+      const matchesPeriod =
+        n.body.includes(`Kỳ thuê số ${period.period_no}`) && n.body.includes(contract.room_label);
+      if (!matchesPeriod) return false;
+      return n.created_at.startsWith(asOf) || n.created_at.startsWith(now.slice(0, 10));
+    });
+
+    if (alreadyNotified) continue;
+
+    const notifCreatedAt = options?.asOfDate ? `${options.asOfDate}T09:00:00.000Z` : now;
+    await repo.notifications.create({
+      id: randomUUID(),
+      user_id: contract.tenant_id,
+      type: "RENT_DUE_SOON",
+      title: "Nhắc hạn thanh toán tiền thuê",
+      body: `Kỳ thuê số ${period.period_no} phòng ${contract.room_label} sẽ đến hạn vào ngày ${period.due_date}. Vui lòng thanh toán đúng hạn.`,
+      read_at: null,
+      created_at: notifCreatedAt,
+    });
+
+    dueSoonCount++;
+  }
+
   return {
-    scannedCount: candidates.length,
+    scannedCount: candidates.length + dueSoonCandidates.length,
     overdueCount,
+    dueSoonCount,
+    remindedCount: dueSoonCount,
     updatedPeriods,
   };
 }
