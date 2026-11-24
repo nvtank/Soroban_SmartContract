@@ -49,7 +49,7 @@ export interface DomainRepository {
       periodNo: number,
       updates: Partial<RentPeriodEntity>,
     ): Promise<RentPeriodEntity>;
-    findOverdueCandidates(asOfDate: string): Promise<RentPeriodEntity[]>;
+    findOverdueCandidates(asOfDate: string, contractId?: string): Promise<RentPeriodEntity[]>;
   };
   deductions: {
     listByContractId(contractId: string): Promise<DeductionEntity[]>;
@@ -71,6 +71,7 @@ export interface DomainRepository {
   notifications: {
     create(notification: NotificationEntity): Promise<void>;
     listByUserId(userId: string): Promise<NotificationEntity[]>;
+    markAsRead(id: string, userId: string): Promise<boolean>;
   };
   auditLogs: {
     create(log: AuditLogEntity): Promise<void>;
@@ -163,10 +164,11 @@ export class FakeDomainRepository implements DomainRepository {
       this.rentPeriodsStore.set(contractId, list);
       return { ...updated };
     },
-    findOverdueCandidates: async (asOfDate: string) => {
+    findOverdueCandidates: async (asOfDate: string, contractId?: string) => {
       const result: RentPeriodEntity[] = [];
-      for (const [contractId, periods] of this.rentPeriodsStore.entries()) {
-        const contract = this.contractsStore.get(contractId);
+      for (const [cId, periods] of this.rentPeriodsStore.entries()) {
+        if (contractId && cId !== contractId) continue;
+        const contract = this.contractsStore.get(cId);
         if (contract?.status !== "ACTIVE") continue;
         for (const p of periods) {
           if (
@@ -255,6 +257,12 @@ export class FakeDomainRepository implements DomainRepository {
         .filter((n) => n.user_id === userId)
         .map((n) => ({ ...n }))
         .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    },
+    markAsRead: async (id: string, userId: string) => {
+      const item = this.notificationsStore.find((n) => n.id === id && n.user_id === userId);
+      if (!item) return false;
+      item.read_at = new Date().toISOString();
+      return true;
     },
   };
 

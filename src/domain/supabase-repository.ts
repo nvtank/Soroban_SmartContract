@@ -39,7 +39,6 @@ type ContractRow = {
   status: ContractStatus;
   onchain_ref: string | null;
   created_at: string;
-  updated_at: string;
 };
 
 type DepositRow = {
@@ -51,7 +50,6 @@ type DepositRow = {
   landlord_refund_amount: string | number | null;
   tenant_refund_amount: string | number | null;
   created_at: string;
-  updated_at: string;
 };
 
 type RentPeriodRow = {
@@ -64,7 +62,6 @@ type RentPeriodRow = {
   late_fee: string | number;
   status: RentStatus;
   created_at: string;
-  updated_at: string;
 };
 
 type DeductionRow = {
@@ -76,7 +73,6 @@ type DeductionRow = {
   reason_hash: string;
   status: DeductionStatus;
   created_at: string;
-  updated_at: string;
 };
 
 type DisputeRow = {
@@ -87,7 +83,6 @@ type DisputeRow = {
   landlord_agreed_amount: string | number | null;
   tenant_agreed_amount: string | number | null;
   created_at: string;
-  updated_at: string;
 };
 
 type PaymentRow = {
@@ -121,7 +116,7 @@ type NotificationRow = {
 
 type AuditLogRow = {
   id: string;
-  actor_id: string;
+  actor_id: string | null;
   action: string;
   entity: string;
   entity_id: string;
@@ -140,8 +135,9 @@ type ProfileRow = {
 /**
  * Adapter bọc Supabase client thành DomainRepository.
  */
-export function createSupabaseDomainRepository(supabase: SupabaseClient): DomainRepository {
+export function createSupabaseDomainRepository(supabase: SupabaseClient): DomainRepository & { db: SupabaseClient } {
   return {
+    db: supabase,
     contracts: {
       findById: async (id: string): Promise<ContractEntity | null> => {
         const { data, error } = await supabase
@@ -188,7 +184,6 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
         if (updates.status !== undefined) row.status = updates.status;
         if (updates.tenant_id !== undefined) row.tenant_id = updates.tenant_id;
         if (updates.onchain_ref !== undefined) row.onchain_ref = updates.onchain_ref;
-        row.updated_at = new Date().toISOString();
 
         const { data, error } = await supabase
           .from("rental_contracts")
@@ -235,7 +230,6 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
           row.landlord_refund_amount = updates.landlord_refund_amount?.toString() ?? null;
         if (updates.tenant_refund_amount !== undefined)
           row.tenant_refund_amount = updates.tenant_refund_amount?.toString() ?? null;
-        row.updated_at = new Date().toISOString();
 
         const { data, error } = await supabase
           .from("deposits")
@@ -293,7 +287,6 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
         if (updates.amount_paid !== undefined) row.amount_paid = updates.amount_paid.toString();
         if (updates.late_days !== undefined) row.late_days = updates.late_days;
         if (updates.late_fee !== undefined) row.late_fee = updates.late_fee.toString();
-        row.updated_at = new Date().toISOString();
 
         const { data, error } = await supabase
           .from("rent_periods")
@@ -305,13 +298,17 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
         if (error) throw error;
         return mapRentPeriodRow(data as RentPeriodRow);
       },
-      findOverdueCandidates: async (asOfDate: string): Promise<RentPeriodEntity[]> => {
-        const { data, error } = await supabase
+      findOverdueCandidates: async (asOfDate: string, contractId?: string): Promise<RentPeriodEntity[]> => {
+        let query = supabase
           .from("rent_periods")
           .select("*, rental_contracts!inner(status)")
           .eq("rental_contracts.status", "ACTIVE")
           .lt("due_date", asOfDate)
           .in("status", ["AWAITING_PAYMENT", "PARTIALLY_PAID", "OVERDUE"]);
+        if (contractId) {
+          query = query.eq("contract_id", contractId);
+        }
+        const { data, error } = await query;
         if (error || !data) return [];
         return (data as RentPeriodRow[]).map(mapRentPeriodRow);
       },
@@ -349,7 +346,6 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
       update: async (id: string, updates: Partial<DeductionEntity>): Promise<DeductionEntity> => {
         const row: Record<string, unknown> = {};
         if (updates.status !== undefined) row.status = updates.status;
-        row.updated_at = new Date().toISOString();
 
         const { data, error } = await supabase.from("deduction_requests").update(row).eq("id", id).select().single();
         if (error) throw error;
@@ -388,7 +384,6 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
           row.landlord_agreed_amount = updates.landlord_agreed_amount?.toString() ?? null;
         if (updates.tenant_agreed_amount !== undefined)
           row.tenant_agreed_amount = updates.tenant_agreed_amount?.toString() ?? null;
-        row.updated_at = new Date().toISOString();
 
         const { data, error } = await supabase
           .from("disputes")
@@ -473,17 +468,29 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
           created_at: d.created_at,
         }));
       },
+      markAsRead: async (id: string, userId: string): Promise<boolean> => {
+        const { data, error } = await supabase
+          .from("notifications")
+          .update({ read_at: new Date().toISOString() })
+          .eq("id", id)
+          .eq("user_id", userId)
+          .select("id")
+          .maybeSingle();
+        return !error && !!data;
+      },
     },
 
     auditLogs: {
       create: async (log: AuditLogEntity): Promise<void> => {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const isValidUuid = typeof log.actor_id === "string" && uuidRegex.test(log.actor_id);
         const row = {
           id: log.id,
-          actor_id: log.actor_id,
+          actor_id: isValidUuid ? log.actor_id : null,
           action: log.action,
           entity: log.entity,
           entity_id: log.entity_id,
-          meta: log.meta,
+          meta: isValidUuid ? log.meta : { ...log.meta, systemActor: log.actor_id },
         };
         await supabase.from("audit_logs").insert(row);
       },
@@ -572,7 +579,7 @@ function mapContractRow(data: ContractRow): ContractEntity {
     status: data.status,
     onchain_ref: data.onchain_ref,
     created_at: data.created_at,
-    updated_at: data.updated_at,
+    updated_at: data.created_at,
   };
 }
 
@@ -586,7 +593,7 @@ function mapDepositRow(data: DepositRow): DepositEntity {
     landlord_refund_amount: data.landlord_refund_amount != null ? BigInt(data.landlord_refund_amount) : null,
     tenant_refund_amount: data.tenant_refund_amount != null ? BigInt(data.tenant_refund_amount) : null,
     created_at: data.created_at,
-    updated_at: data.updated_at,
+    updated_at: data.created_at,
   };
 }
 
@@ -601,7 +608,7 @@ function mapRentPeriodRow(data: RentPeriodRow): RentPeriodEntity {
     late_fee: BigInt(data.late_fee ?? 0),
     status: data.status,
     created_at: data.created_at,
-    updated_at: data.updated_at,
+    updated_at: data.created_at,
   };
 }
 
@@ -615,7 +622,7 @@ function mapDeductionRow(data: DeductionRow): DeductionEntity {
     reason_hash: data.reason_hash,
     status: data.status,
     created_at: data.created_at,
-    updated_at: data.updated_at,
+    updated_at: data.created_at,
   };
 }
 
@@ -628,7 +635,7 @@ function mapDisputeRow(data: DisputeRow): DisputeEntity {
     landlord_agreed_amount: data.landlord_agreed_amount != null ? BigInt(data.landlord_agreed_amount) : null,
     tenant_agreed_amount: data.tenant_agreed_amount != null ? BigInt(data.tenant_agreed_amount) : null,
     created_at: data.created_at,
-    updated_at: data.updated_at,
+    updated_at: data.created_at,
   };
 }
 
