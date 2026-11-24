@@ -890,7 +890,7 @@ function ContractDetailContent({ id }: { id: string }) {
                 Mã băm SHA-256 hợp đồng (Salted Doc Hash):
               </span>
               <div className="p-3 rounded-xl bg-paper border border-line font-mono text-xs text-ink/80 break-all select-all">
-                {contract.docHash || "mock_doc_hash_a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0"}
+                {contract.docHash || "Chưa có mã băm"}
               </div>
             </div>
 

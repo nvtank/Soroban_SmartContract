@@ -190,7 +190,11 @@ export async function callSettlePayment(
         repoOrDb = await createSchemaAlignedDomainRepository(db as SupabaseClient);
       }
 
-      await mod.settlePayment(repoOrDb as Parameters<typeof mod.settlePayment>[0], paymentId);
+      // Ghi nhận thanh toán lên blockchain: đưa vào hàng đợi on-chain (oracle ký), lỗi chain không làm hỏng nghiệp vụ.
+      const { enqueueOnchain } = await import("@/lib/stellar/outbox");
+      await mod.settlePayment(repoOrDb as Parameters<typeof mod.settlePayment>[0], paymentId, {
+        enqueueOnchain,
+      } as Parameters<typeof mod.settlePayment>[2]);
       return;
     }
     throw new Error("Hàm settlePayment không tồn tại trong @/domain/contracts/settlement");

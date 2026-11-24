@@ -2,14 +2,48 @@ import crypto from "node:crypto";
 import { Keypair, authorizeEntry, Transaction, FeeBumpTransaction } from "@stellar/stellar-sdk";
 import type { OnchainTxDto } from "@/domain/dto";
 import { ApiError } from "@/lib/api/http";
-import type { OnchainSigner, OnchainTxRecord, OutboxDeps } from "./types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { CustodySignerCallback, OnchainSigner, OnchainTxRecord, OutboxDeps } from "./types";
 import { assertNoPii, sanitizeError } from "./pii";
 import { encodeContractArgs } from "./abi";
+import { completeAbiArgs, isAbiComplete } from "./resolve-args";
 import { getStellarClient } from "./client";
 import { getExplorerTxUrl } from "./explorer";
 import { buildFeeBumpTx, isFeeBumpEnabled } from "./fee-bump";
 
 const MAX_RETRIES = 5;
+
+/** Mặc định: ký auth entry của người dùng bằng khóa ví custody (giải mã trong bộ nhớ, không log). */
+const defaultWithCustodyKeypair: CustodySignerCallback = async (db, userId, fn) => {
+  const { withCustodyKeypair } = await import("@/lib/crypto/custody");
+  return withCustodyKeypair(db as SupabaseClient, userId, fn);
+};
+
+let backgroundFlushScheduled = false;
+
+/**
+ * Sau khi nghiệp vụ off-chain thành công, đẩy hàng đợi ngay sau khi trả response (bật bằng
+ * ONCHAIN_AUTO_FLUSH=true). Lỗi ghi blockchain không ảnh hưởng nghiệp vụ; dòng FAILED có thể thử lại.
+ */
+async function scheduleBackgroundFlush(): Promise<void> {
+  if (process.env.ONCHAIN_AUTO_FLUSH !== "true" || backgroundFlushScheduled) return;
+  try {
+    const { after } = await import("next/server");
+    backgroundFlushScheduled = true;
+    after(async () => {
+      backgroundFlushScheduled = false;
+      try {
+        const { createAdminSupabase } = await import("@/lib/supabase/admin");
+        await flushOnchain(createAdminSupabase(), { limit: 5, pollTimeoutMs: 8000 });
+      } catch {
+        // Route /api/jobs/flush-onchain hoặc nút thử lại sẽ xử lý tiếp
+      }
+    });
+  } catch {
+    backgroundFlushScheduled = false; // ngoài ngữ cảnh request
+  }
+}
+
 const DEFAULT_POLL_TIMEOUT_MS = 6000;
 
 type GenericDb = {
@@ -123,8 +157,10 @@ export async function enqueueOnchain(
   // 1. Chặn PII
   assertNoPii(params.args, params.action);
 
-  // 2. Kiểm tra tính hợp lệ của tham số theo ABI
-  encodeContractArgs(params.action, params.args);
+  // 2. Kiểm tra tính hợp lệ theo ABI. Tham số nghiệp vụ (chưa có địa chỉ ví) được bổ sung và kiểm tra lúc flush.
+  if (isAbiComplete(params.action, params.args)) {
+    encodeContractArgs(params.action, params.args);
+  }
 
   // 3. Tính toán payload_hash chuẩn tắc
   const canonicalPayload = JSON.stringify({
@@ -175,6 +211,7 @@ export async function enqueueOnchain(
     if (error) {
       throw new ApiError("INTERNAL_ERROR", error, "Lỗi khi lưu giao dịch on-chain vào outbox");
     }
+    await scheduleBackgroundFlush();
   }
 
   return { id };
@@ -393,7 +430,13 @@ export async function flushOnchain(
       try {
         // Quản lý Sequence của PLATFORM account: khóa mutex tránh đụng sequence khi chạy đồng thời
         const subRes = await platformSequenceMutex.run(async () => {
-          const scVals = encodeContractArgs(head.action, head.args);
+          const fullArgs = await completeAbiArgs(db, {
+            action: head.action,
+            args: head.args,
+            contractId: head.contract_id,
+            signer: head.signer,
+          });
+          const scVals = encodeContractArgs(head.action, fullArgs as Record<string, unknown> | unknown[]);
 
           const { transaction, authEntries } = await client.buildAndSimulate({
             action: head.action,
@@ -405,8 +448,9 @@ export async function flushOnchain(
           if (authEntries.length > 0) {
             if (head.signer.kind === "USER") {
               const userId = head.signer.userId;
-              if (deps?.withCustodyKeypair) {
-                await deps.withCustodyKeypair(db, userId, async (custodyKeypair) => {
+              {
+                const signWithCustody = deps?.withCustodyKeypair ?? defaultWithCustodyKeypair;
+                await signWithCustody(db, userId, async (custodyKeypair) => {
                   for (let i = 0; i < authEntries.length; i++) {
                     authEntries[i] = await authorizeEntry(
                       authEntries[i],

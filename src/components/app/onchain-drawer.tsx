@@ -120,7 +120,7 @@ export function OnchainDrawer({
               Mã băm SHA-256 hợp đồng (Salted Doc Hash):
             </span>
             <div className="p-2.5 rounded-lg bg-surface border border-line font-mono text-xs text-ink/80 break-all select-all">
-              {docHash || "mock_doc_hash_7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a"}
+              {docHash || "Chưa có mã băm"}
             </div>
           </div>
 
