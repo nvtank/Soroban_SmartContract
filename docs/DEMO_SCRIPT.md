@@ -30,15 +30,15 @@ Dữ liệu có sẵn sau bước chuẩn bị:
 
 **0:30 Bước 1: ký hợp đồng (45 giây)**
 - Chủ nhà đăng nhập, xem 3 hợp đồng, mở Phòng 301. Có thể tạo nhanh một hợp đồng mới để cho thấy mã băm hiện ngay khi nhập.
-- Người thuê 1 đăng nhập, bấm xác nhận hợp đồng Phòng 301, ký bằng **Passkey** (hoặc OTP mô phỏng nếu máy không có Passkey). Hợp đồng chuyển sang Đang hiệu lực.
+- Người thuê 1 đăng nhập, bấm "Xác nhận & Ký hợp đồng" Phòng 301, ký bằng **Passkey** (hoặc chọn tab "OTP (mô phỏng)" trong hộp thoại ký rồi bấm "Xác nhận & Ký"). Hợp đồng chuyển sang Đang hiệu lực.
 
-**1:15 Bước 2: nạp cọc (45 giây)** Người thuê nạp cọc, hiện mã VietQR **mô phỏng**, bấm "Giả lập: đã nhận tiền". Cọc chuyển sang Đã ghi nhận. Mở ngăn **Bằng chứng on-chain**, chỉ giao dịch `record_deposit_paid`, bấm liên kết sang explorer để cho ban giám khảo thấy giao dịch thật.
+**1:15 Bước 2: nạp cọc (45 giây)** Người thuê nạp cọc, hiện mã VietQR **mô phỏng**, bấm nút "Giả lập: Đã nhận đủ tiền". Cọc chuyển sang Đã ghi nhận. Mở ngăn **Bằng chứng on-chain**, chỉ giao dịch `record_deposit_paid`, bấm liên kết sang explorer để cho ban giám khảo thấy giao dịch thật.
 
-**2:00 Bước 3: tiền thuê và phí trễ (45 giây)** Mở Phòng 402, tab Tiền thuê: kỳ 1 quá hạn, có số ngày trễ và phí trễ tính theo công thức đã cam kết. Chủ nhà bấm **Gia hạn thanh toán**, chọn hạn mới: phí trễ được miễn, giao dịch `extend_due` được ghi lên chain.
+**2:00 Bước 3: tiền thuê và phí trễ (45 giây)** Mở Phòng 402, tab Tiền thuê: kỳ 1 quá hạn, có số ngày trễ và phí trễ tính theo công thức đã cam kết. Chủ nhà bấm **Gia hạn thanh toán**, nhập ngày trong "Hạn thanh toán mới", bấm "Xác nhận", xác thực bước hai ("Xác nhận & Ký"): phí trễ được miễn, giao dịch `extend_due` được ghi lên chain.
 
-**2:45 Bước 4: hoàn cọc (45 giây)** Tab Hoàn cọc. Người thuê duyệt hoàn đủ, hệ thống **chưa** giải ngân. Chủ nhà duyệt cùng số tiền, cọc chuyển sang Đã hoàn trả. Nhấn mạnh: một bên không thể tự rút.
+**2:45 Bước 4: hoàn cọc (45 giây)** Tab Hoàn cọc. Người thuê bấm **Xác nhận hoàn cọc**, xác thực bước hai, hệ thống **chưa** giải ngân (cọc chưa hoàn). Chủ nhà đăng nhập, vào cùng hợp đồng, bấm **Xác nhận hoàn cọc** cùng số tiền, xác thực bước hai: cọc chuyển sang Đã hoàn trả. Nhấn mạnh: một bên không thể tự rút nếu bên kia chưa xác nhận.
 
-**3:30 Bước 5: tranh chấp (45 giây)** Mở Phòng 102 (người thuê 2). Cọc đang ở trạng thái Chờ xử lý tranh chấp. Nói rõ: hệ thống không tự kết luận ai đúng, chỉ chốt khi hai bên cùng gửi một số tiền.
+**3:30 Bước 5: tranh chấp (45 giây)** Mở Phòng 102 (người thuê 2). Cọc đang ở trạng thái Chờ xử lý tranh chấp. Nói rõ: hệ thống trung lập, không tự kết luận ai đúng hay tự trừ tiền, chỉ chốt khi hai bên cùng đồng thuận gửi một số tiền hoặc có phán quyết.
 
 **4:15 Kết (30 giây)** Trang `/bang-chung`: các giao dịch Testnet thật, không có dữ liệu cá nhân. Nhắc ba điều: dữ liệu cá nhân không lên chain, không dùng AI quyết định nghiệp vụ, những gì là mô phỏng.
 
@@ -58,11 +58,11 @@ Dữ liệu có sẵn sau bước chuẩn bị:
 | Mạng Testnet chậm hoặc lỗi | Giao dịch hiện trạng thái Thất bại hoặc Đang ghi, nghiệp vụ vẫn chạy bình thường. Nói đây chính là cơ chế hàng đợi và thử lại. Mở sẵn trang explorer của contract và vài giao dịch đã xác nhận: `https://stellar.expert/explorer/testnet/contract/CCDNF4D4HRIDYSHBEOV2IYC2XQSTD7VPSFZ4NSGCT2QVDPJ7RX4UBVXU`. |
 | Passkey không hoạt động trên máy trình diễn | Chọn tab OTP (mô phỏng) trong hộp thoại ký, mã `123456`. |
 | Dữ liệu bị rối | Admin demo bấm "Đặt lại về kịch bản demo ban đầu", chờ khoảng 1 phút. |
-| Web lỗi hoàn toàn | Phát video quay sẵn (**chưa quay, cần làm**) và mở explorer cho giao dịch thật. |
+| Web lỗi hoàn toàn | Phát video quay sẵn (`demo-assets/demo-backup.webm`, quay bằng lệnh `pnpm e2e:video`) và mở explorer cho giao dịch thật. |
 | Online không truy cập được | Chạy bản local như trên. |
 
 ## Việc cần làm trước ngày thi
 
-- Quay video dự phòng.
+- Đã quay video dự phòng `demo-assets/demo-backup.webm` (có thể tái tạo bất kỳ lúc nào bằng `pnpm e2e:video`).
 - Thử Passkey trên thiết bị trình diễn thật.
 - Sau khi deploy online: đặt `WEBAUTHN_RP_ID` và `WEBAUTHN_ORIGIN` đúng tên miền, tắt `DEMO_MODE` bỏ qua bước hai nếu không phải là buổi trình diễn.

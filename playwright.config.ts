@@ -1,4 +1,10 @@
 import { defineConfig } from "@playwright/test";
+import * as fs from "node:fs";
+
+const defaultChrome = "/run/current-system/sw/bin/google-chrome-stable";
+const chromePath =
+  process.env.PLAYWRIGHT_CHROME_PATH ||
+  (fs.existsSync(defaultChrome) ? defaultChrome : undefined);
 
 /**
  * E2E bấm chuột thật trên giao diện ở chế độ không mock, cần app đang chạy và Supabase local.
@@ -18,7 +24,7 @@ export default defineConfig({
     viewport: { width: 1366, height: 820 },
     video: process.env.E2E_VIDEO === "1" ? { mode: "on", size: { width: 1366, height: 820 } } : "off",
     launchOptions: {
-      executablePath: process.env.PLAYWRIGHT_CHROME_PATH || undefined,
+      executablePath: chromePath,
       slowMo: Number(process.env.E2E_SLOWMO ?? 0),
     },
   },

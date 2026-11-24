@@ -10,7 +10,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:video": "E2E_VIDEO=1 E2E_SLOWMO=400 playwright test tests/e2e/demo-video.spec.ts"
   },
   "dependencies": {
     "@gsap/react": "2.1.2",

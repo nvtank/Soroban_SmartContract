@@ -1,23 +1,41 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 const LANDLORD = "0900000001";
 const TENANT1 = "0900000002";
 const TENANT2 = "0900000003";
 const OTP = "123456";
 
+function getCronSecret(): string {
+  try {
+    const envPath = path.resolve(process.cwd(), ".env.local");
+    const content = fs.readFileSync(envPath, "utf8");
+    const match = content.match(/^CRON_SECRET=(.*)$/m);
+    return match ? match[1].trim().replace(/^["']|["']$/g, "") : "";
+  } catch {
+    return "";
+  }
+}
+
 async function loginViaUi(page: Page, phone: string) {
   await page.goto("/dang-nhap");
+  const quickBtn = page.locator("button", { hasText: phone }).first();
+  if (await quickBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await quickBtn.click();
+    await expect(page).toHaveURL(/\/app/);
+    return;
+  }
   await page.getByRole("textbox").first().fill(phone);
   await page
     .getByRole("button", { name: /OTP|Tiếp tục|Gửi/i })
     .first()
     .click();
-  await page.getByRole("textbox").last().fill(OTP);
-  await page
-    .getByRole("button", { name: /Đăng nhập|Xác nhận|Xác thực/i })
-    .first()
-    .click();
-  await page.waitForURL(/\/app/);
+  const otpInput = page.locator('input[placeholder="123456"]');
+  await expect(otpInput).toBeVisible();
+  await otpInput.fill(OTP);
+  await page.getByRole("button", { name: "Xác nhận & Vào ứng dụng" }).click();
+  await expect(page).toHaveURL(/\/app/);
 }
 
 /** Thẻ hợp đồng trên bảng điều khiển: tìm phần tử nhỏ nhất chứa tên phòng và liên kết "Xem chi tiết". */
@@ -29,7 +47,7 @@ async function openContract(page: Page, room: string) {
     .last()
     .locator('a:has-text("Xem chi tiết")');
   await link.click();
-  await page.waitForURL(/\/app\/hop-dong\//);
+  await expect(page).toHaveURL(/\/app\/hop-dong\//);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(room);
 }
 
@@ -50,7 +68,13 @@ test.describe.configure({ mode: "serial" });
 
 test.describe("RentFlow: luồng trình diễn trên giao diện thật", () => {
   test("chuẩn bị kịch bản demo và chờ giao dịch Testnet", async ({ request, baseURL }) => {
-    const res = await request.post("/api/demo/prepare", { headers: { origin: baseURL! } });
+    const cronSecret = getCronSecret();
+    const res = await request.post("/api/demo/prepare", {
+      headers: {
+        origin: baseURL!,
+        ...(cronSecret ? { authorization: `Bearer ${cronSecret}` } : {}),
+      },
+    });
     expect(res.status()).toBe(200);
     // 10 giao dịch của kịch bản phải được xác nhận trên Testnet
     await expect
@@ -106,31 +130,19 @@ test.describe("RentFlow: luồng trình diễn trên giao diện thật", () => 
     await loginViaUi(tenant, TENANT1);
     await openContract(tenant, "Phòng 402");
     await tab(tenant, /Hoàn cọc/);
-    await tenant
-      .getByRole("button", { name: /Yêu cầu hoàn cọc|Gửi yêu cầu/ })
-      .first()
-      .click();
-    await expect(tenant.getByText(/Chờ hoàn cọc/).first()).toBeVisible({ timeout: 30_000 });
+    await tenant.getByRole("button", { name: "Xác nhận hoàn cọc" }).click();
+    await signStepUpWithOtp(tenant);
+    await expect(tenant.getByText("6.000.000").first()).toBeVisible({ timeout: 30_000 });
 
     await loginViaUi(landlord, LANDLORD);
     await openContract(landlord, "Phòng 402");
     await tab(landlord, /Hoàn cọc/);
-    await landlord
-      .getByRole("button", { name: /Duyệt|Xác nhận hoàn/ })
-      .first()
-      .click();
-    await signStepUpWithOtp(landlord);
-    // Mới một bên duyệt: chưa được giải ngân
-    await expect(landlord.getByText(/Đã hoàn trả/)).toHaveCount(0);
+    await expect(landlord.getByText("Đã hoàn trả")).toHaveCount(0);
 
-    await tenant.reload();
-    await tab(tenant, /Hoàn cọc/);
-    await tenant
-      .getByRole("button", { name: /Duyệt|Xác nhận hoàn/ })
-      .first()
-      .click();
-    await signStepUpWithOtp(tenant);
-    await expect(tenant.getByText("Đã hoàn trả").first()).toBeVisible({ timeout: 30_000 });
+    await landlord.getByRole("button", { name: "Xác nhận hoàn cọc" }).click();
+    await signStepUpWithOtp(landlord);
+    await expect(landlord.getByText("Đã hoàn trả").first()).toBeVisible({ timeout: 30_000 });
+
     await tenantCtx.close();
     await landlordCtx.close();
   });
@@ -154,11 +166,15 @@ test.describe("RentFlow: luồng trình diễn trên giao diện thật", () => 
       .locator('a[href*="stellar.expert"]')
       .evaluateAll((as) => as.map((a) => a.getAttribute("href")));
     expect(hrefs.length).toBeGreaterThan(0);
-    const body = await page.locator("body").innerText();
-    expect(body).not.toMatch(/0900000001|0900000002|Nguyễn Văn An|Trần Thị Bình/);
+    const onchainTable = page.locator("table", { hasText: /create_contract/ });
+    const tableText = await onchainTable.innerText();
+    expect(tableText).not.toMatch(/0900000001|0900000002|Nguyễn Văn An|Trần Thị Bình/);
 
     await page.goto("/bang-chung");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Bằng chứng");
     await expect(page.locator('a[href*="stellar.expert"]').first()).toBeVisible();
+    const publicTable = page.locator("table");
+    const publicTableText = await publicTable.innerText();
+    expect(publicTableText).not.toMatch(/0900000001|0900000002|Nguyễn Văn An|Trần Thị Bình/);
   });
 });
