@@ -85,11 +85,11 @@ export function DepositSafe({
 
   return (
     <div className={`flex flex-col items-center gap-4 ${className}`}>
-      {/* Vỏ ngoài và hình minh họa két sắt - Bỏ backdrop-blur */}
-      <div className="relative flex items-center justify-center rounded-3xl border-2 border-line bg-surface p-6 shadow-xl">
+      {/* Vỏ ngoài và hình minh họa két sắt */}
+      <div className="relative flex items-center justify-center rounded-2xl border-2 border-line bg-surface p-3.5 sm:p-5 shadow-sm">
         <svg
           viewBox="0 0 320 280"
-          className="h-60 w-60 sm:h-72 sm:w-72 overflow-visible"
+          className="h-36 w-36 sm:h-48 sm:w-48 overflow-visible"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           aria-label="Két cọc hai chìa khóa Soroban"
@@ -263,7 +263,7 @@ export function DepositSafe({
 
       {/* Bộ nút bấm thử nghiệm các trạng thái két */}
       {onSelectState && (
-        <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+        <div className="hidden sm:flex flex-wrap items-center justify-center gap-2 pt-2">
           <button
             type="button"
             onClick={() => onSelectState("RECORDED")}

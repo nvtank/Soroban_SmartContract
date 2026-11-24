@@ -1,23 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitText } from "gsap/SplitText";
 import { marketingVi } from "@/i18n/sections/marketing";
-import { DataSortGame } from "@/components/motion/DataSortGame";
 import { TestnetMarquee, type OnchainTxItem } from "@/components/motion/TestnetMarquee";
 import { OnchainStamp } from "@/components/motion/OnchainStamp";
 import { Cpu, ArrowRight } from "lucide-react";
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger, SplitText);
+}
 
 export type BlockchainSectionProps = {
   transactions?: readonly OnchainTxItem[];
 };
 
 export function BlockchainSection({ transactions = [] }: BlockchainSectionProps) {
-  const techCards = marketingVi.chapter04.techCards;
+  const techCards = marketingVi.chapter05.techCards;
   const [feedTxs, setFeedTxs] = useState<readonly OnchainTxItem[]>(transactions);
+  const sectionRef = useRef<HTMLElement>(null);
+  const headlineRef = useRef<HTMLHeadingElement>(null);
+  const cardsRef = useRef<HTMLDivElement>(null);
 
-  // 14. Nhận GET /api/public/onchain-feed (Agent D làm).
-  // Nếu rỗng hoặc lỗi thì hiện trạng thái rỗng trung thực, tuyệt đối không hash giả.
+  // Nhận GET /api/public/onchain-feed. Nếu rỗng thì giữ trạng thái rỗng trung thực
   useEffect(() => {
     let isSubscribed = true;
 
@@ -46,7 +54,7 @@ export function BlockchainSection({ transactions = [] }: BlockchainSectionProps)
           setFeedTxs(mapped);
         }
       } catch {
-        // Lỗi mạng hoặc route chưa sẵn sàng -> giữ feedTxs rỗng trung thực
+        // Giữ feedTxs rỗng trung thực
       }
     }
 
@@ -57,87 +65,149 @@ export function BlockchainSection({ transactions = [] }: BlockchainSectionProps)
     };
   }, []);
 
+  // GSAP: Blur vào rõ tiêu đề & Slide xuất hiện các thẻ
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    const headline = headlineRef.current;
+    const cardsEl = cardsRef.current;
+    if (!headline || !cardsEl) return;
+
+    const ctx = gsap.context(() => {
+      try {
+        const split = new SplitText(headline, { type: "words" });
+        gsap.from(split.words, {
+          scrollTrigger: {
+            trigger: headline,
+            start: "top 85%",
+            once: true,
+          },
+          y: 20,
+          opacity: 0,
+          filter: "blur(6px)",
+          duration: 0.65,
+          stagger: 0.025,
+          ease: "power2.out",
+          onComplete: () => {
+            gsap.set(split.words, { clearProps: "filter" });
+          },
+        });
+      } catch {
+        gsap.from(headline, {
+          scrollTrigger: {
+            trigger: headline,
+            start: "top 85%",
+            once: true,
+          },
+          y: 20,
+          opacity: 0,
+          duration: 0.6,
+          ease: "power2.out",
+        });
+      }
+
+      const cardEls = cardsEl.querySelectorAll(".tech-card");
+      gsap.from(cardEls, {
+        scrollTrigger: {
+          trigger: cardsEl,
+          start: "top 85%",
+          once: true,
+        },
+        y: 25,
+        opacity: 0,
+        duration: 0.6,
+        stagger: 0.1,
+        ease: "power2.out",
+      });
+    }, sectionRef);
+
+    return () => ctx.revert();
+  }, []);
+
   return (
-    <section id="blockchain" className="relative py-20 sm:py-28 overflow-hidden scroll-mt-16">
+    <section
+      ref={sectionRef}
+      id="on-chain"
+      className="relative py-5 sm:py-8 overflow-hidden scroll-mt-20"
+    >
+      {/* Anchor bí danh để hỗ trợ navbar cũ của Agent G (#blockchain) */}
+      <div id="blockchain" className="absolute -top-24 pointer-events-none invisible" />
+
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Tiêu đề chương 04 */}
-        <div className="max-w-3xl">
+        {/* Header chương 05 */}
+        <div className="max-w-2xl">
           <div className="flex items-center gap-2 text-xs font-bold tracking-widest text-primary-strong uppercase">
-            <span className="font-mono text-base">{marketingVi.chapter04.number}</span>
+            <span className="font-mono text-sm">{marketingVi.chapter05.number}</span>
             <span>•</span>
-            <span>{marketingVi.chapter04.subtitle}</span>
+            <span>{marketingVi.chapter05.subtitle}</span>
           </div>
-          <h2 className="mt-2 text-[length:var(--text-section)] font-extrabold leading-tight text-ink">
-            {marketingVi.chapter04.title}
+          <h2
+            ref={headlineRef}
+            className="mt-1 text-2xl sm:text-3xl font-extrabold leading-tight text-ink"
+          >
+            {marketingVi.chapter05.title}
           </h2>
-          <p className="mt-3 text-base sm:text-lg text-ink/75">
-            {marketingVi.chapter04.description}
+          <p className="mt-1 text-xs sm:text-sm text-ink/75">
+            {marketingVi.chapter05.description}
           </p>
         </div>
 
-        {/* 1. Mini-Game: Kéo thả dữ liệu On-Chain & Off-Chain */}
-        <div className="mt-12">
-          <DataSortGame />
-        </div>
-
-        {/* 2. Băng chạy giao dịch Testnet thật (Trung thực, không dùng hash giả) */}
-        <div className="mt-10">
+        {/* Băng giao dịch Testnet thật */}
+        <div className="mt-6">
           <TestnetMarquee transactions={feedTxs} />
         </div>
 
-        {/* 3. Khối giải thích công nghệ: Vì sao chọn Stellar & Soroban */}
-        <div className="mt-12">
-          <h3 className="text-xl sm:text-2xl font-bold text-ink">
-            Công nghệ cốt lõi & Lộ trình thực hiện
-          </h3>
-          <p className="mt-1 text-sm text-ink/70">
-            Minh bạch những gì đã hoàn thiện trong bản demo và những gì thuộc lộ trình phát triển.
-          </p>
-
-          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {techCards.map((tech) => {
-              const isImplemented = !tech.status.includes("LỘ TRÌNH");
-
-              return (
-                <div
-                  key={tech.name}
-                  className="flex flex-col justify-between rounded-3xl border border-line bg-paper p-6 shadow-xs"
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                          isImplemented
-                            ? "bg-primary/10 text-primary-strong"
-                            : "bg-surface text-ink/60"
-                        }`}
-                      >
-                        {tech.status}
-                      </span>
-                      <Cpu className="h-4 w-4 text-ink/40" />
-                    </div>
-
-                    <h4 className="mt-4 text-lg font-bold text-ink">{tech.name}</h4>
-                    <p className="text-xs font-semibold text-primary-strong">{tech.role}</p>
-                    <p className="mt-3 text-xs leading-relaxed text-ink/75">{tech.desc}</p>
-                  </div>
+        {/* 3 Thẻ công nghệ cốt lõi */}
+        <div
+          ref={cardsRef}
+          className="mt-5 flex md:grid overflow-x-auto md:overflow-visible no-scrollbar snap-x snap-mandatory gap-3 sm:gap-4 md:grid-cols-3 pb-2"
+        >
+          {techCards.map((tech) => (
+            <div
+              key={tech.name}
+              className="tech-card flex w-[82vw] max-w-[300px] shrink-0 snap-center md:w-auto flex-col justify-between rounded-2xl border border-line bg-paper p-4 sm:p-5 shadow-xs hover:border-primary/40 transition-colors"
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary-strong">
+                    {tech.status}
+                  </span>
+                  <Cpu className="h-3.5 w-3.5 text-ink/40" />
                 </div>
-              );
-            })}
-          </div>
+
+                <h3 className="mt-2.5 text-sm sm:text-base font-bold text-ink">
+                  {tech.name}
+                </h3>
+                <p className="text-[11px] font-semibold text-primary-strong">
+                  {tech.role}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-ink/75">
+                  {tech.desc}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* 4. Con dấu ON-CHAIN Stamp demo */}
-        <div className="mt-12 rounded-3xl border border-line bg-surface/50 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+        {/* Hướng dẫn vuốt trên di động */}
+        <div className="mt-1 md:hidden flex items-center justify-between text-[11px] text-ink/40 px-1">
+          <span>Vuốt xem 3 công nghệ →</span>
+          <span className="font-mono">1/3</span>
+        </div>
+
+        {/* Khối con dấu On-chain Stamp */}
+        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-5 rounded-2xl border border-line bg-surface/40 p-4 sm:p-5">
           <div className="max-w-xl">
-            <span className="text-xs font-bold uppercase tracking-wider text-primary-strong">
-              Cơ chế đóng dấu bằng chứng
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-primary-strong">
+              Cơ chế đóng dấu bất biến
             </span>
-            <h4 className="mt-1 text-lg sm:text-xl font-bold text-ink">
-              Con dấu bất biến: &ldquo;ĐÃ GHI NHẬN ON-CHAIN&rdquo;
+            <h4 className="mt-0.5 text-base sm:text-lg font-bold text-ink">
+              Mã băm SHA-256 có muối bảo vệ dữ liệu cá nhân
             </h4>
-            <p className="mt-1 text-xs sm:text-sm text-ink/70">
-              Mỗi khi một giao dịch được xác nhận (CONFIRMED) bởi mạng lưới Soroban, con dấu điện tử được đóng xuống để khẳng định tính toàn vẹn của bằng chứng tranh chấp.
+            <p className="mt-1 text-xs text-ink/70 leading-relaxed">
+              Dấu vết trên Stellar Testnet khẳng định tính toàn vẹn của hợp đồng mà không bao giờ làm lộ danh tính cá nhân.
             </p>
           </div>
 
@@ -150,23 +220,16 @@ export function BlockchainSection({ transactions = [] }: BlockchainSectionProps)
           </div>
         </div>
 
-        {/* Nút Deep-Link thử bước này & Câu dẫn sang chương sau */}
-        <div className="mt-12 flex flex-wrap items-center justify-between gap-4">
+        {/* Link thử bước này */}
+        <div className="mt-5 flex items-center justify-start">
           <Link
             href="/dang-nhap?demo=landlord&next=/app/hop-dong/ct-002#bang-chung"
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-paper shadow-sm hover:bg-primary-strong transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-primary-strong hover:underline"
             data-cursor-hover="true"
           >
-            <span>Thử bước này trong demo</span>
-            <ArrowRight className="h-4 w-4" />
+            <span>Xem ngăn bằng chứng on-chain trong demo</span>
+            <ArrowRight className="h-3.5 w-3.5" />
           </Link>
-
-          <a
-            href="#so-sanh"
-            className="inline-flex items-center text-sm sm:text-base font-bold text-primary-strong hover:underline"
-          >
-            {marketingVi.chapter04.nextBridge}
-          </a>
         </div>
       </div>
     </section>

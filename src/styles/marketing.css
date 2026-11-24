@@ -101,7 +101,7 @@ header:focus-within {
   animation-play-state: paused;
 }
 
-/* 3D Perspective cho thẻ Nỗi đau - Bỏ transition-all và will-change thường trực */
+/* 3D Perspective cho thẻ Nỗi đau */
 .perspective-card-container {
   perspective: 1000px;
 }
@@ -140,42 +140,13 @@ header:focus-within {
   transform: rotateY(-75deg);
 }
 
-/* Sợi chỉ Continuous Thread - Không dùng filter drop-shadow */
-.thread-glow {
-  /* Bỏ drop-shadow filter để không rasterize lại */
+/* Ẩn scrollbar cho track cuộn ngang nhưng vẫn cho phép swipe mượt mà */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
-
-/* Tô sáng quét qua cột RentFlow khi vào khung nhìn (Chương 05) */
-@keyframes rentflowSweep {
-  0% {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
-  30% {
-    opacity: 0.7;
-  }
-  100% {
-    transform: translateY(200%);
-    opacity: 0;
-  }
-}
-
-.rentflow-col-highlight {
-  position: relative;
-  overflow: hidden;
-}
-
-.rentflow-col-highlight::after {
-  content: "";
-  position: absolute;
-  inset: -100% 0 -100% 0;
-  background: linear-gradient(180deg, transparent 0%, rgba(15, 139, 109, 0.25) 50%, transparent 100%);
-  pointer-events: none;
-  transform: translateY(-100%);
-}
-
-.rentflow-col-highlight.sweeping::after {
-  animation: rentflowSweep 1.2s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Hỗ trợ Reduced Motion */
@@ -191,8 +162,5 @@ header:focus-within {
     animation: none !important;
     transform: rotate(-6deg);
     opacity: 1;
-  }
-  .rentflow-col-highlight::after {
-    display: none !important;
   }
 }

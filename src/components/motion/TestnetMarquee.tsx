@@ -25,7 +25,7 @@ export function TestnetMarquee({ transactions = [], className = "" }: TestnetMar
         <div className="flex items-center gap-2">
           <DatabaseZap className="h-4 w-4 text-primary" />
           <span className="text-xs font-bold uppercase tracking-wider text-ink/75">
-            {marketingVi.chapter04.marqueeTitle}
+            {marketingVi.chapter05.marqueeTitle}
           </span>
         </div>
         <span className="text-[11px] font-mono text-ink/50">Stellar Testnet (RPC Soroban)</span>
@@ -56,10 +56,10 @@ export function TestnetMarquee({ transactions = [], className = "" }: TestnetMar
         /* Trạng thái rỗng trung thực tuyệt đối - Không dùng hash giả */
         <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line bg-paper/60 px-6 py-8 text-center">
           <p className="text-sm font-medium text-ink/70">
-            {marketingVi.chapter04.marqueeEmpty}
+            {marketingVi.chapter05.marqueeEmpty}
           </p>
           <p className="text-xs text-ink/50 max-w-md">
-            {marketingVi.chapter04.marqueeNote}
+            {marketingVi.chapter05.marqueeNote}
           </p>
         </div>
       )}
