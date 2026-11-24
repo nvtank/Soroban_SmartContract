@@ -295,19 +295,29 @@ describe("Demo Routes & Security Isolation (Agent B - Vòng 4)", () => {
   // 4. Kiểm tra tài khoản 0900000004 và vai trò ADMIN_DEMO
   // =========================================================================
   describe("4. Admin demo account 0900000004 & role enforcement", () => {
-    it("0900000004 đăng nhập được bằng OTP mô phỏng 123456 và nhận vai trò ADMIN_DEMO", async () => {
-      const req = new Request("http://localhost:3000/api/auth/otp/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: "0900000004", code: "123456" }),
-      });
+    it("0900000004 chỉ đăng nhập được bằng OTP bí mật DEMO_ADMIN_OTP và nhận vai trò ADMIN_DEMO", async () => {
+      const previous = process.env.DEMO_ADMIN_OTP;
+      process.env.DEMO_ADMIN_OTP = "test-admin-otp-8";
+      try {
+        const make = (code: string) =>
+          new Request("http://localhost:3000/api/auth/otp/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone: "0900000004", code }),
+          });
 
-      const res = await otpVerifyPost(req, {});
-      const json = await res.json();
+        // Mã demo công khai không còn mở được tài khoản quản trị
+        expect((await otpVerifyPost(make("123456"), {})).status).toBe(400);
 
-      expect(res.status).toBe(200);
-      expect(json.data.user.phone).toBe("0900000004");
-      expect(json.data.user.role).toBe("ADMIN_DEMO");
+        const res = await otpVerifyPost(make("test-admin-otp-8"), {});
+        const json = await res.json();
+        expect(res.status).toBe(200);
+        expect(json.data.user.phone).toBe("0900000004");
+        expect(json.data.user.role).toBe("ADMIN_DEMO");
+      } finally {
+        if (previous === undefined) delete process.env.DEMO_ADMIN_OTP;
+        else process.env.DEMO_ADMIN_OTP = previous;
+      }
     });
 
     it("client gửi role: ADMIN_DEMO với số điện thoại khác KHÔNG được nhận vai trò ADMIN_DEMO", async () => {

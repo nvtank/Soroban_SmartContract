@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { safeEqual } from "@/lib/demo/auth";
 import { setSessionCookie } from "@/lib/supabase/demo-session-cookie";
 import { withApi, parseJson, ok, ApiError } from "@/lib/api/http";
 import { createAdminSupabase } from "@/lib/supabase/admin";
@@ -7,8 +8,12 @@ import { assertRateLimit, getClientIp } from "@/lib/supabase/rate-limit";
 import type { SessionUser } from "@/domain/dto";
 
 const VerifyOtpSchema = z.object({
-  phone: z.string().min(8).max(15).regex(/^[0-9+]+$/),
-  code: z.string().min(4).max(8),
+  phone: z
+    .string()
+    .min(8)
+    .max(15)
+    .regex(/^[0-9+]+$/),
+  code: z.string().min(4).max(32),
   role: z.enum(["LANDLORD", "TENANT", "ADMIN_DEMO"]).optional(),
   fullName: z.string().optional(),
 });
@@ -31,15 +36,19 @@ export const POST = withApi(async (request: Request) => {
 
   const isDemo = process.env.DEMO_MODE === "true";
   const isFixedDemoNumber =
-    phone === "0900000001" ||
-    phone === "0900000002" ||
-    phone === "0900000003" ||
-    phone === "0900000004";
+    phone === "0900000001" || phone === "0900000002" || phone === "0900000003" || phone === "0900000004";
 
   let isValid = false;
 
-  // 1. Check fixed demo credentials
-  if (isDemo && isFixedDemoNumber && code === "123456") {
+  if (phone === "0900000004") {
+    // Tài khoản quản trị demo: mã OTP là BÍ MẬT do người vận hành đặt (DEMO_ADMIN_OTP), không bao giờ công khai.
+    // Nếu không đặt biến này thì không ai đăng nhập quản trị được. Không dùng bảng auth_otps cho số này.
+    isValid = isDemo && safeEqual(code, process.env.DEMO_ADMIN_OTP ?? "", 8);
+    if (!isValid) {
+      throw new ApiError("VALIDATION_ERROR", undefined, "Mã OTP không đúng hoặc đã hết hạn.");
+    }
+  } else if (isDemo && isFixedDemoNumber && code === "123456") {
+    // 1. Tài khoản demo công khai (chủ nhà, người thuê): mã OTP mô phỏng 123456
     isValid = true;
   } else {
     // 2. Check auth_otps
@@ -57,7 +66,11 @@ export const POST = withApi(async (request: Request) => {
     }
 
     if (otpRow.attempts >= 5) {
-      throw new ApiError("RATE_LIMITED", undefined, "Bạn đã nhập sai quá nhiều lần. Vui lòng yêu cầu mã mới.");
+      throw new ApiError(
+        "RATE_LIMITED",
+        undefined,
+        "Bạn đã nhập sai quá nhiều lần. Vui lòng yêu cầu mã mới.",
+      );
     }
 
     if (otpRow.code !== code) {
@@ -86,11 +99,7 @@ export const POST = withApi(async (request: Request) => {
 
   // Vai trò do máy chủ quyết định: CHỈ 0900000004 mới nhận ADMIN_DEMO, client không tự chọn được
   const serverAssignedRole: SessionUser["role"] =
-    phone === "0900000004"
-      ? "ADMIN_DEMO"
-      : body.role === "LANDLORD"
-        ? "LANDLORD"
-        : "TENANT";
+    phone === "0900000004" ? "ADMIN_DEMO" : body.role === "LANDLORD" ? "LANDLORD" : "TENANT";
 
   let user: SessionUser;
 

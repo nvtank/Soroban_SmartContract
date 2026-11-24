@@ -1,6 +1,15 @@
+import { timingSafeEqual } from "node:crypto";
 import { ApiError } from "@/lib/api/http";
 import { getOptionalUser } from "@/lib/supabase/session";
 import { DEMO_SESSION_COOKIE, verifyDemoSessionToken } from "@/lib/supabase/demo-session";
+
+/** So sánh chuỗi bí mật theo thời gian không đổi. minLength chặn bí mật quá ngắn hoặc để trống. */
+export function safeEqual(given: string, expected: string, minLength = 1): boolean {
+  if (expected.length < minLength) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 /**
  * Kiểm tra quyền truy cập các route demo nguy hiểm (/api/demo/prepare, /api/demo/reset, /api/demo/seed).
@@ -23,10 +32,10 @@ export async function assertDemoRouteAccess(request: Request): Promise<void> {
   const cronSecretHeader = request.headers.get("x-cron-secret");
   const expectedSecret = process.env.CRON_SECRET;
 
-  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : "";
   const hasValidSecret =
-    Boolean(expectedSecret) &&
-    (bearerToken === expectedSecret || cronSecretHeader === expectedSecret);
+    safeEqual(bearerToken, expectedSecret ?? "", 16) ||
+    safeEqual(cronSecretHeader ?? "", expectedSecret ?? "", 16);
 
   if (hasValidSecret) {
     return;

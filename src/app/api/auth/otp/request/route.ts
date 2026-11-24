@@ -4,7 +4,11 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { assertRateLimit, getClientIp } from "@/lib/supabase/rate-limit";
 
 const RequestOtpSchema = z.object({
-  phone: z.string().min(8).max(15).regex(/^[0-9+]+$/),
+  phone: z
+    .string()
+    .min(8)
+    .max(15)
+    .regex(/^[0-9+]+$/),
   role: z.enum(["LANDLORD", "TENANT", "ADMIN_DEMO"]).optional(),
 });
 
@@ -48,13 +52,19 @@ export const POST = withApi(async (request: Request) => {
   // Generate 6-digit OTP code (in DEMO_MODE, fixed or random, but DO NOT log the OTP)
   const isDemo = process.env.DEMO_MODE === "true";
   const isFixedDemoNumber =
-    phone === "0900000001" ||
-    phone === "0900000002" ||
-    phone === "0900000003" ||
-    phone === "0900000004";
-  const code = isDemo && isFixedDemoNumber
-    ? "123456"
-    : Math.floor(100000 + Math.random() * 900000).toString();
+    phone === "0900000001" || phone === "0900000002" || phone === "0900000003" || phone === "0900000004";
+  // Tài khoản quản trị demo không bao giờ nhận mã qua đường này (mã là bí mật vận hành, xem verify)
+  if (phone === "0900000004") {
+    return ok({
+      success: true,
+      phone,
+      isDemo,
+      expiresInSeconds: 300,
+      message: "Nếu số điện thoại hợp lệ, mã OTP đã được gửi.",
+    });
+  }
+  const code =
+    isDemo && isFixedDemoNumber ? "123456" : Math.floor(100000 + Math.random() * 900000).toString();
 
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
@@ -62,7 +72,7 @@ export const POST = withApi(async (request: Request) => {
   await admin.from("auth_otps").insert({
     phone,
     code,
-    role: phone === "0900000004" ? "ADMIN_DEMO" : (body.role === "LANDLORD" ? "LANDLORD" : "TENANT"),
+    role: phone === "0900000004" ? "ADMIN_DEMO" : body.role === "LANDLORD" ? "LANDLORD" : "TENANT",
     expires_at: expiresAt,
   });
 
