@@ -90,11 +90,11 @@ export function HeroKeyAnimation() {
   }, []);
 
   return (
-    <div className="relative flex items-center justify-center p-6">
+    <div className="relative flex items-center justify-center p-2 sm:p-4">
       <svg
         ref={containerRef}
         viewBox="0 0 320 280"
-        className="h-64 w-64 sm:h-72 sm:w-72 md:h-80 md:w-80 overflow-visible"
+        className="h-44 w-44 sm:h-56 sm:w-56 md:h-64 md:w-64 overflow-visible"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         aria-label="Minh họa ngôi nhà và chìa khóa bảo chứng tiền cọc"

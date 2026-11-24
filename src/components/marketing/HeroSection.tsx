@@ -29,36 +29,45 @@ export function HeroSection() {
     if (!headline || !desc || !ctaGroup) return;
 
     const ctx = gsap.context(() => {
-      // Tách chữ chỉ bằng words để không chèn thẻ lines gây vỡ dòng responsive
+      // SplitText theo words với hiệu ứng blur-to-clear mượt mà
       try {
         const split = new SplitText(headline, { type: "words" });
         gsap.from(split.words, {
-          y: 35,
+          y: 25,
           opacity: 0,
-          duration: 0.8,
-          stagger: 0.035,
-          ease: "power3.out",
+          filter: "blur(6px)",
+          duration: 0.75,
+          stagger: 0.03,
+          ease: "power2.out",
           delay: 0.1,
+          onComplete: () => {
+            gsap.set(split.words, { clearProps: "filter" });
+          },
         });
       } catch {
-        // Fallback nếu SplitText không khả dụng
-        gsap.from(headline, { y: 25, opacity: 0, duration: 0.7, ease: "power3.out" });
+        // Fallback nếu SplitText gặp lỗi
+        gsap.from(headline, {
+          y: 20,
+          opacity: 0,
+          duration: 0.6,
+          ease: "power2.out",
+        });
       }
 
       gsap.from(desc, {
-        y: 20,
+        y: 16,
         opacity: 0,
-        duration: 0.7,
+        duration: 0.6,
         ease: "power2.out",
-        delay: 0.45,
+        delay: 0.35,
       });
 
       gsap.from(ctaGroup, {
-        y: 20,
+        y: 16,
         opacity: 0,
-        duration: 0.7,
+        duration: 0.6,
         ease: "power2.out",
-        delay: 0.6,
+        delay: 0.5,
       });
     }, containerRef);
 
@@ -68,30 +77,31 @@ export function HeroSection() {
   return (
     <section
       ref={containerRef}
-      className="relative flex min-h-[85vh] flex-col justify-center pt-28 pb-16 overflow-hidden"
+      id="mo-dau"
+      className="relative flex flex-col justify-center pt-14 pb-4 sm:pt-16 sm:pb-6 overflow-hidden scroll-mt-20"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-start">
-          <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary-strong">
-            <ShieldCheck className="h-4 w-4" />
+          <div className="flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-0.5 text-xs font-bold text-primary-strong">
+            <ShieldCheck className="h-3.5 w-3.5" />
             <span>{marketingVi.hero.badgeIdeathon}</span>
           </div>
 
           <h1
             ref={headlineRef}
-            className="mt-6 text-[length:var(--text-display)] font-extrabold leading-[1.05] tracking-tight text-ink"
+            className="mt-2.5 text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight tracking-tight text-ink"
           >
             <span>{marketingVi.hero.titleLine1}</span>{" "}
             <span className="text-primary-strong">{marketingVi.hero.titleLine2}</span>
           </h1>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-8">
+        <div className="mt-2 grid grid-cols-1 items-center gap-4 lg:grid-cols-12 lg:gap-8">
           {/* Cột trái: mô tả & CTA */}
           <div className="flex flex-col items-start lg:col-span-7">
             <p
               ref={descRef}
-              className="mt-6 max-w-xl text-lg sm:text-xl leading-relaxed text-ink/80"
+              className="mt-2 max-w-xl text-sm sm:text-base leading-relaxed text-ink/80"
             >
               {marketingVi.hero.description}
             </p>
@@ -99,28 +109,28 @@ export function HeroSection() {
             {/* Hai nút CTA */}
             <div
               ref={ctaGroupRef}
-              className="mt-8 flex flex-wrap items-center gap-4 sm:gap-5"
+              className="mt-5 flex flex-wrap items-center gap-3"
             >
               <MagneticButton
                 href="/dang-nhap?demo=landlord&next=/app"
-                className="rounded-2xl bg-primary px-7 py-4 text-base sm:text-lg font-bold text-paper shadow-md transition-colors hover:bg-primary-strong focus-visible:ring-4 focus-visible:ring-primary/20"
+                className="rounded-xl bg-primary px-4 py-2.5 text-xs sm:text-sm font-bold text-paper shadow-md transition-colors hover:bg-primary-strong focus-visible:ring-4 focus-visible:ring-primary/20"
                 ariaLabel={marketingVi.hero.ctaPrimary}
               >
                 <span>{marketingVi.hero.ctaPrimary}</span>
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </MagneticButton>
 
               <MagneticButton
-                href="#cach-hoat-dong"
-                className="rounded-2xl border-2 border-line bg-paper/80 px-6 py-4 text-base sm:text-lg font-bold text-ink shadow-xs transition-colors hover:border-primary hover:text-primary-strong"
+                href="#hanh-trinh"
+                className="rounded-xl border border-line bg-paper/80 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-ink shadow-xs transition-colors hover:border-primary hover:text-primary-strong"
                 ariaLabel={marketingVi.hero.ctaSecondary}
               >
-                <PlayCircle className="mr-2 h-5 w-5 text-primary" />
+                <PlayCircle className="mr-1.5 h-3.5 w-3.5 text-primary" />
                 <span>{marketingVi.hero.ctaSecondary}</span>
               </MagneticButton>
             </div>
 
-            <p className="mt-8 text-xs font-medium text-ink/60">
+            <p className="mt-3 text-[11px] font-medium text-ink/60">
               * {marketingVi.hero.trustNote}
             </p>
           </div>

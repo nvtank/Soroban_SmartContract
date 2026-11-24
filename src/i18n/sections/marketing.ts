@@ -2,9 +2,9 @@ export const marketingVi = {
   nav: {
     problem: "01 Vấn đề",
     solution: "02 Giải pháp",
-    howItWorks: "03 Cách hoạt động",
-    blockchain: "04 Blockchain",
-    comparison: "05 So sánh",
+    howItWorks: "03 Hành trình",
+    blockchain: "04 Bằng chứng",
+    comparison: "05 Sự thật",
     tryIt: "06 Dùng thử",
     transparency: "Minh bạch & Đạo đức",
     tryDemo: "Dùng thử demo",
@@ -14,92 +14,83 @@ export const marketingVi = {
   },
   hero: {
     tagline: "Bảo chứng tiền cọc (mô phỏng) & Thu tiền thuê nhà",
-    titleLine1: "Giữ cọc công bằng,",
-    titleLine2: "thu tiền nhà nhẹ nhàng.",
+    titleLine1: "Tiền cọc & tiền nhà,",
+    titleLine2: "bắt đầu từ niềm tin.",
     description:
-      "RentFlow là mô hình bảo chứng tiền cọc trung lập và tự động hóa theo dõi thu tiền thuê nhà qua VietQR (mô phỏng). Trạng thái cọc được kiểm soát bởi smart contract Soroban, chỉ cho phép phát sự kiện giải ngân khi cả hai bên cùng xác nhận; lưu bằng chứng băm SHA-256 bất biến trên Stellar Testnet mà không lưu bất kỳ dữ liệu cá nhân nào.",
+      "RentFlow là mô hình két bảo chứng trung lập và theo dõi thanh toán qua VietQR (mô phỏng). Mọi trạng thái do smart contract Soroban kiểm soát trên Stellar Testnet, bảo đảm hai bên cùng xác nhận mới giải ngân và tuyệt đối không lưu dữ liệu cá nhân.",
     ctaPrimary: "Dùng thử demo ngay",
-    ctaSecondary: "Xem cách hoạt động",
-    badgeIdeathon: "Stellar Ideathon — Track 4 & 5 (Custody & Soroban)",
+    ctaSecondary: "Xem hành trình 5 bước",
+    badgeIdeathon: "Stellar Ideathon — Két cọc trung lập Soroban",
     trustNote:
       "Bản demo: ngân hàng, VietQR, OTP và giải ngân là mô phỏng. Bằng chứng chạy trên Stellar Testnet.",
   },
   chapter01: {
     number: "01",
-    subtitle: "Thực trạng nhức nhối",
+    subtitle: "Mở đầu • Điểm tựa niềm tin",
+    title: "Tiền cọc và tiền nhà là chuyện niềm tin giữa hai người",
+    description:
+      "Một hợp đồng thuê nhà thành công luôn bắt đầu từ sự tin tưởng. Nhưng khi chỉ dựa vào thỏa thuận miệng, niềm tin rất dễ bị lung lay.",
+  },
+  chapter02: {
+    number: "02",
+    subtitle: "Vấn đề • Đứt gãy niềm tin",
     title: "Ba nỗi đau người thuê và chủ nhà đối mặt mỗi ngày",
     description:
-      "Thị trường thuê nhà truyền thống phụ thuộc hoàn toàn vào niềm tin cá nhân và những thỏa thuận miệng, dẫn đến sự bất an cho cả hai phía.",
+      "Thiếu cơ chế bảo vệ khách quan khiến cả hai phía luôn trong tình trạng bất an và mệt mỏi.",
     cards: [
       {
         id: "giam-coc",
         badge: "Nỗi đau 01",
-        title: "Người thuê bị giam cọc hoặc trừ cọc vô lý",
+        title: "Người thuê bị giam cọc vô lý",
         description:
-          "Khi kết thúc hợp đồng, nhiều chủ nhà tìm mọi lý do hư hỏng hao mòn tự nhiên để trừ tiền hoặc kéo dài thời gian hoàn cọc nhiều tháng.",
-        impact: "Mất niềm tin, căng thẳng, rủi ro mất số tiền tương đương 1-2 tháng tiền thuê.",
+          "Khi kết thúc hợp đồng, người thuê luôn ở thế yếu, lo bị chủ nhà viện cớ hao mòn tự nhiên để trừ tiền hoặc kéo dài thời gian hoàn cọc.",
+        impact: "Căng thẳng tâm lý và rủi ro mất 1–2 tháng tiền thuê.",
       },
       {
         id: "bung-tien",
         badge: "Nỗi đau 02",
-        title: "Chủ nhà bị trễ tiền, bùng tiền, mệt mỏi nhắc nợ",
+        title: "Chủ nhà mệt mỏi vì trễ tiền thuê",
         description:
-          "Đến kỳ thanh toán phải nhắn tin, gọi điện đòi tiền nhiều lần. Người thuê chậm trễ không có cơ chế chế tài rõ ràng và minh bạch.",
-        impact: "Đứt gãy dòng tiền sinh hoạt, hao tổn thời gian và phá vỡ mối quan hệ giữa hai bên.",
+          "Đến kỳ thanh toán phải gọi điện, nhắn tin nhắc nợ nhiều lần. Không có cơ chế tự động tính phí phạt trễ hạn minh bạch.",
+        impact: "Đứt gãy dòng tiền sinh hoạt và rạn nứt quan hệ thuê trọ.",
       },
       {
         id: "tranh-chap",
         badge: "Nỗi đau 03",
-        title: "Tranh chấp khi trả phòng, bằng chứng rải rác",
+        title: "Tranh chấp không có bằng chứng",
         description:
-          "Thỏa thuận, tin nhắn trao đổi thất lạc qua Zalo, Messenger. Khi xảy ra xích mích không có biên bản thống nhất bất biến để đối chiếu.",
-        impact: "Không có căn cứ khách quan; người thuê yếu thế, chủ nhà mang tiếng xấu.",
+          "Thỏa thuận và tin nhắn trao đổi rải rác qua mạng xã hội, dễ thất lạc. Khi xảy ra xích mích không có biên bản bất biến để đối chiếu.",
+        impact: "Không có căn cứ phân xử khách quan và công bằng.",
       },
     ],
-    nextBridge: "Vậy RentFlow giải quyết ba bài toán này như thế nào? ↓",
-  },
-  chapter02: {
-    number: "02",
-    subtitle: "Mô hình giải pháp",
-    title: "Chuyển hóa nỗi đau thành sự an tâm minh bạch",
-    description:
-      "Mỗi bài toán nhức nhối trong thực tế được RentFlow đối chiếu 1-1 bằng cơ chế kỹ thuật rõ ràng, trung lập. Dưới đây nêu rõ phần chạy thật trên Stellar Testnet và phần mô phỏng.",
-    pairs: [
-      {
-        painTitle: "Giam cọc / Trừ cọc vô lý",
-        painDesc:
-          "Tiền cọc nằm hoàn toàn trong tay chủ nhà, người thuê luôn ở thế bị động khi kết thúc kỳ hạn.",
-        solutionTitle: "Két cọc hai chìa khóa (Dual-Key Vault)",
-        solutionDesc:
-          "Hợp đồng Soroban chạy thật trên Testnet kiểm soát trạng thái, chỉ phát sự kiện giải ngân khi CẢ HAI BÊN cùng gửi đúng số tiền bằng chữ ký Passkey. Phần giải ngân và giữ tiền VNĐ hiện là MÔ PHỎNG (contract không giữ tiền VNĐ, chưa kết nối tài khoản phong tỏa ngân hàng).",
-        pillar: "Bảo chứng trung lập",
-      },
-      {
-        painTitle: "Trễ tiền & Mất công đòi nợ",
-        painDesc: "Không có chuẩn hóa lịch thu, nhắc nợ thủ công, cãi vã về số ngày quá hạn và tiền phạt.",
-        solutionTitle: "VietQR động & Quy tắc phạt trễ tự động",
-        solutionDesc:
-          "Hệ thống tự động tính ngày quá hạn và tiền phạt trễ hạn chính xác theo công thức cam kết (%/ngày), ghi nhận kỳ thuê lên Testnet (CHẠY THẬT). Phần phát sinh mã VietQR và đối soát thanh toán hiện ở chế độ MÔ PHỎNG (chưa kết nối cổng thanh toán thật, payOS chưa kiểm chứng).",
-        pillar: "Thu nợ tự động",
-      },
-      {
-        painTitle: "Bằng chứng rải rác, khó phân xử",
-        painDesc:
-          "Hợp đồng giấy dễ sửa đổi, thỏa thuận thất lạc, không có nguồn sự thật khách quan bất biến.",
-        solutionTitle: "Bằng chứng SHA-256 trên Stellar Testnet",
-        solutionDesc:
-          "Văn bản hợp đồng được chuẩn hóa và băm SHA-256 kèm muối ngẫu nhiên (salt 32-byte), lưu bất biến lên Soroban Testnet (CHẠY THẬT). Lưu ý trung thực: Hệ thống mới băm nội dung hợp đồng, CHƯA có tính năng lưu hay băm ảnh hiện trạng bàn giao (đây là định hướng lộ trình).",
-        pillar: "Bất biến & Trung thực",
-      },
-    ],
-    nextBridge: "Khám phá quy trình 5 bước vận hành thực tế ↓",
   },
   chapter03: {
     number: "03",
-    subtitle: "Quy trình vận hành",
-    title: "Hành trình 5 bước minh bạch từ ký kết đến kết thúc",
+    subtitle: "Giải pháp • Bước ngoặt",
+    title: "Két cọc hai chìa khóa: Cần cả hai bên mới mở được",
     description:
-      "Từng bước trong vòng đời thuê nhà được kiểm soát bởi hợp đồng thông minh Soroban trên Testnet, phân định rõ ràng giữa dữ liệu lưu trữ và giao dịch mô phỏng.",
+      "Hợp đồng thông minh Soroban trên Testnet kiểm soát trạng thái cọc; chỉ giải ngân mô phỏng khi cả Chủ nhà và Người thuê cùng ký xác nhận bằng Passkey (contract không giữ tiền VNĐ).",
+    principles: [
+      {
+        title: "Không ai tự ý rút cọc",
+        desc: "Chủ nhà không thể tự lấy tiền cọc; người thuê không thể tự hủy cam kết.",
+      },
+      {
+        title: "Hai chìa khóa cùng xoay",
+        desc: "Giải ngân chỉ kích hoạt khi chữ ký hai bên khớp chính xác cùng một số tiền.",
+      },
+      {
+        title: "Khóa an toàn khi bất đồng",
+        desc: "Khi phát sinh tranh chấp, két tự động khóa cứng, hệ thống không tự phán quyết.",
+      },
+    ],
+  },
+  chapter04: {
+    number: "04",
+    subtitle: "Hành trình • 5 bước",
+    title: "Hành trình 5 bước minh bạch từ ký kết đến hoàn tất",
+    description:
+      "Từng bước trong vòng đời thuê trọ được ghi nhận minh bạch trên sổ cái Stellar Testnet, bảo vệ trọn vẹn cả hai bên.",
     steps: [
       {
         step: "SIGN",
@@ -107,42 +98,38 @@ export const marketingVi = {
         name: "Ký hợp đồng",
         shortDesc: "Chủ nhà tạo hợp đồng — Người thuê xác nhận bằng Passkey",
         detail:
-          "Chủ nhà nhập thông tin hợp đồng (tiền cọc, tiền thuê, ngày đến hạn, phí trễ). Hợp đồng được chuẩn hóa và tính mã băm SHA-256 có muối 32-byte. Người thuê xác thực danh tính và ký điện tử qua Passkey/WebAuthn (thử nghiệm với thiết bị ảo trên Chrome). Ví custody được cấp và ký giao dịch trên Stellar Testnet.",
-        onchainAction:
-          "Ghi nhận mã băm hợp đồng (doc_hash), số tiền (i128) và địa chỉ ví hai bên lên Soroban contract qua create_contract, tenant_confirm.",
+          "Hợp đồng được chuẩn hóa và tính mã băm SHA-256 có muối ngẫu nhiên 32-byte. Người thuê ký xác nhận bằng Passkey (thử nghiệm trên thiết bị ảo).",
+        onchainAction: "Ghi nhận mã băm hợp đồng (doc_hash) và số tiền lên Soroban Testnet.",
         deepLink: "/dang-nhap?demo=landlord&next=/app/hop-dong/ct-001#tong-quan",
       },
       {
         step: "DEPOSIT",
         stepNumber: "02",
         name: "Nạp cọc bảo chứng",
-        shortDesc: "Người thuê quét VietQR — Ghi nhận cọc vào két bảo chứng",
+        shortDesc: "Quét VietQR mô phỏng — Cọc vào két bảo chứng Soroban",
         detail:
-          "Người thuê quét mã VietQR (mô phỏng). Sau khi cổng thanh toán mô phỏng xác nhận đúng số tiền, backend đưa giao dịch vào hàng đợi Outbox. Soroban chuyển trạng thái tiền cọc sang RECORDED. Contract không giữ tiền VNĐ.",
-        onchainAction:
-          "Oracle ghi nhận payment_ref_hash (băm mã thanh toán kèm muối) và xác nhận cọc đã vào két qua record_deposit_paid.",
+          "Người thuê quét mã VietQR mô phỏng. Sau khi xác nhận thanh toán, trạng thái cọc chuyển sang RECORDED trên hợp đồng Soroban. Contract không giữ tiền VNĐ.",
+        onchainAction: "Oracle ghi nhận payment_ref_hash và xác nhận cọc đã vào két.",
         deepLink: "/dang-nhap?demo=tenant&next=/app/hop-dong/ct-001#tien-coc",
       },
       {
         step: "RENT",
         stepNumber: "03",
         name: "Thu thuê hàng tháng",
-        shortDesc: "VietQR từng kỳ — Tính phí trễ hạn tự động",
+        shortDesc: "Theo dõi kỳ thuê — Tự động tính phạt trễ hạn minh bạch",
         detail:
-          "Đến hạn hàng tháng, mã VietQR kỳ thuê được phát hành (mô phỏng). Nếu thanh toán trễ, hệ thống tự tính phí phạt chính xác theo công thức quy định (rent × bps × days / 10000) và cập nhật công nợ.",
-        onchainAction:
-          "Ghi nhận trạng thái thanh toán hoặc số ngày trễ (record_rent_paid hoặc mark_overdue) lên contract.",
+          "Đến hạn hàng tháng, mã VietQR kỳ thuê được phát hành (mô phỏng). Nếu trễ hạn, hệ thống tự tính phí phạt chính xác theo tỷ lệ cam kết.",
+        onchainAction: "Ghi nhận trạng thái thanh toán hoặc số ngày trễ lên Testnet.",
         deepLink: "/dang-nhap?demo=tenant&next=/app/hop-dong/ct-002#tien-thue",
       },
       {
         step: "SETTLE",
         stepNumber: "04",
-        name: "Nghiệm thu & Hoàn cọc",
+        name: "Hoàn cọc đồng thuận",
         shortDesc: "Hai chìa khóa cùng xoay — Két mở hoàn cọc đồng thuận",
         detail:
-          "Khi trả phòng, chủ nhà đề xuất hoàn cọc toàn bộ hoặc khấu trừ chi phí có lý do. Chỉ khi cả hai bên dùng Passkey đồng thuận cùng một số tiền, smart contract mới phát sự kiện giải ngân (mô phỏng, không có chuyển khoản ngân hàng thật).",
-        onchainAction:
-          "Contract phát sự kiện release_authorized khi cả hai bên khớp chữ ký xác nhận số tiền (approve_refund hoặc resolve_dispute).",
+          "Khi trả phòng, chủ nhà đề xuất mức hoàn cọc hoặc khấu trừ có lý do. Chỉ khi hai bên khớp số tiền bằng Passkey, smart contract mới phát sự kiện giải ngân (mô phỏng).",
+        onchainAction: "Phát sự kiện release_authorized khi cả hai bên khớp chữ ký xác nhận.",
         deepLink: "/dang-nhap?demo=landlord&next=/app/hop-dong/ct-002#hoan-coc",
       },
       {
@@ -151,131 +138,84 @@ export const marketingVi = {
         name: "Xử lý tranh chấp",
         shortDesc: "Bất đồng ý kiến — Khóa cọc an toàn, không tự giải ngân",
         detail:
-          "Nếu người thuê từ chối mức khấu trừ hoặc hai bên gửi số tiền lệch nhau, hệ thống chuyển sang trạng thái PENDING_DISPUTE. Tiền cọc bị khóa cứng trên contract, RentFlow tuyệt đối không tự phán quyết bên nào đúng.",
-        onchainAction:
-          "Khóa cọc trên contract qua open_dispute, chặn hoàn cọc cho đến khi hai bên gửi cùng số tiền qua resolve_dispute.",
+          "Nếu có bất đồng hoặc số tiền gửi lệch nhau, cọc bị khóa cứng ở trạng thái PENDING_DISPUTE trên chuỗi cho đến khi hai bên tìm được tiếng nói chung.",
+        onchainAction: "Khóa cọc trên contract, chặn hoàn cọc cho đến khi đạt thỏa thuận chung.",
         deepLink: "/dang-nhap?demo=tenant&next=/app/hop-dong/ct-003#hoan-coc",
       },
     ],
     safeStatusLocked: "Két cọc: Đang khóa bảo chứng (RECORDED)",
     safeStatusUnlocked: "Két cọc: Mở giải ngân (REFUNDED)",
     safeStatusDisputed: "Két cọc: Khóa tranh chấp (PENDING_DISPUTE)",
-    interactiveHint: "Cuộn trang hoặc chọn bước bên dưới để điều khiển két cọc mô phỏng:",
-    nextBridge: "Dữ liệu được lưu trữ on-chain và off-chain như thế nào? ↓",
+    interactiveHint: "Cuộn ngang để xem từng bước trong hành trình:",
   },
-  chapter04: {
-    number: "04",
-    subtitle: "Kiến trúc công nghệ",
-    title: "Phân chia ranh giới On-Chain và Off-Chain tuyệt đối",
+  chapter05: {
+    number: "05",
+    subtitle: "Bằng chứng • On-Chain",
+    title: "Mỗi bước để lại dấu vết bất biến trên Stellar Testnet",
     description:
-      "Quy tắc đạo đức cốt lõi của RentFlow: Blockchain là sổ cái bất biến để chống gian lận, không phải nơi lưu thông tin nhạy cảm của người dùng.",
-    gameTitle: "Tương tác: Kéo thả phân loại dữ liệu",
-    gameInstruction:
-      "Hãy kéo từng mảnh dữ liệu (hoặc bấm chọn) vào đúng vùng lưu trữ Off-chain (Supabase) hoặc On-chain (Stellar Soroban):",
-    gameSuccessMessage: "Chính xác! Dữ liệu đã được phân loại đúng nguyên tắc kiến trúc.",
+      "Blockchain là sổ cái công khai chống gian lận; tuyệt đối không lưu họ tên, số điện thoại, CCCD hay bất kỳ dữ liệu cá nhân nào.",
     marqueeTitle: "Băng giao dịch Stellar Testnet mới nhất",
     marqueeEmpty: "Chưa có giao dịch nào được ghi nhận trên Testnet trong phiên làm việc này.",
     marqueeNote:
       "Dữ liệu được lấy trực tiếp từ hàng đợi onchain_txs. Bấm vào giao dịch để mở Stellar Expert Explorer.",
     techCards: [
       {
-        name: "Stellar & Soroban",
+        name: "Smart Contract Soroban",
         role: "Sổ cái trạng thái & Chống gian lận",
         status: "ĐÃ TRIỂN KHAI TRÊN TESTNET",
-        desc: "Smart contract Soroban quản lý máy trạng thái và kiểm tra chữ ký của từng bên. Contract không giữ tiền VNĐ: nó chỉ cho phép phát lệnh giải ngân (mô phỏng) khi cả hai bên cùng xác nhận.",
+        desc: "Quản lý máy trạng thái cọc và hợp đồng. Contract không giữ tiền VNĐ, chỉ phát sự kiện giải ngân khi cả hai bên cùng xác nhận.",
       },
       {
         name: "Passkey (WebAuthn)",
-        role: "Ký thao tác quan trọng không cần mật khẩu",
+        role: "Ký bảo mật không cần mật khẩu",
         status: "ĐÃ CHẠY THỬ (THIẾT BỊ ẢO)",
-        desc: "Đăng ký và xác thực Passkey được kiểm thử trên Chrome bằng thiết bị Passkey ảo (Virtual Authenticator); ký hợp đồng dùng mã bước hai một lần do máy chủ cấp. Chưa kiểm tra trên điện thoại thật (Face ID, vân tay thật). Ví do máy chủ giữ hộ (custodial), người dùng không phải nhớ 12 từ khóa.",
+        desc: "Ký hợp đồng và duyệt hoàn cọc an toàn qua WebAuthn. Ví custodial do máy chủ giữ hộ, người dùng không cần nhớ cụm từ khóa.",
       },
       {
         name: "CAP-15 Fee-Bump",
-        role: "Nền tảng trả phí gas thay người dùng",
+        role: "Nền tảng tài trợ toàn bộ phí giao dịch",
         status: "ĐÃ CHẠY TRÊN TESTNET",
-        desc: "Giao dịch được bọc FeeBumpTransaction, tài khoản nền tảng trả phí gas trên Testnet nên người dùng không cần sở hữu XLM. Người dùng chỉ ký phần ủy quyền Soroban của mình.",
-      },
-      {
-        name: "SEP-10 & Stellar Anchor",
-        role: "Xác thực ví chuẩn Stellar và cầu nối nạp rút VND",
-        status: "LỘ TRÌNH DÀI HẠN (CHƯA LÀM)",
-        desc: "Chưa triển khai trong bản demo. Dự án hiện dùng OTP và Passkey, chưa dùng SEP-10. Hướng phát triển dài hạn: tích hợp SEP-10 cho xác thực ví và SEP-24 với tổ chức tài chính/ngân hàng được cấp phép để nạp rút tiền định danh VND thật.",
+        desc: "Giao dịch được bọc Fee-Bump, máy chủ trả phí mạng trên Testnet. Người dùng không cần sở hữu bất kỳ token nào.",
       },
     ],
-    nextBridge: "Xem bảng so sánh RentFlow với các mô hình hiện tại ↓",
-  },
-  chapter05: {
-    number: "05",
-    subtitle: "So sánh khách quan",
-    title: "RentFlow định vị ở đâu trên thị trường?",
-    description:
-      "So sánh trung thực với ngân hàng truyền thống, phần mềm quản lý trọ và các dự án Web3 thuần túy. Thông tin căn cứ theo Brief thiết kế.",
-    columns: [
-      "Tiêu chí",
-      "RentFlow (Đề xuất)",
-      "Ngân hàng truyền thống",
-      "App quản lý phòng trọ",
-      "Dự án Web3 thuần",
-    ],
-    rows: [
-      {
-        criteria: "Bảo chứng tiền cọc",
-        rentflow:
-          "Két cọc 2 chìa khóa (mô phỏng escrow): Soroban Testnet kiểm soát điều kiện, chỉ giải ngân mô phỏng khi cả hai bên ký; contract không giữ tiền VNĐ",
-        bank: "Có tài khoản ký quỹ nhưng thủ tục phức tạp, chi phí cao, không áp dụng cho phòng trọ nhỏ lẻ",
-        rentalApp: "Không bảo chứng, tiền nằm trực tiếp trong tài khoản chủ nhà",
-        web3: "Smart contract khóa crypto, rủi ro biến động giá và đòi hỏi ví crypto cá nhân",
-      },
-      {
-        criteria: "Thu tiền thuê & phạt trễ",
-        rentflow:
-          "Tự động tính ngày trễ và phạt trễ theo %/ngày thỏa thuận (chạy thật trên Testnet); phát VietQR thanh toán (mô phỏng, payOS chưa kiểm chứng)",
-        bank: "Ủy nhiệm chi tự động nhưng không linh hoạt xử lý thiếu/thừa hoặc trễ hạn theo hợp đồng thuê",
-        rentalApp: "Chỉ nhắc nợ bằng thông báo, chủ nhà vẫn phải đối soát sao kê ngân hàng thủ công",
-        web3: "Trừ token tự động từ ví người thuê, đòi hỏi người thuê phải nạp sẵn crypto",
-      },
-      {
-        criteria: "Bằng chứng khi có tranh chấp",
-        rentflow:
-          "Hash SHA-256 có muối lưu trên Stellar Testnet, bất biến, khóa cọc khi bất đồng. (Lưu ý: mới băm nội dung hợp đồng, chưa có ảnh bàn giao)",
-        bank: "Sao kê chuyển khoản thuần túy, không liên kết điều khoản hợp đồng hay biên bản nghiệm thu",
-        rentalApp: "Dữ liệu lưu tập trung ở máy chủ công ty phần mềm, có thể bị chỉnh sửa hoặc mất dữ liệu",
-        web3: "Lưu trên chuỗi nhưng thường để lộ địa chỉ ví công khai hoặc metadata nhạy cảm",
-      },
-      {
-        criteria: "Trải nghiệm người dùng phổ thông",
-        rentflow:
-          "Giao diện tiếng Việt, quét VietQR (mô phỏng), Passkey (thử nghiệm trên thiết bị ảo), không chạm XLM hay gas nhờ CAP-15 Fee-Bump",
-        bank: "Quen thuộc nhưng rườm rà giấy tờ tại quầy giao dịch",
-        rentalApp: "Quen thuộc, dễ dùng nhưng thiếu tính bảo vệ pháp lý và bảo chứng dòng tiền",
-        web3: "Rào cản lớn: cài ví MetaMask/Freighter, mua XLM trả gas, ký hex transaction khó hiểu",
-      },
-      {
-        criteria: "Bảo vệ dữ liệu cá nhân",
-        rentflow:
-          "Tuyệt đối không đưa CCCD, SĐT, họ tên lên blockchain; phân quyền RLS chặt chẽ; hash có muối ngăn dò ngược",
-        bank: "Tuân thủ bảo mật ngân hàng",
-        rentalApp: "Tập trung dữ liệu, phụ thuộc vào chính sách bảo mật của từng nhà phát triển app",
-        web3: "Dễ sơ suất đưa siêu dữ liệu (metadata) cá nhân vào IPFS hoặc tham số contract",
-      },
-    ],
-    nextBridge: "Sẵn sàng trải nghiệm ngay trên hệ thống demo? ↓",
   },
   chapter06: {
     number: "06",
-    subtitle: "Trải nghiệm thực tế",
+    subtitle: "Sự thật • Thẳng thắn",
+    title: "Minh bạch tuyệt đối: Phần nào thật, phần nào mô phỏng?",
+    description:
+      "Chúng tôi công khai rõ ràng ranh giới kỹ thuật để bảo đảm tính trung thực tuyệt đối của bản demo Ideathon.",
+    realSectionTitle: "Chạy thật trên Stellar Testnet",
+    simulatedSectionTitle: "Mô phỏng trong bản demo",
+    realFeatures: [
+      "Smart contract Soroban quản lý trạng thái cọc và hợp đồng",
+      "Mã băm SHA-256 có muối (doc_hash, payment_ref_hash) lưu bất biến trên chain",
+      "Nền tảng trả phí mạng Testnet qua giao dịch CAP-15 Fee-Bump",
+      "Xác thực Passkey (WebAuthn) thử nghiệm trên trình duyệt Chrome",
+    ],
+    simulatedFeatures: [
+      "Tiền VNĐ và tài khoản ký quỹ ngân hàng (contract không giữ tiền VNĐ, chưa kết nối tài khoản phong tỏa)",
+      "Cổng thanh toán VietQR và đối soát (chạy trong sandbox thử nghiệm, payOS chưa kiểm chứng)",
+      "Giải ngân hoàn cọc liên ngân hàng (chỉ cập nhật trạng thái UI, không có lệnh chuyển tiền thật)",
+      "Mã xác thực OTP qua SMS (sử dụng mã mặc định 123456)",
+    ],
+    transparencyCta: "Xem chi tiết cam kết Đạo đức & Kỹ thuật",
+    transparencyLink: "/minh-bach",
+  },
+  chapter07: {
+    number: "07",
+    subtitle: "Dùng thử • Trải nghiệm",
     title: "Chọn vai trò và khám phá RentFlow ngay",
     description:
-      "Hệ thống đã chuẩn bị sẵn tài khoản demo có đầy đủ dữ liệu giả lập cho cả hai bên để bạn trải nghiệm trọn vẹn luồng 5 bước (ngân hàng và giải ngân là mô phỏng).",
+      "Hệ thống đã chuẩn bị sẵn tài khoản demo có đầy đủ dữ liệu cho cả Chủ nhà và Người thuê để trải nghiệm trọn vẹn quy trình 5 bước.",
     landlordCard: {
       role: "CHỦ NHÀ",
       badge: "Tài khoản demo",
-      title: "Trải nghiệm với vai trò Chủ nhà",
+      title: "Trải nghiệm vai trò Chủ nhà",
       benefits: [
-        "Tạo hợp đồng mới với điều khoản tiền cọc và biểu phí phạt trễ rõ ràng",
-        "Theo dõi danh sách hợp đồng và trạng thái cọc đã vào két bảo chứng (mô phỏng)",
-        "Kiểm tra lịch sử thanh toán VietQR từng kỳ thuê (mô phỏng)",
+        "Tạo hợp đồng với điều khoản cọc và phí phạt trễ hạn minh bạch",
+        "Theo dõi trạng thái tiền cọc đã ghi nhận vào két bảo chứng",
+        "Kiểm tra lịch sử thanh toán VietQR từng kỳ thuê",
         "Đề xuất mức khấu trừ hao mòn có đính kèm lý do khi trả phòng",
       ],
       cta: "Đăng nhập nhanh Chủ nhà",
@@ -284,12 +224,12 @@ export const marketingVi = {
     tenantCard: {
       role: "NGƯỜI THUÊ",
       badge: "Tài khoản demo",
-      title: "Trải nghiệm với vai trò Người thuê",
+      title: "Trải nghiệm vai trò Người thuê",
       benefits: [
-        "Xác nhận hợp đồng thuê bằng bảo mật Passkey (thử nghiệm với thiết bị ảo)",
+        "Xác nhận hợp đồng thuê bằng Passkey an toàn",
         "Quét VietQR nạp cọc vào két bảo chứng (mô phỏng)",
-        "Thanh toán tiền thuê hàng tháng chỉ với một chạm (mô phỏng)",
-        "Yêu cầu hoàn cọc hoặc từ chối khấu trừ vô lý để khóa cọc trên chain",
+        "Thanh toán tiền thuê hàng tháng chỉ với một chạm",
+        "Đồng thuận hoàn cọc hoặc từ chối khấu trừ vô lý để khóa cọc",
       ],
       cta: "Đăng nhập nhanh Người thuê",
       link: "/dang-nhap?demo=tenant&next=/app",
