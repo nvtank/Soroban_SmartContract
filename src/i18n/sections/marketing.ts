@@ -21,7 +21,8 @@ export const marketingVi = {
     ctaPrimary: "Dùng thử demo ngay",
     ctaSecondary: "Xem cách hoạt động",
     badgeIdeathon: "Stellar Ideathon — Track 4 & 5 (Custody & Soroban)",
-    trustNote: "Bản demo: ngân hàng, VietQR, OTP và giải ngân là mô phỏng. Bằng chứng chạy trên Stellar Testnet.",
+    trustNote:
+      "Bản demo: ngân hàng, VietQR, OTP và giải ngân là mô phỏng. Bằng chứng chạy trên Stellar Testnet.",
   },
   chapter01: {
     number: "01",
@@ -83,7 +84,8 @@ export const marketingVi = {
       },
       {
         painTitle: "Bằng chứng rải rác, khó phân xử",
-        painDesc: "Hợp đồng giấy dễ sửa đổi, thỏa thuận thất lạc, không có nguồn sự thật khách quan bất biến.",
+        painDesc:
+          "Hợp đồng giấy dễ sửa đổi, thỏa thuận thất lạc, không có nguồn sự thật khách quan bất biến.",
         solutionTitle: "Bằng chứng SHA-256 trên Stellar Testnet",
         solutionDesc:
           "Văn bản hợp đồng được chuẩn hóa và băm SHA-256 kèm muối ngẫu nhiên (salt 32-byte), lưu bất biến lên Soroban Testnet (CHẠY THẬT). Lưu ý trung thực: Hệ thống mới băm nội dung hợp đồng, CHƯA có tính năng lưu hay băm ảnh hiện trạng bàn giao (đây là định hướng lộ trình).",
@@ -106,7 +108,8 @@ export const marketingVi = {
         shortDesc: "Chủ nhà tạo hợp đồng — Người thuê xác nhận bằng Passkey",
         detail:
           "Chủ nhà nhập thông tin hợp đồng (tiền cọc, tiền thuê, ngày đến hạn, phí trễ). Hợp đồng được chuẩn hóa và tính mã băm SHA-256 có muối 32-byte. Người thuê xác thực danh tính và ký điện tử qua Passkey/WebAuthn (thử nghiệm với thiết bị ảo trên Chrome). Ví custody được cấp và ký giao dịch trên Stellar Testnet.",
-        onchainAction: "Ghi nhận mã băm hợp đồng (doc_hash), số tiền (i128) và địa chỉ ví hai bên lên Soroban contract qua create_contract, tenant_confirm.",
+        onchainAction:
+          "Ghi nhận mã băm hợp đồng (doc_hash), số tiền (i128) và địa chỉ ví hai bên lên Soroban contract qua create_contract, tenant_confirm.",
         deepLink: "/dang-nhap?demo=landlord&next=/app/hop-dong/ct-001#tong-quan",
       },
       {
@@ -116,7 +119,8 @@ export const marketingVi = {
         shortDesc: "Người thuê quét VietQR — Ghi nhận cọc vào két bảo chứng",
         detail:
           "Người thuê quét mã VietQR (mô phỏng). Sau khi cổng thanh toán mô phỏng xác nhận đúng số tiền, backend đưa giao dịch vào hàng đợi Outbox. Soroban chuyển trạng thái tiền cọc sang RECORDED. Contract không giữ tiền VNĐ.",
-        onchainAction: "Oracle ghi nhận payment_ref_hash (băm mã thanh toán kèm muối) và xác nhận cọc đã vào két qua record_deposit_paid.",
+        onchainAction:
+          "Oracle ghi nhận payment_ref_hash (băm mã thanh toán kèm muối) và xác nhận cọc đã vào két qua record_deposit_paid.",
         deepLink: "/dang-nhap?demo=tenant&next=/app/hop-dong/ct-001#tien-coc",
       },
       {
@@ -126,7 +130,8 @@ export const marketingVi = {
         shortDesc: "VietQR từng kỳ — Tính phí trễ hạn tự động",
         detail:
           "Đến hạn hàng tháng, mã VietQR kỳ thuê được phát hành (mô phỏng). Nếu thanh toán trễ, hệ thống tự tính phí phạt chính xác theo công thức quy định (rent × bps × days / 10000) và cập nhật công nợ.",
-        onchainAction: "Ghi nhận trạng thái thanh toán hoặc số ngày trễ (record_rent_paid hoặc mark_overdue) lên contract.",
+        onchainAction:
+          "Ghi nhận trạng thái thanh toán hoặc số ngày trễ (record_rent_paid hoặc mark_overdue) lên contract.",
         deepLink: "/dang-nhap?demo=tenant&next=/app/hop-dong/ct-002#tien-thue",
       },
       {
@@ -136,7 +141,8 @@ export const marketingVi = {
         shortDesc: "Hai chìa khóa cùng xoay — Két mở hoàn cọc đồng thuận",
         detail:
           "Khi trả phòng, chủ nhà đề xuất hoàn cọc toàn bộ hoặc khấu trừ chi phí có lý do. Chỉ khi cả hai bên dùng Passkey đồng thuận cùng một số tiền, smart contract mới phát sự kiện giải ngân (mô phỏng, không có chuyển khoản ngân hàng thật).",
-        onchainAction: "Contract phát sự kiện release_authorized khi cả hai bên khớp chữ ký xác nhận số tiền (approve_refund hoặc resolve_dispute).",
+        onchainAction:
+          "Contract phát sự kiện release_authorized khi cả hai bên khớp chữ ký xác nhận số tiền (approve_refund hoặc resolve_dispute).",
         deepLink: "/dang-nhap?demo=landlord&next=/app/hop-dong/ct-002#hoan-coc",
       },
       {
@@ -146,7 +152,8 @@ export const marketingVi = {
         shortDesc: "Bất đồng ý kiến — Khóa cọc an toàn, không tự giải ngân",
         detail:
           "Nếu người thuê từ chối mức khấu trừ hoặc hai bên gửi số tiền lệch nhau, hệ thống chuyển sang trạng thái PENDING_DISPUTE. Tiền cọc bị khóa cứng trên contract, RentFlow tuyệt đối không tự phán quyết bên nào đúng.",
-        onchainAction: "Khóa cọc trên contract qua open_dispute, chặn hoàn cọc cho đến khi hai bên gửi cùng số tiền qua resolve_dispute.",
+        onchainAction:
+          "Khóa cọc trên contract qua open_dispute, chặn hoàn cọc cho đến khi hai bên gửi cùng số tiền qua resolve_dispute.",
         deepLink: "/dang-nhap?demo=tenant&next=/app/hop-dong/ct-003#hoan-coc",
       },
     ],
@@ -214,35 +221,40 @@ export const marketingVi = {
     rows: [
       {
         criteria: "Bảo chứng tiền cọc",
-        rentflow: "Két cọc 2 chìa khóa (mô phỏng escrow): Soroban Testnet kiểm soát điều kiện, chỉ giải ngân mô phỏng khi cả hai bên ký; contract không giữ tiền VNĐ",
+        rentflow:
+          "Két cọc 2 chìa khóa (mô phỏng escrow): Soroban Testnet kiểm soát điều kiện, chỉ giải ngân mô phỏng khi cả hai bên ký; contract không giữ tiền VNĐ",
         bank: "Có tài khoản ký quỹ nhưng thủ tục phức tạp, chi phí cao, không áp dụng cho phòng trọ nhỏ lẻ",
         rentalApp: "Không bảo chứng, tiền nằm trực tiếp trong tài khoản chủ nhà",
         web3: "Smart contract khóa crypto, rủi ro biến động giá và đòi hỏi ví crypto cá nhân",
       },
       {
         criteria: "Thu tiền thuê & phạt trễ",
-        rentflow: "Tự động tính ngày trễ và phạt trễ theo %/ngày thỏa thuận (chạy thật trên Testnet); phát VietQR thanh toán (mô phỏng, payOS chưa kiểm chứng)",
+        rentflow:
+          "Tự động tính ngày trễ và phạt trễ theo %/ngày thỏa thuận (chạy thật trên Testnet); phát VietQR thanh toán (mô phỏng, payOS chưa kiểm chứng)",
         bank: "Ủy nhiệm chi tự động nhưng không linh hoạt xử lý thiếu/thừa hoặc trễ hạn theo hợp đồng thuê",
         rentalApp: "Chỉ nhắc nợ bằng thông báo, chủ nhà vẫn phải đối soát sao kê ngân hàng thủ công",
         web3: "Trừ token tự động từ ví người thuê, đòi hỏi người thuê phải nạp sẵn crypto",
       },
       {
         criteria: "Bằng chứng khi có tranh chấp",
-        rentflow: "Hash SHA-256 có muối lưu trên Stellar Testnet, bất biến, khóa cọc khi bất đồng. (Lưu ý: mới băm nội dung hợp đồng, chưa có ảnh bàn giao)",
+        rentflow:
+          "Hash SHA-256 có muối lưu trên Stellar Testnet, bất biến, khóa cọc khi bất đồng. (Lưu ý: mới băm nội dung hợp đồng, chưa có ảnh bàn giao)",
         bank: "Sao kê chuyển khoản thuần túy, không liên kết điều khoản hợp đồng hay biên bản nghiệm thu",
         rentalApp: "Dữ liệu lưu tập trung ở máy chủ công ty phần mềm, có thể bị chỉnh sửa hoặc mất dữ liệu",
         web3: "Lưu trên chuỗi nhưng thường để lộ địa chỉ ví công khai hoặc metadata nhạy cảm",
       },
       {
         criteria: "Trải nghiệm người dùng phổ thông",
-        rentflow: "Giao diện tiếng Việt, quét VietQR (mô phỏng), Passkey (thử nghiệm trên thiết bị ảo), không chạm XLM hay gas nhờ CAP-15 Fee-Bump",
+        rentflow:
+          "Giao diện tiếng Việt, quét VietQR (mô phỏng), Passkey (thử nghiệm trên thiết bị ảo), không chạm XLM hay gas nhờ CAP-15 Fee-Bump",
         bank: "Quen thuộc nhưng rườm rà giấy tờ tại quầy giao dịch",
         rentalApp: "Quen thuộc, dễ dùng nhưng thiếu tính bảo vệ pháp lý và bảo chứng dòng tiền",
         web3: "Rào cản lớn: cài ví MetaMask/Freighter, mua XLM trả gas, ký hex transaction khó hiểu",
       },
       {
         criteria: "Bảo vệ dữ liệu cá nhân",
-        rentflow: "Tuyệt đối không đưa CCCD, SĐT, họ tên lên blockchain; phân quyền RLS chặt chẽ; hash có muối ngăn dò ngược",
+        rentflow:
+          "Tuyệt đối không đưa CCCD, SĐT, họ tên lên blockchain; phân quyền RLS chặt chẽ; hash có muối ngăn dò ngược",
         bank: "Tuân thủ bảo mật ngân hàng",
         rentalApp: "Tập trung dữ liệu, phụ thuộc vào chính sách bảo mật của từng nhà phát triển app",
         web3: "Dễ sơ suất đưa siêu dữ liệu (metadata) cá nhân vào IPFS hoặc tham số contract",
@@ -310,7 +322,8 @@ export const marketingVi = {
         items: [
           {
             field: "Số điện thoại",
-            source: "Người dùng tự nhập khi đăng nhập nhận mã xác thực OTP (mô phỏng bằng mã 123456 trong bản demo).",
+            source:
+              "Người dùng tự nhập khi đăng nhập nhận mã xác thực OTP (mô phỏng bằng mã 123456 trong bản demo).",
             purpose: "Định danh tài khoản và hiển thị thông báo nhắc đến hạn thanh toán / hoàn cọc.",
           },
           {
@@ -320,7 +333,8 @@ export const marketingVi = {
           },
           {
             field: "Mã khóa công khai Passkey (WebAuthn)",
-            source: "Trình duyệt của thiết bị người dùng sinh ra khi đăng ký (kiểm thử trên Chrome với thiết bị Passkey ảo).",
+            source:
+              "Trình duyệt của thiết bị người dùng sinh ra khi đăng ký (kiểm thử trên Chrome với thiết bị Passkey ảo).",
             purpose:
               "Xác thực hành vi ký hợp đồng và duyệt hoàn cọc an toàn, thay thế chữ ký tay truyền thống.",
           },
@@ -335,28 +349,37 @@ export const marketingVi = {
         items: [
           {
             category: "Danh tính cá nhân (PII)",
-            offchain: "Họ tên, Số điện thoại, Số CCCD / CMND, thông tin tài khoản ngân hàng nhận tiền. Được bảo vệ bởi Postgres RLS.",
-            onchain: "CHỈ lưu địa chỉ ví Stellar ngẫu nhiên (ví dụ G...ABC của chủ nhà, người thuê, signer). Tuyệt đối cấm PII.",
+            offchain:
+              "Họ tên, Số điện thoại, Số CCCD / CMND, thông tin tài khoản ngân hàng nhận tiền. Được bảo vệ bởi Postgres RLS.",
+            onchain:
+              "CHỈ lưu địa chỉ ví Stellar ngẫu nhiên (ví dụ G...ABC của chủ nhà, người thuê, signer). Tuyệt đối cấm PII.",
           },
           {
             category: "Nội dung hợp đồng & Thông số",
-            offchain: "Toàn văn điều khoản (terms_text), tên phòng (room_label), chuỗi muối ngẫu nhiên (doc_salt). Hệ thống mới băm nội dung hợp đồng, CHƯA có ảnh bàn giao.",
-            onchain: "doc_hash: BytesN<32> (băm SHA-256 kèm doc_salt), deposit_amount: i128, rent_amount: i128, due_day: u32, late_fee_bps_per_day: u32, UUID: BytesN<16>.",
+            offchain:
+              "Toàn văn điều khoản (terms_text), tên phòng (room_label), chuỗi muối ngẫu nhiên (doc_salt). Hệ thống mới băm nội dung hợp đồng, CHƯA có ảnh bàn giao.",
+            onchain:
+              "doc_hash: BytesN<32> (băm SHA-256 kèm doc_salt), deposit_amount: i128, rent_amount: i128, due_day: u32, late_fee_bps_per_day: u32, UUID: BytesN<16>.",
           },
           {
             category: "Trạng thái cọc & Quá hạn",
             offchain: "Lịch sử chi tiết, nhật ký thao tác (audit logs), thông báo hệ thống in-app.",
-            onchain: "Mã trạng thái số nguyên u32 (ContractStatus, DepositStatus, RentStatus), số ngày trễ (days_late: u32), mốc gia hạn (new_due_ts: u64).",
+            onchain:
+              "Mã trạng thái số nguyên u32 (ContractStatus, DepositStatus, RentStatus), số ngày trễ (days_late: u32), mốc gia hạn (new_due_ts: u64).",
           },
           {
             category: "Thanh toán cọc & Thuê",
-            offchain: "Mã đơn hàng payOS (chưa kiểm chứng thực tế), chuỗi mã VietQR mô phỏng, chuỗi muối thanh toán (payment_ref_salt), biên nhận chuyển khoản mô phỏng.",
-            onchain: "payment_ref_hash: BytesN<32> (băm mã thanh toán kèm payment_ref_salt), số tiền VND (amount: i128), kỳ thuê (period: u32).",
+            offchain:
+              "Mã đơn hàng payOS (chưa kiểm chứng thực tế), chuỗi mã VietQR mô phỏng, chuỗi muối thanh toán (payment_ref_salt), biên nhận chuyển khoản mô phỏng.",
+            onchain:
+              "payment_ref_hash: BytesN<32> (băm mã thanh toán kèm payment_ref_salt), số tiền VND (amount: i128), kỳ thuê (period: u32).",
           },
           {
             category: "Khấu trừ & Tranh chấp",
-            offchain: "Toàn văn lý do khấu trừ (reason_text), chuỗi muối lý do (reason_salt), biên bản trao đổi giải quyết tranh chấp.",
-            onchain: "reason_hash: BytesN<32> (băm lý do kèm reason_salt), số tiền khấu trừ (amount: i128), phản hồi chấp nhận (accept: bool), số tiền thỏa thuận giải quyết (agreed_amount: i128). Contract không giữ tiền VNĐ.",
+            offchain:
+              "Toàn văn lý do khấu trừ (reason_text), chuỗi muối lý do (reason_salt), biên bản trao đổi giải quyết tranh chấp.",
+            onchain:
+              "reason_hash: BytesN<32> (băm lý do kèm reason_salt), số tiền khấu trừ (amount: i128), phản hồi chấp nhận (accept: bool), số tiền thỏa thuận giải quyết (agreed_amount: i128). Contract không giữ tiền VNĐ.",
           },
         ],
       },
@@ -428,7 +451,7 @@ export const marketingVi = {
           "Bổ sung tính năng chụp, lưu trữ và băm mã SHA-256 ảnh hiện trạng bàn giao phòng (hiện mới băm nội dung văn bản hợp đồng).",
           "Nâng cấp hạ tầng quản lý khóa sang HSM (Hardware Security Module) hoặc AWS KMS đạt chuẩn FIPS 140-2.",
           "Bổ sung kênh thông báo đa kênh qua Email, SMS và Web Push Notifications (hiện mới có thông báo in-app).",
-          "Mở rộng ghi nhận công nợ tiền điện, nước, chi phí sinh hoạt phát sinh ngoài tiền thuê.",
+          "Thanh toán các khoản điện, nước, phí dịch vụ qua VietQR và ghi lên chain (hiện chủ nhà chỉ ghi nhận khoản nợ và tự xác nhận đã nhận ngoài hệ thống, không phải xác nhận của ngân hàng).",
           "Kết nối với Trung tâm Trọng tài Thương mại để có quy trình hòa giải tranh chấp ngoài chuỗi có giá trị pháp lý thi hành.",
         ],
       },

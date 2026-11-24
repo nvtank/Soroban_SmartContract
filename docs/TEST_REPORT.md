@@ -63,13 +63,14 @@ Các lỗi này lọt qua test đơn vị và chỉ lộ ra khi chạy thật:
 
 ## 7. Số đo cuộn trang chủ
 
-Đo bằng Chrome, giả lập CPU chậm 4 lần, trên bản build production cùng một kịch bản cuộn (`perf-scroll`):
+**Đính chính:** bản trước của mục này dùng script đo có cờ `--disable-frame-rate-limit=false`. Chrome chỉ kiểm tra sự tồn tại của cờ nên tốc độ khung hình bị mở khóa, dẫn đến con số khoảng 560 FPS vô lý và các số đếm layout hay khung giật không so sánh được giữa các lần chạy. Các số đó **bị rút lại**. Agent F đã bỏ cờ và đo lại với vsync chuẩn.
 
-| Chỉ số | Trước tối ưu | Sau tối ưu |
-|---|---|---|
-| Tác vụ chặn luồng chính quá 50 ms | 58 | 0 |
-| Số lần tính lại layout | 1.564 | khoảng 370 |
-| Tổng thời gian xử lý luồng chính | 16,1 giây | khoảng 11,7 giây |
-| Khung hình giật (trên 33 ms) | 207 | 2 đến 6 |
+Đo bằng Chrome, giả lập CPU chậm 4 lần, trên bản build production, cùng một kịch bản cuộn:
 
-Số FPS đo được ở trang chủ sau tối ưu (khoảng 560) **không đáng tin** và không được dùng làm kết luận. Trang `/minh-bach` đo 83 FPS, p95 17,7 ms. Đánh giá độ mượt thực tế cần cảm nhận trên máy trình diễn.
+| Trang | FPS | p95 khung (ms) | Khung giật trên 33 ms | Số lần layout |
+|---|---|---|---|---|
+| Trang chủ `/` (sau khi chuẩn hóa phép đo, trước tối ưu thêm) | 58,8 | 16,8 | 1 | 307 |
+| Trang chủ `/` (sau tối ưu thêm) | 51,5 đến 59,3 (dao động giữa các lần) | 16,8 đến 33,4 | 1 đến 2 | 214 |
+| `/minh-bach` | 60,0 | 16,7 | 0 | 0 |
+
+Kết luận trung thực: ở phép đo đúng, trang chủ **đã gần 60 FPS** ngay cả khi CPU chậm 4 lần; các tối ưu bổ sung giảm số lần layout nhưng chưa cho thấy cải thiện FPS rõ rệt (dao động giữa các lần chạy lớn hơn mức cải thiện). Phản ánh "web lướt rất lag" ban đầu chưa được tái hiện bằng số đo; cảm nhận thực tế phụ thuộc máy, cần thử trên máy trình diễn thật.

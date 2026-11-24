@@ -114,3 +114,8 @@ Mọi cụm từ sau đây đã được rà soát và loại bỏ hoàn toàn k
 3. ❌ *"Mã hóa ảnh bàn giao / Băm ảnh bàn giao lên chuỗi"* ➔ Xác nhận hiện chỉ băm nội dung văn bản hợp đồng (`terms_text`), tính năng ảnh bàn giao là lộ trình tương lai.
 4. ❌ *"Cổng thanh toán payOS tự động"* ➔ Ghi rõ payOS chưa kiểm chứng thực tế, hệ thống chạy ở chế độ giả lập thanh toán.
 5. ❌ *"Xác thực OTP SMS"* ➔ Ghi rõ dùng mã OTP mô phỏng `123456`.
+
+
+## Cập nhật của Manager sau khi gộp Agent C
+
+Tính năng ghi nhận khoản nợ điện, nước, phí dịch vụ đã có (chỉ off-chain, chủ nhà tự xác nhận đã nhận ngoài hệ thống). Mục "Phí điện nước" trong danh sách "Chưa làm" được đổi thành: chưa thanh toán các khoản này qua VietQR và chưa ghi lên chain.
