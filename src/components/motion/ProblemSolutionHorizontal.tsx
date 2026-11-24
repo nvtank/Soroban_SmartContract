@@ -36,6 +36,7 @@ export function ProblemSolutionHorizontal() {
           scrollTrigger: {
             trigger: container,
             pin: true,
+            anticipatePin: 1,
             scrub: true, // Không trễ đúp với Lenis
             start: "top top+=80",
             end: () => `+=${track.scrollWidth - container.clientWidth}`,

@@ -3,10 +3,9 @@
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { DrawSVGPlugin } from "gsap/DrawSVGPlugin";
 
 if (typeof window !== "undefined") {
-  gsap.registerPlugin(ScrollTrigger, DrawSVGPlugin);
+  gsap.registerPlugin(ScrollTrigger);
 }
 
 export function ContinuousThread() {
@@ -24,21 +23,22 @@ export function ContinuousThread() {
     mm.add(
       "(min-width: 1280px) and (prefers-reduced-motion: no-preference)",
       () => {
-        gsap.fromTo(
-          path,
-          { drawSVG: "0%" },
-          {
-            drawSVG: "100%",
-            ease: "none",
-            scrollTrigger: {
-              trigger: document.body,
-              start: "top top+=150",
-              end: "max",
-              scrub: true, // Đồng bộ không trễ đúp với Lenis
-              refreshPriority: -1,
-            },
-          }
-        );
+        // Đo chiều dài path duy nhất 1 lần khi khởi tạo, tuyệt đối không gọi getTotalLength() mỗi frame cuộn!
+        const totalLen = Math.ceil(path.getTotalLength() || 1200);
+        path.style.strokeDasharray = `${totalLen}`;
+        path.style.strokeDashoffset = `${totalLen}`;
+
+        gsap.to(path, {
+          strokeDashoffset: 0,
+          ease: "none",
+          scrollTrigger: {
+            trigger: document.body,
+            start: "top top+=150",
+            end: "max",
+            scrub: true,
+            refreshPriority: -1,
+          },
+        });
       }
     );
 
@@ -69,9 +69,6 @@ export function ContinuousThread() {
           stroke="var(--primary)"
           strokeWidth="2"
           strokeLinecap="round"
-          strokeDasharray="5 7"
-          vectorEffect="non-scaling-stroke"
-          className="thread-glow"
         />
       </svg>
     </div>

@@ -64,6 +64,7 @@ export function HowItWorksSection() {
           start: "top top",
           end: () => `+=${pinDistance}`,
           pin: true,
+          anticipatePin: 1,
           scrub: true,
           onUpdate: (self) => {
             // Tính bước hiện tại từ progress (0 đến 1)

@@ -93,14 +93,45 @@ export function Navbar() {
     return () => ctx.revert();
   }, [pathname]);
 
-  // Cập nhật vị trí gạch chân trượt (sliding underline indicator)
+  const navPositionsRef = useRef<Record<string, { width: number; left: number }>>({});
+
+  // Đo trước vị trí các mục nav trên desktop một lần khi mount và khi resize
+  // Tuyệt đối không đọc offsetWidth/offsetLeft trong frame cuộn!
+  useEffect(() => {
+    const measureNav = () => {
+      const positions: Record<string, { width: number; left: number }> = {};
+      NAV_ITEMS.forEach((item) => {
+        const el = document.querySelector<HTMLElement>(`[data-nav-id="${item.id}"]`);
+        if (el) {
+          positions[item.id] = { width: el.offsetWidth, left: el.offsetLeft };
+        }
+      });
+      navPositionsRef.current = positions;
+
+      // Cập nhật ngay vị trí indicator hiện tại
+      const currentActive = pathname === "/minh-bach" ? "minh-bach" : activeSection;
+      const pos = positions[currentActive];
+      const indicator = indicatorRef.current;
+      if (pos && indicator) {
+        indicator.style.width = `${pos.width}px`;
+        indicator.style.transform = `translateX(${pos.left}px)`;
+        indicator.style.opacity = "1";
+      }
+    };
+
+    measureNav();
+    window.addEventListener("resize", measureNav, { passive: true });
+    return () => window.removeEventListener("resize", measureNav);
+  }, [pathname, activeSection]);
+
+  // Cập nhật vị trí gạch chân trượt (sliding underline indicator) qua GPU transform
   useEffect(() => {
     const currentActive = pathname === "/minh-bach" ? "minh-bach" : activeSection;
-    const activeEl = document.querySelector<HTMLElement>(`[data-nav-id="${currentActive}"]`);
+    const pos = navPositionsRef.current[currentActive];
     const indicator = indicatorRef.current;
-    if (activeEl && indicator) {
-      indicator.style.width = `${activeEl.offsetWidth}px`;
-      indicator.style.left = `${activeEl.offsetLeft}px`;
+    if (pos && indicator) {
+      indicator.style.width = `${pos.width}px`;
+      indicator.style.transform = `translateX(${pos.left}px)`;
       indicator.style.opacity = "1";
     } else if (indicator) {
       indicator.style.opacity = "0";
@@ -148,9 +179,7 @@ export function Navbar() {
         className="fixed left-0 right-0 z-50 py-3 sm:py-4 transition-transform duration-250 ease-out"
         style={{
           top: "var(--demo-banner-h, 2.75rem)",
-          backgroundColor: "rgba(251, 248, 243, 0.8)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
+          backgroundColor: "rgba(251, 248, 243, 0.96)",
           borderBottom: "1px solid var(--line)",
         }}
       >
@@ -202,10 +231,10 @@ export function Navbar() {
                 </Link>
               );
             })}
-            {/* Sliding underline indicator */}
+            {/* Sliding underline indicator - using left-0 and transform */}
             <div
               ref={indicatorRef}
-              className="pointer-events-none absolute bottom-0 h-0.5 rounded-full bg-primary transition-all duration-200 ease-out"
+              className="pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-primary transition-all duration-200 ease-out"
               aria-hidden="true"
             />
           </nav>
@@ -246,7 +275,7 @@ export function Navbar() {
       {/* Fullscreen Mobile Menu */}
       <div
         ref={mobileMenuRef}
-        className="fixed inset-0 z-40 hidden flex-col justify-between px-6 pt-36 pb-10 text-ink xl:hidden bg-paper/95 backdrop-blur-md"
+        className="fixed inset-0 z-40 hidden flex-col justify-between px-6 pt-36 pb-10 text-ink xl:hidden bg-paper"
         aria-modal="true"
         role="dialog"
       >
