@@ -10,6 +10,7 @@ import { apiClient } from "@/components/app/api-client";
 import { LoadingSkeleton, EmptyState, ErrorState } from "@/components/app/ui-state";
 import { JourneyStepper, StatusBadge, MoneyAmount, MockBadge } from "@/components/shared";
 import { formatDate } from "@/components/app/date-format";
+import { extractRoomTourKey } from "@/components/app/tour";
 import type { ContractSummaryDto } from "@/domain/dto";
 
 export default function DashboardPage() {
@@ -119,7 +120,10 @@ export default function DashboardPage() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Welcome Banner */}
-        <section className="p-6 sm:p-8 rounded-panel bg-surface/60 border border-line flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xs">
+        <section
+          data-tour="dashboard-stats"
+          className="p-6 sm:p-8 rounded-panel bg-surface/60 border border-line flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xs"
+        >
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">
@@ -140,6 +144,7 @@ export default function DashboardPage() {
             {role === "LANDLORD" && (
               <Link
                 href="/app/hop-dong/moi"
+                data-tour="create-contract"
                 className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors shadow-xs cursor-pointer text-sm whitespace-nowrap"
               >
                 + Tạo hợp đồng mới
@@ -261,10 +266,12 @@ export default function DashboardPage() {
               onAction={role === "LANDLORD" ? () => router.push("/app/hop-dong/moi") : undefined}
             />
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div data-tour="contract-list" className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredContracts.map((c) => (
                 <div
                   key={c.id}
+                  data-tour="contract-card"
+                  data-tour-key={extractRoomTourKey(c.roomLabel)}
                   className="bg-paper rounded-card border border-line p-5 sm:p-6 shadow-xs hover:shadow-soft transition-shadow flex flex-col justify-between space-y-5"
                 >
                   {/* Card top */}
@@ -311,6 +318,7 @@ export default function DashboardPage() {
                     </span>
                     <Link
                       href={`/app/hop-dong/${c.id}`}
+                      data-tour="contract-open"
                       className="px-3.5 py-1.5 rounded-lg bg-primary/10 text-primary font-bold hover:bg-primary hover:text-paper transition-colors"
                     >
                       Xem chi tiết ➔

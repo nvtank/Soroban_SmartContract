@@ -419,14 +419,14 @@ function ContractDetailContent({ id }: { id: string }) {
         <section className="bg-paper rounded-panel border border-line p-6 sm:p-8 shadow-soft space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1">
-              <div className="flex items-center gap-3 flex-wrap">
+              <div data-tour="contract-status" className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">
                   {contract.roomLabel}
                 </h1>
                 <StatusBadge kind="contract" status={contract.status} />
                 <StatusBadge kind="deposit" status={contract.depositStatus} />
               </div>
-              <div className="text-xs sm:text-sm text-ink/70">
+              <div data-tour="contract-parties" className="text-xs sm:text-sm text-ink/70">
                 Chủ nhà: <strong>{contract.landlordName}</strong> • Người thuê:{" "}
                 <strong>{contract.tenantName}</strong>
               </div>
@@ -461,6 +461,7 @@ function ContractDetailContent({ id }: { id: string }) {
           data-lenis-prevent
         >
           <button
+            data-tour="tab-tong-quan"
             onClick={() => switchTab("tong-quan")}
             className={`pb-3 px-2 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === "tong-quan"
@@ -471,6 +472,7 @@ function ContractDetailContent({ id }: { id: string }) {
             1. Tổng quan
           </button>
           <button
+            data-tour="tab-tien-coc"
             onClick={() => switchTab("tien-coc")}
             className={`pb-3 px-2 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === "tien-coc"
@@ -481,6 +483,7 @@ function ContractDetailContent({ id }: { id: string }) {
             2. Tiền cọc
           </button>
           <button
+            data-tour="tab-tien-thue"
             onClick={() => switchTab("tien-thue")}
             className={`pb-3 px-2 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === "tien-thue"
@@ -491,6 +494,7 @@ function ContractDetailContent({ id }: { id: string }) {
             3. Tiền thuê & công nợ
           </button>
           <button
+            data-tour="tab-hoan-coc"
             onClick={() => switchTab("hoan-coc")}
             className={`pb-3 px-2 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === "hoan-coc"
@@ -501,6 +505,7 @@ function ContractDetailContent({ id }: { id: string }) {
             4. Hoàn cọc & Tranh chấp
           </button>
           <button
+            data-tour="tab-bang-chung"
             onClick={() => switchTab("bang-chung")}
             className={`pb-3 px-2 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === "bang-chung"
@@ -532,6 +537,7 @@ function ContractDetailContent({ id }: { id: string }) {
                 </div>
                 {isTenant && (
                   <button
+                    data-tour="confirm-sign"
                     onClick={handleConfirmContract}
                     className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors shadow-xs cursor-pointer text-xs sm:text-sm whitespace-nowrap self-start sm:self-auto"
                   >
@@ -609,6 +615,7 @@ function ContractDetailContent({ id }: { id: string }) {
                 </div>
                 {isTenant && (
                   <button
+                    data-tour="deposit-pay"
                     onClick={handlePayDeposit}
                     className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors shadow-xs cursor-pointer text-xs sm:text-sm whitespace-nowrap self-start sm:self-auto"
                   >
@@ -791,6 +798,7 @@ function ContractDetailContent({ id }: { id: string }) {
                                 </span>
                               ) : (
                                 <button
+                                  data-tour="extend-due"
                                   onClick={() => setExtendPeriod(period.periodNo)}
                                   className="px-3 py-1.5 rounded-lg border border-primary text-primary-strong font-bold hover:bg-primary/10 transition-colors text-xs"
                                 >
@@ -799,6 +807,7 @@ function ContractDetailContent({ id }: { id: string }) {
                               ))}
                             {period.status !== "PAID" && isTenant && (
                               <button
+                                data-tour="rent-pay"
                                 onClick={() => handlePayRent(period.periodNo)}
                                 className="px-3.5 py-1.5 rounded-lg bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-xs"
                               >
@@ -1131,6 +1140,7 @@ function ContractDetailContent({ id }: { id: string }) {
                   className="px-3.5 py-2.5 rounded-xl border border-line bg-surface text-xs sm:text-sm font-mono w-full sm:w-48 focus:outline-primary"
                 />
                 <button
+                  data-tour="refund-action"
                   onClick={handleApproveRefund}
                   className="px-4 py-2.5 rounded-xl bg-primary text-paper text-xs sm:text-sm font-bold hover:bg-primary-strong transition-colors cursor-pointer text-center"
                 >
@@ -1333,7 +1343,7 @@ function ContractDetailContent({ id }: { id: string }) {
             </div>
 
             {/* Txs table */}
-            <div className="space-y-3">
+            <div data-tour="onchain-list" className="space-y-3">
               <span className="text-xs font-bold text-ink uppercase tracking-wider block">
                 Các giao dịch Soroban đã ghi nhận ({onchainTxs.length}):
               </span>

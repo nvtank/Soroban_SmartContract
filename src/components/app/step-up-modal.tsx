@@ -117,6 +117,7 @@ export function StepUpModal({
           </button>
           <button
             type="button"
+            data-tour="stepup-otp-tab"
             onClick={() => setMethod("otp")}
             className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
               method === "otp" ? "bg-paper text-primary shadow-xs font-bold" : "text-ink/60 hover:text-ink"
@@ -143,6 +144,7 @@ export function StepUpModal({
             </label>
             <input
               type="text"
+              data-tour="stepup-otp-input"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
               maxLength={6}
@@ -174,6 +176,7 @@ export function StepUpModal({
           </button>
           <button
             type="button"
+            data-tour="stepup-submit"
             onClick={handleVerify}
             disabled={loading}
             className="flex-1 py-2.5 rounded-xl bg-primary text-paper font-semibold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs disabled:opacity-50"

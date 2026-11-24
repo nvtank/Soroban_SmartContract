@@ -195,7 +195,7 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
         {/* QR Display */}
         <div className="flex flex-col items-center justify-center p-6 bg-surface/50 rounded-card border border-line text-center space-y-3">
           {/* VietQR Mock SVG Canvas */}
-          <div className="p-4 bg-white rounded-2xl shadow-xs border border-line/40 inline-block">
+          <div data-tour="payment-qr" className="p-4 bg-white rounded-2xl shadow-xs border border-line/40 inline-block">
             <svg
               className="w-44 h-44 sm:w-52 sm:h-52"
               viewBox="0 0 200 200"
@@ -300,6 +300,7 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             <button
+              data-tour="payment-simulate-full"
               onClick={() => handleSimulate("CONFIRMED")}
               disabled={loading || rechecking}
               className="min-h-[44px] p-2.5 rounded-xl bg-primary text-paper font-semibold hover:bg-primary-strong transition-colors cursor-pointer text-center disabled:opacity-50 flex items-center justify-center"
