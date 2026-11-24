@@ -26,25 +26,28 @@ export default function AdminDemoPage() {
 
   useEffect(() => {
     let ignore = false;
-    apiClient.getPendingRecoveries().then((recs) => {
-      if (!ignore) {
-        setPaymentMode(apiClient.getPaymentMode());
-        setRecoveries(recs);
-      }
-    }).catch(() => {});
+    apiClient
+      .getPendingRecoveries()
+      .then((recs) => {
+        if (!ignore) {
+          setPaymentMode(apiClient.getPaymentMode());
+          setRecoveries(recs);
+        }
+      })
+      .catch(() => {});
     return () => {
       ignore = true;
     };
   }, []);
 
   const handleReset = async () => {
-    if (!confirm("Bạn có chắc chắn muốn đặt lại toàn bộ dữ liệu demo về trạng thái ban đầu?")) return;
+    if (!confirm("Đặt lại toàn bộ dữ liệu demo về trạng thái ban đầu?")) return;
     setLoading(true);
     setError(null);
     setMessage(null);
     try {
       await apiClient.resetDemo();
-      setMessage("Đã đặt lại dữ liệu demo thành công.");
+      setMessage("Đã đặt lại dữ liệu demo.");
       await loadData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Đặt lại dữ liệu thất bại");
@@ -59,7 +62,7 @@ export default function AdminDemoPage() {
     setMessage(null);
     try {
       await apiClient.seedDemo();
-      setMessage("Đã chuẩn bị 3 hợp đồng demo. Các giao dịch đang được ghi lên Stellar Testnet trong nền, mở tab Bằng chứng on-chain để theo dõi.");
+      setMessage("Đã khởi tạo 3 hợp đồng mẫu và đẩy hàng đợi lên Stellar Testnet.");
       await loadData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Nạp dữ liệu mẫu thất bại");
@@ -74,7 +77,7 @@ export default function AdminDemoPage() {
     setMessage(null);
     try {
       const res = await apiClient.runOverdueScan();
-      setMessage(`Đã quét xong. Cập nhật ${res.updatedCount} kỳ thuê quá hạn và tự động tính phí trễ.`);
+      setMessage(`Đã quét xong ${res.updatedCount} kỳ quá hạn.`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Quét quá hạn thất bại");
     } finally {
@@ -88,7 +91,7 @@ export default function AdminDemoPage() {
     setMessage(null);
     try {
       const res = await apiClient.flushOnchain();
-      setMessage(`Worker Outbox đã xử lý. Đã ghi nhận thành công ${res.confirmedCount} giao dịch on-chain.`);
+      setMessage(`Đã xác nhận ${res.confirmedCount} giao dịch on-chain.`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Đẩy giao dịch on-chain thất bại");
     } finally {
@@ -99,7 +102,7 @@ export default function AdminDemoPage() {
   const handlePaymentModeChange = (mode: "payos" | "simulated" | "both") => {
     apiClient.setPaymentMode(mode);
     setPaymentMode(mode);
-    setMessage(`Đã chuyển chế độ thanh toán sang: ${mode}`);
+    setMessage(`Chế độ thanh toán: ${mode}`);
   };
 
   const handleApproveRecovery = async (id: string) => {
@@ -107,10 +110,10 @@ export default function AdminDemoPage() {
     setError(null);
     try {
       await apiClient.approveRecovery(id);
-      setMessage("Đã duyệt yêu cầu khôi phục tài khoản.");
+      setMessage("Đã phê duyệt yêu cầu khôi phục.");
       await loadData();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Duyệt yêu cầu khôi phục thất bại");
+      setError(err instanceof Error ? err.message : "Duyệt yêu cầu thất bại");
     } finally {
       setLoading(false);
     }
@@ -120,204 +123,169 @@ export default function AdminDemoPage() {
     <div className="min-h-screen bg-paper flex flex-col">
       <AppNavbar />
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line pb-6">
+      <main className="flex-1 mx-auto max-w-5xl w-full px-4 sm:px-6 py-8 space-y-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">
-                Bảng điều khiển Quản trị Thử nghiệm
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ink">
+                Quản trị kịch bản demo
               </h1>
-              <MockBadge label="ADMIN DEMO" />
+              <MockBadge label="ADMIN" />
             </div>
-            <p className="text-xs sm:text-sm text-ink/70">
-              Khu vực hỗ trợ Ban giám khảo Ideathon thiết lập kịch bản trình diễn và thử nghiệm các tình huống ngoại lệ.
+            <p className="text-xs sm:text-sm text-ink/65">
+              Duyệt yêu cầu khôi phục tài khoản và khởi tạo lại dữ liệu thử nghiệm.
             </p>
           </div>
 
           <Link
             href="/app"
-            className="px-4 py-2 rounded-xl bg-surface border border-line text-ink font-semibold text-xs sm:text-sm hover:bg-line/20 self-start sm:self-auto transition-colors"
+            className="rounded-full border border-line bg-paper px-4 py-2 text-xs font-bold text-ink hover:bg-surface transition-colors"
           >
-            Vào ứng dụng App ➔
+            ← Về bảng điều khiển
           </Link>
         </div>
 
         {message && (
-          <div role="status" className="p-4 rounded-xl bg-primary/10 border border-primary/30 text-xs sm:text-sm text-primary font-semibold flex items-center justify-between">
-            <span>✓ {message}</span>
-            <button onClick={() => setMessage(null)} className="cursor-pointer text-ink/40 hover:text-ink">
-              ✕
+          <div role="status" className="flex items-center justify-between rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-xs sm:text-sm font-semibold text-primary-strong">
+            <span>{message}</span>
+            <button type="button" onClick={() => setMessage(null)} className="text-xs font-bold cursor-pointer">
+              Đóng
             </button>
           </div>
         )}
 
         {error && (
-          <div role="alert" className="p-4 rounded-xl bg-brick/10 border border-brick/30 text-xs sm:text-sm text-brick font-semibold flex items-center justify-between">
-            <span>⚠️ {error}</span>
-            <button onClick={() => setError(null)} className="cursor-pointer text-ink/40 hover:text-ink">
-              ✕
+          <div role="alert" className="flex items-center justify-between rounded-2xl border border-brick/30 bg-brick/10 px-4 py-3 text-xs sm:text-sm font-semibold text-brick-ink">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError(null)} className="text-xs font-bold cursor-pointer">
+              Đóng
             </button>
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Box 1: Seed & Reset */}
-          <div className="p-6 rounded-panel bg-surface/50 border border-line space-y-4 shadow-xs">
+        <div className="grid md:grid-cols-2 gap-5">
+          {/* Recovery Approval (Primary Admin Action) */}
+          <section className="md:col-span-2 rounded-[2rem] border border-line bg-paper p-6 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-ink">1. Thiết lập & Đặt lại dữ liệu</h2>
-              <MockBadge label="DATA RESET" />
-            </div>
-            <p className="text-xs text-ink/70 leading-relaxed">
-              Khởi tạo sẵn 1 chủ nhà, 2 người thuê và 3 hợp đồng ở các trạng thái: Chờ ký, Đang hiệu lực có kỳ quá hạn, và Đang tranh chấp khóa cọc.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <h2 className="text-base font-extrabold text-ink">
+                Yêu cầu khôi phục tài khoản ({recoveries.length})
+              </h2>
               <button
-                onClick={handleSeed}
+                type="button"
+                onClick={loadData}
                 disabled={loading}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-xs sm:text-sm text-center shadow-xs disabled:opacity-50"
+                className="rounded-full border border-line px-3.5 py-1 text-xs font-semibold text-ink hover:bg-surface cursor-pointer"
               >
-                Nạp dữ liệu mẫu chuẩn (Seed)
-              </button>
-              <button
-                onClick={handleReset}
-                disabled={loading}
-                className="py-2.5 px-4 rounded-xl border border-brick/40 text-brick bg-brick/10 font-bold hover:bg-brick/20 transition-colors cursor-pointer text-xs sm:text-sm text-center disabled:opacity-50"
-              >
-                Đặt lại toàn bộ (Reset)
+                Làm mới
               </button>
             </div>
-          </div>
 
-          {/* Box 2: Cron Jobs & Workers */}
-          <div className="p-6 rounded-panel bg-surface/50 border border-line space-y-4 shadow-xs">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-ink">2. Tác vụ chạy nền (Background Jobs)</h2>
-              <MockBadge label="CRON WORKER" />
-            </div>
-            <p className="text-xs text-ink/70 leading-relaxed">
-              Giả lập bộ quét định kỳ (Vercel Cron) để tự động tính tiền phạt trễ hạn hoặc đẩy các giao dịch on-chain trong outbox lên Stellar Testnet.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button
-                onClick={handleOverdueScan}
-                disabled={loading}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-ink text-paper font-bold hover:bg-ink/90 transition-colors cursor-pointer text-xs sm:text-sm text-center shadow-xs disabled:opacity-50"
-              >
-                Quét nợ quá hạn
-              </button>
-              <button
-                onClick={handleFlushOnchain}
-                disabled={loading}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-paper border border-line text-ink font-bold hover:bg-surface transition-colors cursor-pointer text-xs sm:text-sm text-center shadow-xs disabled:opacity-50"
-              >
-                Đẩy giao dịch On-chain
-              </button>
-            </div>
-          </div>
-
-          {/* Box 3: Payment Mode Configuration */}
-          <div className="p-6 rounded-panel bg-surface/50 border border-line space-y-4 shadow-xs">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-ink">3. Cấu hình chế độ thanh toán</h2>
-              <MockBadge label={paymentMode.toUpperCase()} />
-            </div>
-            <p className="text-xs text-ink/70 leading-relaxed">
-              Lựa chọn giữa cổng thanh toán payOS thật, chế độ giả lập (Simulated) để diễn các lỗi thanh toán thiếu/thừa, hoặc cả hai.
-            </p>
-
-            <div className="grid grid-cols-3 gap-2 text-xs font-semibold pt-1">
-              <button
-                onClick={() => handlePaymentModeChange("both")}
-                className={`p-2 rounded-xl border text-center transition-colors cursor-pointer ${
-                  paymentMode === "both"
-                    ? "bg-primary text-paper border-primary font-bold shadow-xs"
-                    : "bg-paper text-ink border-line hover:bg-surface"
-                }`}
-              >
-                Cả hai (Khuyên dùng)
-              </button>
-              <button
-                onClick={() => handlePaymentModeChange("simulated")}
-                className={`p-2 rounded-xl border text-center transition-colors cursor-pointer ${
-                  paymentMode === "simulated"
-                    ? "bg-primary text-paper border-primary font-bold shadow-xs"
-                    : "bg-paper text-ink border-line hover:bg-surface"
-                }`}
-              >
-                Chỉ mô phỏng
-              </button>
-              <button
-                onClick={() => handlePaymentModeChange("payos")}
-                className={`p-2 rounded-xl border text-center transition-colors cursor-pointer ${
-                  paymentMode === "payos"
-                    ? "bg-primary text-paper border-primary font-bold shadow-xs"
-                    : "bg-paper text-ink border-line hover:bg-surface"
-                }`}
-              >
-                Cổng payOS
-              </button>
-            </div>
-          </div>
-
-          {/* Box 4: Pending Account Recovery Requests */}
-          <div className="p-6 rounded-panel bg-surface/50 border border-line space-y-4 shadow-xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-ink">4. Yêu cầu khôi phục tài khoản</h2>
-                <MockBadge label="MÔ PHỎNG" />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-ink/50">{recoveries.length} yêu cầu</span>
-                <button
-                  type="button"
-                  onClick={loadData}
-                  disabled={loading}
-                  className="px-2.5 py-1 rounded-lg border border-line bg-paper text-[11px] font-semibold text-ink/70 hover:text-ink hover:bg-surface cursor-pointer"
-                >
-                  ↻ Làm mới
-                </button>
-              </div>
-            </div>
-            <p className="text-xs text-ink/70 leading-relaxed">
-              Phê duyệt các yêu cầu cấp lại quyền truy cập sau khi người dùng hoàn tất bước eKYC mô phỏng.
-            </p>
-
-            <div className="space-y-2">
-              {recoveries.length === 0 ? (
-                <div className="p-3 bg-paper rounded-xl border border-line text-xs text-center text-ink/50">
-                  Không có yêu cầu khôi phục nào đang chờ duyệt.
-                </div>
-              ) : (
-                recoveries.map((rec) => (
+            {recoveries.length === 0 ? (
+              <p className="rounded-2xl border border-line bg-surface/35 p-4 text-center text-xs text-ink/55">
+                Không có yêu cầu khôi phục nào đang chờ duyệt.
+              </p>
+            ) : (
+              <div className="space-y-2.5">
+                {recoveries.map((rec) => (
                   <div
                     key={rec.id}
-                    className="p-3 bg-paper rounded-xl border border-line flex items-center justify-between gap-3 text-xs"
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface/35 p-4 text-xs"
                   >
                     <div>
-                      <div className="font-mono font-bold text-ink">{rec.phone}</div>
-                      <div className="text-[10px] text-ink/50">
-                        {new Date(rec.createdAt).toLocaleTimeString("vi-VN")} • {rec.status}
+                      <div className="font-mono text-sm font-bold text-ink">{rec.phone}</div>
+                      <div className="text-ink/55">
+                        {new Date(rec.createdAt).toLocaleString("vi-VN")} · {rec.status}
                       </div>
                     </div>
                     {rec.status === "PENDING" ? (
                       <button
+                        type="button"
                         onClick={() => handleApproveRecovery(rec.id)}
                         disabled={loading}
-                        className="px-3 py-1 rounded-lg bg-primary text-paper font-bold hover:bg-primary-strong cursor-pointer text-xs disabled:opacity-50"
+                        className="rounded-full bg-primary px-4 py-2 font-bold text-paper hover:bg-primary-strong cursor-pointer disabled:opacity-50"
                       >
-                        Duyệt ngay
+                        Duyệt khôi phục
                       </button>
                     ) : (
-                      <span className="text-primary font-bold">Đã duyệt ✓</span>
+                      <span className="font-bold text-primary-strong">Đã duyệt</span>
                     )}
                   </div>
-                ))
-              )}
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Seed & Reset */}
+          <section className="rounded-[2rem] border border-line bg-paper p-6 shadow-xs space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-base font-extrabold text-ink">Dữ liệu mẫu</h2>
+              <p className="text-xs text-ink/60">Khởi tạo 3 hợp đồng mẫu hoặc đặt lại trạng thái.</p>
             </div>
-          </div>
+            <div className="flex flex-wrap gap-2.5">
+              <button
+                type="button"
+                onClick={handleSeed}
+                disabled={loading}
+                className="rounded-full bg-ink px-5 py-2.5 text-xs font-bold text-paper hover:bg-ink/90 cursor-pointer disabled:opacity-50"
+              >
+                Nạp dữ liệu mẫu
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={loading}
+                className="rounded-full border border-brick/35 bg-brick/10 px-5 py-2.5 text-xs font-bold text-brick-ink hover:bg-brick/20 cursor-pointer disabled:opacity-50"
+              >
+                Đặt lại
+              </button>
+            </div>
+          </section>
+
+          {/* Jobs & Mode */}
+          <section className="rounded-[2rem] border border-line bg-paper p-6 shadow-xs space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-base font-extrabold text-ink">Tác vụ nền & Thanh toán</h2>
+              <p className="text-xs text-ink/60">Quét kỳ quá hạn, đẩy giao dịch on-chain hoặc đổi cổng.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleOverdueScan}
+                disabled={loading}
+                className="rounded-full border border-line px-4 py-2 text-xs font-bold text-ink hover:bg-surface cursor-pointer disabled:opacity-50"
+              >
+                Quét nợ quá hạn
+              </button>
+              <button
+                type="button"
+                onClick={handleFlushOnchain}
+                disabled={loading}
+                className="rounded-full border border-line px-4 py-2 text-xs font-bold text-ink hover:bg-surface cursor-pointer disabled:opacity-50"
+              >
+                Đẩy giao dịch On-chain
+              </button>
+            </div>
+            <div className="flex rounded-full border border-line bg-surface p-1 text-xs font-semibold">
+              {(
+                [
+                  { k: "both", l: "Cả hai" },
+                  { k: "simulated", l: "Mô phỏng" },
+                  { k: "payos", l: "payOS" },
+                ] as const
+              ).map((m) => (
+                <button
+                  key={m.k}
+                  type="button"
+                  onClick={() => handlePaymentModeChange(m.k)}
+                  className={`flex-1 rounded-full py-1.5 cursor-pointer ${
+                    paymentMode === m.k ? "bg-paper font-bold text-ink shadow-xs" : "text-ink/60"
+                  }`}
+                >
+                  {m.l}
+                </button>
+              ))}
+            </div>
+          </section>
         </div>
       </main>
     </div>

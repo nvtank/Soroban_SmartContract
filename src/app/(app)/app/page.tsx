@@ -8,9 +8,19 @@ import { useSession } from "@/components/app/session-context";
 import { PasskeySetup } from "@/components/app/passkey-setup";
 import { apiClient } from "@/components/app/api-client";
 import { LoadingSkeleton, EmptyState, ErrorState } from "@/components/app/ui-state";
-import { JourneyStepper, StatusBadge, MoneyAmount, MockBadge } from "@/components/shared";
+import { StatusBadge, MoneyAmount, resolvePrimaryContractBadge } from "@/components/shared";
 import { formatDate } from "@/components/app/date-format";
 import type { ContractSummaryDto } from "@/domain/dto";
+
+function stripDemoSuffix(name: string | null | undefined, fallback: string): string {
+  if (!name) return fallback;
+  return name.replace(/\s*\([^)]*\)\s*/g, "").trim() || fallback;
+}
+
+function extractRoomKey(roomLabel: string, fallbackId: string): string {
+  const match = roomLabel.match(/\d+/);
+  return match ? match[0] : fallbackId;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -18,7 +28,7 @@ export default function DashboardPage() {
   const [contracts, setContracts] = useState<ContractSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "PENDING" | "DISPUTE" | "ENDED">("ALL");
+  const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "PENDING" | "DISPUTE">("ALL");
   const [search, setSearch] = useState("");
 
   const loadData = useCallback(async () => {
@@ -56,57 +66,82 @@ export default function DashboardPage() {
     };
   }, [role]);
 
-  // Filtered list
   const filteredContracts = contracts.filter((c) => {
     if (filter === "ACTIVE" && c.status !== "ACTIVE") return false;
     if (filter === "PENDING" && c.status !== "PENDING_CONFIRMATION") return false;
-    if (filter === "DISPUTE" && c.depositStatus !== "PENDING_DISPUTE" && c.disputeStatus === "NONE")
+    if (
+      filter === "DISPUTE" &&
+      c.depositStatus !== "PENDING_DISPUTE" &&
+      c.disputeStatus === "NONE"
+    ) {
       return false;
-    if (filter === "ENDED" && c.status !== "ENDED") return false;
+    }
 
     if (search.trim()) {
       const q = search.toLowerCase();
-      const matchRoom = c.roomLabel.toLowerCase().includes(q);
-      const matchLandlord = c.landlordName?.toLowerCase().includes(q);
-      const matchTenant = c.tenantName?.toLowerCase().includes(q);
-      return matchRoom || matchLandlord || matchTenant;
+      return (
+        c.roomLabel.toLowerCase().includes(q) ||
+        Boolean(c.landlordName?.toLowerCase().includes(q)) ||
+        Boolean(c.tenantName?.toLowerCase().includes(q))
+      );
     }
     return true;
   });
 
-  // Calculate To-Do / Action items
-  const actionItems: { contract: ContractSummaryDto; text: string; deepLink: string }[] = [];
+  // 3 overview numbers
+  const activeCount = contracts.filter((c) => c.status === "ACTIVE").length;
+
+  const heldDepositTotal = contracts.reduce((sum, c) => {
+    if (
+      c.depositStatus === "RECORDED" ||
+      c.depositStatus === "PENDING_REFUND" ||
+      c.depositStatus === "PENDING_DISPUTE"
+    ) {
+      return sum + BigInt(c.depositAmount || "0");
+    }
+    return sum;
+  }, BigInt(0));
+
+  const attentionCount = contracts.filter(
+    (c) =>
+      c.status === "PENDING_CONFIRMATION" ||
+      (c.status === "ACTIVE" && c.depositStatus === "UNPAID") ||
+      c.depositStatus === "PENDING_DISPUTE" ||
+      (c.disputeStatus !== "NONE" && c.disputeStatus !== "RESOLVED") ||
+      (c.status === "ACTIVE" && c.journeyStep === "RENT"),
+  ).length;
+
+  // Compact action items
+  const actionItems: { id: string; text: string; href: string }[] = [];
   contracts.forEach((c) => {
-    if (c.status === "PENDING_CONFIRMATION") {
-      if (role === "TENANT") {
-        actionItems.push({
-          contract: c,
-          text: `Cần xem xét & Ký xác nhận hợp đồng cho ${c.roomLabel}`,
-          deepLink: `/app/hop-dong/${c.id}#tong-quan`,
-        });
-      }
-    }
-    if (c.status === "ACTIVE" && c.depositStatus === "UNPAID" && role === "TENANT") {
+    if (c.status === "PENDING_CONFIRMATION" && role === "TENANT") {
       actionItems.push({
-        contract: c,
-        text: `Cần nạp tiền cọc bảo chứng cho ${c.roomLabel}`,
-        deepLink: `/app/hop-dong/${c.id}#tien-coc`,
+        id: `${c.id}-sign`,
+        text: `${c.roomLabel} đang chờ bạn ký xác nhận`,
+        href: `/app/hop-dong/${c.id}#tong-quan`,
       });
-    }
-    if (c.depositStatus === "PENDING_DISPUTE") {
+    } else if (c.status === "ACTIVE" && c.depositStatus === "UNPAID" && role === "TENANT") {
       actionItems.push({
-        contract: c,
-        text: `Hợp đồng ${c.roomLabel} đang có tranh chấp, cần hai bên thống nhất`,
-        deepLink: `/app/hop-dong/${c.id}#hoan-coc`,
+        id: `${c.id}-deposit`,
+        text: `${c.roomLabel} chưa nộp tiền cọc bảo chứng`,
+        href: `/app/hop-dong/${c.id}#tien-coc`,
+      });
+    } else if (c.depositStatus === "PENDING_DISPUTE") {
+      actionItems.push({
+        id: `${c.id}-dispute`,
+        text: `${c.roomLabel} có tranh chấp cần hai bên thống nhất`,
+        href: `/app/hop-dong/${c.id}#hoan-coc`,
       });
     }
   });
+
+  const cleanUserName = stripDemoSuffix(user?.fullName, "bạn");
 
   if (sessionLoading) {
     return (
       <div className="min-h-screen bg-paper flex flex-col">
         <AppNavbar />
-        <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <main className="mx-auto max-w-6xl w-full px-4 sm:px-6 py-8 space-y-6">
           <LoadingSkeleton lines={4} />
         </main>
       </div>
@@ -117,137 +152,140 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-paper flex flex-col">
       <AppNavbar />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Welcome Banner */}
-        <section className="p-6 sm:p-8 rounded-panel bg-surface/60 border border-line flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xs">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">
-                Xin chào, {user?.fullName || "Người dùng"}!
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-primary/15 text-primary border border-primary/30">
-                {role === "LANDLORD" ? "Chủ nhà" : role === "ADMIN_DEMO" ? "Admin Demo" : "Người thuê"}
-              </span>
-            </div>
-            <p className="text-sm sm:text-base text-ink/70">
+      <main className="flex-1 mx-auto max-w-6xl w-full px-4 sm:px-6 py-6 sm:py-8 space-y-6 min-w-0">
+        {/* 1. Short Greeting + Landlord Primary Action */}
+        <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ink">
+              Chào {cleanUserName}
+            </h1>
+            <p className="text-sm text-ink/65">
               {role === "LANDLORD"
-                ? "Quản lý hợp đồng cho thuê, theo dõi bảo chứng tiền cọc và lịch thu tiền thuê tự động."
-                : "Theo dõi trạng thái tiền cọc bảo chứng, nghĩa vụ thanh toán và ký hợp đồng bảo mật."}
+                ? "Quản lý hợp đồng thuê, trạng thái tiền cọc và kỳ thu tiền."
+                : "Theo dõi hợp đồng thuê, tiền cọc bảo chứng và lịch thanh toán."}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {role === "LANDLORD" && (
-              <Link
-                href="/app/hop-dong/moi"
-                className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors shadow-xs cursor-pointer text-sm whitespace-nowrap"
-              >
-                + Tạo hợp đồng mới
-              </Link>
-            )}
+          {role === "LANDLORD" && (
             <Link
-              href="/bang-chung"
-              className="px-4 py-2.5 rounded-xl bg-paper border border-line text-ink font-semibold hover:bg-surface transition-colors text-sm whitespace-nowrap"
+              href="/app/hop-dong/moi"
+              data-tour="create-contract"
+              className="inline-flex items-center justify-center rounded-full bg-ink px-6 py-3 text-sm font-bold text-paper transition-colors hover:bg-ink/90 self-start sm:self-auto shrink-0"
             >
-              Xem sổ cái On-chain
+              Tạo hợp đồng
             </Link>
+          )}
+        </section>
+
+        {/* 2. Row of 3 Overview Numbers */}
+        <section
+          data-tour="dashboard-stats"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-3.5"
+        >
+          <div className="rounded-3xl border border-line bg-paper p-5 shadow-xs space-y-1">
+            <span className="text-xs font-semibold text-ink/60 block">
+              Hợp đồng đang hiệu lực
+            </span>
+            <div className="tabular text-2xl sm:text-3xl font-extrabold tracking-tight text-ink">
+              {activeCount}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-line bg-paper p-5 shadow-xs space-y-1">
+            <span className="text-xs font-semibold text-ink/60 block">
+              Cọc đang giữ (mô phỏng)
+            </span>
+            <MoneyAmount value={heldDepositTotal.toString()} size="lg" />
+          </div>
+
+          <div className="rounded-3xl border border-line bg-paper p-5 shadow-xs space-y-1">
+            <span className="text-xs font-semibold text-ink/60 block">
+              Khoản đến hạn hoặc quá hạn
+            </span>
+            <div
+              className={`tabular text-2xl sm:text-3xl font-extrabold tracking-tight ${
+                attentionCount > 0 ? "text-amber-ink" : "text-ink"
+              }`}
+            >
+              {attentionCount}
+            </div>
           </div>
         </section>
 
-        {/* To-Do / Action Items Callout */}
-        {actionItems.length > 0 && (
-          <section
-            aria-labelledby="todo-heading"
-            className="p-5 sm:p-6 rounded-card bg-amber/15 border border-amber/40 space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <h2 id="todo-heading" className="text-base font-bold text-amber-ink flex items-center gap-2">
-                <span>⚠️</span> Việc cần làm ngay ({actionItems.length})
-              </h2>
-              <MockBadge label="HÀNH ĐỘNG" />
-            </div>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {actionItems.map((item, idx) => (
-                <Link
-                  key={idx}
-                  href={item.deepLink}
-                  className="p-3 bg-paper rounded-xl border border-line hover:border-amber/60 flex items-center justify-between gap-3 transition-colors group cursor-pointer shadow-xs"
-                >
-                  <span className="text-xs sm:text-sm font-semibold text-ink group-hover:text-primary">
-                    {item.text}
-                  </span>
-                  <span className="text-xs text-primary font-bold whitespace-nowrap">Xử lý ➔</span>
-                </Link>
-              ))}
-            </div>
+        {/* 3. Compact Notifications / Pending Actions + Passkey */}
+        {(actionItems.length > 0 || process.env.NEXT_PUBLIC_UI_MOCK !== "true") && (
+          <section className="space-y-3">
+            {actionItems.length > 0 && (
+              <div className="rounded-3xl border border-amber/35 bg-amber/10 p-4 sm:p-5 space-y-2.5">
+                <div className="text-xs font-bold uppercase tracking-wider text-amber-ink">
+                  Cần xử lý ({actionItems.length})
+                </div>
+                <div className="divide-y divide-amber/20">
+                  {actionItems.map((item) => (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0 text-xs sm:text-sm font-semibold text-ink hover:text-primary transition-colors"
+                    >
+                      <span>{item.text}</span>
+                      <span className="text-xs font-bold text-primary shrink-0">Mở →</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {process.env.NEXT_PUBLIC_UI_MOCK !== "true" && <PasskeySetup />}
           </section>
         )}
 
-        {process.env.NEXT_PUBLIC_UI_MOCK !== "true" && <PasskeySetup />}
-
-        {/* Contract list section */}
-        <section className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="text-xl font-extrabold text-ink tracking-tight">
-              Danh sách hợp đồng ({filteredContracts.length})
+        {/* 4. Contract List */}
+        <section data-tour="contract-list" className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-ink">
+              Hợp đồng ({filteredContracts.length})
             </h2>
 
-            {/* Filters and search */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
-              <div className="flex items-center rounded-xl bg-surface p-1 border border-line text-xs font-semibold overflow-x-auto max-w-full whitespace-nowrap">
-                <button
-                  onClick={() => setFilter("ALL")}
-                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer min-h-[32px] ${
-                    filter === "ALL" ? "bg-paper text-ink shadow-xs" : "text-ink/60 hover:text-ink"
-                  }`}
-                >
-                  Tất cả
-                </button>
-                <button
-                  onClick={() => setFilter("ACTIVE")}
-                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer min-h-[32px] ${
-                    filter === "ACTIVE"
-                      ? "bg-paper text-primary font-bold shadow-xs"
-                      : "text-ink/60 hover:text-ink"
-                  }`}
-                >
-                  Hiệu lực
-                </button>
-                <button
-                  onClick={() => setFilter("PENDING")}
-                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer min-h-[32px] ${
-                    filter === "PENDING"
-                      ? "bg-paper text-amber-ink font-bold shadow-xs"
-                      : "text-ink/60 hover:text-ink"
-                  }`}
-                >
-                  Chờ ký
-                </button>
-                <button
-                  onClick={() => setFilter("DISPUTE")}
-                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer min-h-[32px] ${
-                    filter === "DISPUTE"
-                      ? "bg-paper text-brick font-bold shadow-xs"
-                      : "text-ink/60 hover:text-ink"
-                  }`}
-                >
-                  Tranh chấp
-                </button>
+              <div
+                className="flex items-center gap-0.5 rounded-full border border-line bg-surface/65 p-1 text-xs font-semibold overflow-x-auto max-w-full whitespace-nowrap"
+                data-lenis-prevent
+              >
+                {(
+                  [
+                    { key: "ALL", label: "Tất cả" },
+                    { key: "ACTIVE", label: "Đang hiệu lực" },
+                    { key: "PENDING", label: "Chờ xác nhận" },
+                    { key: "DISPUTE", label: "Tranh chấp" },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setFilter(tab.key)}
+                    className={`rounded-full px-3 py-1.5 transition-colors cursor-pointer ${
+                      filter === tab.key
+                        ? "bg-paper font-bold text-ink shadow-xs"
+                        : "text-ink/60 hover:text-ink"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
               <input
                 type="text"
-                placeholder="Tìm kiếm phòng..."
+                placeholder="Tìm phòng hoặc tên…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-line bg-paper text-xs text-ink focus:outline-primary w-full sm:w-48"
+                className="w-full sm:w-48 rounded-full border border-line bg-paper px-4 py-1.5 text-xs text-ink focus:outline-primary"
               />
             </div>
           </div>
 
-          {/* List Content */}
           {loading ? (
-            <div className="space-y-4">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               <LoadingSkeleton lines={3} />
               <LoadingSkeleton lines={3} />
             </div>
@@ -255,69 +293,62 @@ export default function DashboardPage() {
             <ErrorState message={error} onRetry={loadData} />
           ) : filteredContracts.length === 0 ? (
             <EmptyState
-              title="Không tìm thấy hợp đồng nào"
-              description="Bạn chưa có hợp đồng nào trong danh mục này hoặc từ khóa tìm kiếm không khớp."
-              actionLabel={role === "LANDLORD" ? "+ Tạo hợp đồng đầu tiên" : undefined}
+              title="Chưa có hợp đồng phù hợp"
+              description="Thử đổi bộ lọc hoặc tạo hợp đồng thuê mới."
+              actionLabel={role === "LANDLORD" ? "Tạo hợp đồng" : undefined}
               onAction={role === "LANDLORD" ? () => router.push("/app/hop-dong/moi") : undefined}
             />
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredContracts.map((c) => (
-                <div
-                  key={c.id}
-                  className="bg-paper rounded-card border border-line p-5 sm:p-6 shadow-xs hover:shadow-soft transition-shadow flex flex-col justify-between space-y-5"
-                >
-                  {/* Card top */}
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-extrabold text-base sm:text-lg text-ink line-clamp-1">
-                        {c.roomLabel}
-                      </h3>
-                      <StatusBadge kind="contract" status={c.status} />
-                    </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredContracts.map((c) => {
+                const badge = resolvePrimaryContractBadge(c);
+                const roomKey = extractRoomKey(c.roomLabel, c.id);
+                const counterpartLabel =
+                  role === "LANDLORD"
+                    ? `Người thuê: ${stripDemoSuffix(c.tenantName, "Trần Thị Bình")}`
+                    : `Chủ nhà: ${stripDemoSuffix(c.landlordName, "Nguyễn Văn An")}`;
 
-                    <div className="text-xs text-ink/70 space-y-1">
-                      <div>
-                        Chủ nhà: <strong>{c.landlordName || "Nguyễn Văn An"}</strong>
+                return (
+                  <div
+                    key={c.id}
+                    data-tour="contract-card"
+                    data-tour-key={roomKey}
+                    className="flex flex-col justify-between rounded-[2rem] border border-line bg-paper p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft space-y-5"
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between gap-2.5">
+                        <h3 className="text-base sm:text-lg font-extrabold text-ink leading-snug">
+                          {c.roomLabel}
+                        </h3>
+                        <StatusBadge kind={badge.kind} status={badge.status} />
                       </div>
-                      <div>
-                        Người thuê: <strong>{c.tenantName || "Trần Thị Bình"}</strong>
-                      </div>
-                    </div>
 
-                    {/* Stepper */}
-                    <JourneyStepper current={c.journeyStep} compact />
-
-                    {/* Financial summary */}
-                    <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-surface/50 border border-line text-xs">
-                      <div>
-                        <span className="text-ink/60 block mb-0.5">Giá thuê:</span>
-                        <MoneyAmount value={c.rentAmount} size="sm" />
-                      </div>
-                      <div>
-                        <span className="text-ink/60 block mb-0.5">Tiền cọc:</span>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <MoneyAmount value={c.depositAmount} size="sm" />
-                          <StatusBadge kind="deposit" status={c.depositStatus} />
+                      <div className="space-y-1">
+                        <div className="flex items-baseline gap-1.5">
+                          <MoneyAmount value={c.rentAmount} size="lg" />
+                          <span className="text-xs font-medium text-ink/55">/ tháng</span>
                         </div>
+                        <p className="text-xs text-ink/65">
+                          Cọc: <MoneyAmount value={c.depositAmount} size="sm" /> · {counterpartLabel}
+                        </p>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Card footer */}
-                  <div className="pt-3 border-t border-line flex items-center justify-between text-xs">
-                    <span className="text-ink/50">
-                      Hạn: {formatDate(c.startDate)} → {formatDate(c.endDate)}
-                    </span>
-                    <Link
-                      href={`/app/hop-dong/${c.id}`}
-                      className="px-3.5 py-1.5 rounded-lg bg-primary/10 text-primary font-bold hover:bg-primary hover:text-paper transition-colors"
-                    >
-                      Xem chi tiết ➔
-                    </Link>
+                    <div className="flex items-center justify-between gap-2 border-t border-line/60 pt-4 text-xs">
+                      <span className="text-ink/55">
+                        {formatDate(c.startDate)} – {formatDate(c.endDate)}
+                      </span>
+                      <Link
+                        href={`/app/hop-dong/${c.id}`}
+                        data-tour="contract-open"
+                        className="rounded-full bg-surface px-4 py-2 font-bold text-ink transition-colors hover:bg-ink hover:text-paper shrink-0"
+                      >
+                        Xem chi tiết
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

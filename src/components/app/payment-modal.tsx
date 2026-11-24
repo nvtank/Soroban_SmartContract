@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { X } from "lucide-react";
 import type { PaymentDto } from "@/domain/dto";
 import { apiClient } from "./api-client";
-import { MockBadge } from "@/components/shared";
+import { MockBadge, MoneyAmount } from "@/components/shared";
 
 export interface PaymentModalProps {
   payment: PaymentDto;
@@ -22,7 +23,14 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
   const pollCountRef = useRef(0);
   const MAX_POLLS = 15;
 
-  // Polling payment status with limit and cleanup on unmount
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
     let isActive = true;
@@ -34,7 +42,7 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
       }
 
       if (pollCountRef.current >= MAX_POLLS) {
-        setStatusMessage("Đã dừng tự động kiểm tra. Vui lòng bấm 'Kiểm tra lại' để đối soát.");
+        setStatusMessage("Đã tạm dừng kiểm tra tự động. Bấm 'Kiểm tra lại' để đối soát.");
         return;
       }
 
@@ -44,7 +52,7 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
         if (isActive && updated) {
           setCurrentPayment(updated);
           if (updated.status === "CONFIRMED") {
-            setStatusMessage("Thanh toán đã được xác nhận thành công!");
+            setStatusMessage("Giao dịch đã xác nhận thành công!");
             setTimeout(() => {
               if (isActive) {
                 onSuccess();
@@ -71,7 +79,7 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
     };
   }, [payment.id, currentPayment.status, onSuccess, onClose]);
 
-  const handleSimulate = async (outcome: "CONFIRMED" | "UNDERPAID" | "OVERPAID" | "FAILED") => {
+  const handleSimulate = async (outcome: "CONFIRMED" | "UNDERPAID") => {
     setLoading(true);
     setStatusMessage(null);
     setError(null);
@@ -80,23 +88,17 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
       setCurrentPayment(res.payment);
 
       if (outcome === "CONFIRMED") {
-        setStatusMessage("Thanh toán thành công! Giao dịch đã được ghi nhận vào outbox on-chain.");
+        setStatusMessage("Thanh toán thành công! Đang ghi nhận bằng chứng lên Stellar Testnet.");
         setTimeout(() => {
           onSuccess();
           onClose();
         }, 1200);
-      } else if (outcome === "UNDERPAID") {
-        setStatusMessage("Đã nhận tiền thiếu so với số yêu cầu. Trạng thái: Nộp thiếu (UNDERPAID).");
+      } else {
+        setStatusMessage("Đã nhận tiền thiếu so với yêu cầu. Trạng thái: Nộp thiếu (UNDERPAID).");
         onSuccess();
-      } else if (outcome === "OVERPAID") {
-        setStatusMessage("Đã nhận tiền thừa so với số yêu cầu. Trạng thái: Nộp thừa (OVERPAID). Phần dư được lưu lại đối soát.");
-        onSuccess();
-      } else if (outcome === "FAILED") {
-        setStatusMessage("Thanh toán thất bại hoặc người dùng đã hủy giao dịch.");
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi xử lý giao dịch";
-      setError(msg);
+      setError(err instanceof Error ? err.message : "Lỗi xử lý giao dịch");
     } finally {
       setLoading(false);
     }
@@ -110,233 +112,182 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
       const res = await apiClient.recheckPayment(payment.id);
       setCurrentPayment(res);
       if (res.status === "CONFIRMED") {
-        setStatusMessage("Đối soát thành công: Giao dịch đã được thanh toán đầy đủ!");
+        setStatusMessage("Đối soát thành công: Giao dịch đã xác nhận thành công!");
         setTimeout(() => {
           onSuccess();
           onClose();
         }, 1000);
       } else if (res.status === "PENDING") {
-        setStatusMessage("Đang chờ xác nhận từ hệ thống ngân hàng.");
+        setStatusMessage("Đang chờ xác nhận từ ngân hàng (mô phỏng).");
       } else if (res.status === "UNDERPAID") {
-        setStatusMessage("Kết quả đối soát: Nộp thiếu tiền so với yêu cầu.");
-      } else if (res.status === "OVERPAID") {
-        setStatusMessage("Kết quả đối soát: Nộp thừa tiền so với yêu cầu.");
-      } else if (res.status === "FAILED") {
-        setStatusMessage("Kết quả đối soát: Giao dịch thất bại hoặc đã bị hủy.");
-      } else if (res.status === "EXPIRED") {
-        setStatusMessage("Kết quả đối soát: Giao dịch đã hết hạn thanh toán.");
+        setStatusMessage("Kết quả đối soát: Nộp thiếu tiền.");
       } else {
-        setStatusMessage(`Kết quả đối soát: Trạng thái hiện tại là ${res.status}.`);
+        setStatusMessage(`Trạng thái hiện tại: ${res.status}.`);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
-      if (
-        msg.includes("payOS") ||
-        msg.includes("PAYOS") ||
-        msg.includes("khóa API") ||
-        msg.includes("cấu hình")
-      ) {
-        setError(msg || "Cổng thanh toán payOS chưa được cấu hình khóa API.");
-      } else {
-        setError(msg || "Không thể đối soát lúc này. Vui lòng thử lại sau.");
-      }
+      setError(msg || "Không thể đối soát lúc này.");
     } finally {
       setRechecking(false);
     }
   };
 
-  const formattedRealAmount = new Intl.NumberFormat("vi-VN").format(Number(currentPayment.businessAmount));
-  const formattedTestAmount = new Intl.NumberFormat("vi-VN").format(Number(currentPayment.expectedAmount));
+  const formattedTestAmount = new Intl.NumberFormat("vi-VN").format(
+    Number(currentPayment.expectedAmount),
+  );
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink/50 p-0 sm:p-4 backdrop-blur-xs"
       role="dialog"
       aria-modal="true"
       aria-labelledby="payment-modal-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className="w-full max-w-lg bg-paper rounded-panel border border-line shadow-soft p-4 sm:p-8 space-y-5 sm:space-y-6 max-h-[90vh] overflow-y-auto min-w-0"
+        className="w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] border border-line bg-paper p-5 sm:p-7 shadow-soft space-y-5 max-h-[92vh] overflow-y-auto min-w-0"
         data-lenis-prevent
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-line pb-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h3 id="payment-modal-title" className="text-xl font-extrabold text-ink">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 id="payment-modal-title" className="text-lg sm:text-xl font-extrabold text-ink">
                 Thanh toán qua VietQR
               </h3>
               <MockBadge label="MÔ PHỎNG" />
             </div>
-            <p className="text-xs sm:text-sm text-ink/70">
-              {currentPayment.kind === "DEPOSIT" ? "Nạp tiền cọc bảo chứng cho: " : "Thanh toán tiền thuê cho: "}
-              <strong className="text-ink">{roomLabel}</strong>
+            <p className="text-xs text-ink/65 truncate">
+              {currentPayment.kind === "DEPOSIT" ? "Tiền cọc · " : "Tiền thuê · "}
+              <span className="font-semibold text-ink">{roomLabel}</span>
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-ink/40 hover:text-ink hover:bg-surface cursor-pointer text-xl leading-none"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink cursor-pointer shrink-0"
             aria-label="Đóng cửa sổ"
           >
-            ✕
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Demo payment amount notice banner */}
-        <div className="p-3.5 rounded-xl bg-amber/15 border border-amber/40 text-xs sm:text-sm text-amber-ink space-y-1">
-          <div className="font-bold flex items-center gap-1.5">
-            <span>ℹ️</span> Số tiền thanh toán thử nghiệm: {formattedTestAmount} ₫
+        {/* Amount + QR */}
+        <div className="rounded-3xl border border-line bg-surface/45 p-5 text-center space-y-4">
+          <div className="space-y-0.5">
+            <MoneyAmount value={currentPayment.businessAmount} size="xl" />
+            <p className="text-[11px] text-ink/60">
+              Mã VietQR mô phỏng (mức thu thử nghiệm: {formattedTestAmount} đ)
+            </p>
           </div>
-          <p className="text-xs text-amber-ink/80">
-            Số tiền cam kết theo hợp đồng là <strong>{formattedRealAmount} ₫</strong>. Trong môi trường thử nghiệm Ideathon, số tiền thanh toán thực qua VietQR được thu nhỏ để tiện kiểm thử.
-          </p>
-        </div>
 
-        {/* QR Display */}
-        <div className="flex flex-col items-center justify-center p-6 bg-surface/50 rounded-card border border-line text-center space-y-3">
-          {/* VietQR Mock SVG Canvas */}
-          <div className="p-4 bg-white rounded-2xl shadow-xs border border-line/40 inline-block">
+          <div
+            data-tour="payment-qr"
+            className="inline-block rounded-2xl border border-line/60 bg-white p-3.5 shadow-xs"
+          >
             <svg
-              className="w-44 h-44 sm:w-52 sm:h-52"
+              className="h-40 w-40 sm:h-44 sm:w-44"
               viewBox="0 0 200 200"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
               aria-label="Mã QR thanh toán VietQR mô phỏng"
             >
-              {/* Corner position markers */}
               <rect x="15" y="15" width="45" height="45" rx="6" stroke="#14213D" strokeWidth="6" />
               <rect x="27" y="27" width="21" height="21" fill="#14213D" />
-
               <rect x="140" y="15" width="45" height="45" rx="6" stroke="#14213D" strokeWidth="6" />
               <rect x="152" y="27" width="21" height="21" fill="#14213D" />
-
               <rect x="15" y="140" width="45" height="45" rx="6" stroke="#14213D" strokeWidth="6" />
               <rect x="27" y="152" width="21" height="21" fill="#14213D" />
 
-              {/* Data matrix pattern */}
               <rect x="75" y="25" width="10" height="10" fill="#14213D" />
               <rect x="100" y="25" width="10" height="10" fill="#14213D" />
               <rect x="75" y="50" width="10" height="10" fill="#14213D" />
               <rect x="115" y="50" width="10" height="10" fill="#14213D" />
-
               <rect x="25" y="75" width="10" height="10" fill="#14213D" />
               <rect x="50" y="75" width="10" height="10" fill="#14213D" />
               <rect x="75" y="75" width="10" height="10" fill="#0F8B6D" />
               <rect x="100" y="75" width="10" height="10" fill="#14213D" />
               <rect x="125" y="75" width="10" height="10" fill="#14213D" />
               <rect x="150" y="75" width="10" height="10" fill="#14213D" />
-
               <rect x="25" y="100" width="10" height="10" fill="#14213D" />
               <rect x="75" y="100" width="10" height="10" fill="#14213D" />
-              <rect x="100" y="100" width="10" height="10" fill="#0F8B6D" />
               <rect x="125" y="100" width="10" height="10" fill="#14213D" />
               <rect x="165" y="100" width="10" height="10" fill="#14213D" />
-
               <rect x="75" y="125" width="10" height="10" fill="#14213D" />
               <rect x="100" y="125" width="10" height="10" fill="#14213D" />
               <rect x="125" y="125" width="10" height="10" fill="#14213D" />
               <rect x="150" y="125" width="10" height="10" fill="#14213D" />
-
               <rect x="75" y="150" width="10" height="10" fill="#14213D" />
               <rect x="110" y="150" width="10" height="10" fill="#14213D" />
               <rect x="140" y="150" width="10" height="10" fill="#14213D" />
               <rect x="165" y="150" width="10" height="10" fill="#14213D" />
-
-              {/* Center Brand Badge */}
-              <circle cx="100" cy="100" r="16" fill="#0F8B6D" />
+              <circle cx="100" cy="100" r="15" fill="#0F8B6D" />
               <text x="100" y="105" textAnchor="middle" fill="#FBF8F3" fontSize="12" fontWeight="bold">
                 R
               </text>
             </svg>
           </div>
 
-          <div className="space-y-1">
-            <div className="flex items-center justify-center gap-2 text-xs font-medium text-ink/70">
-              {currentPayment.status === "CONFIRMED" ? (
-                <span className="text-primary font-bold">✓ Giao dịch đã xác nhận thành công</span>
-              ) : currentPayment.status === "UNDERPAID" ? (
-                <span className="text-amber-ink font-bold">⚠️ Trạng thái: Nộp thiếu tiền</span>
-              ) : currentPayment.status === "OVERPAID" ? (
-                <span className="text-primary font-bold">ℹ️ Trạng thái: Nộp thừa tiền</span>
-              ) : currentPayment.status === "FAILED" ? (
-                <span className="text-brick font-bold">✕ Trạng thái: Thất bại / Hủy</span>
-              ) : (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-amber animate-ping" />
-                  <span>Đang chờ xác nhận từ ngân hàng…</span>
-                </>
-              )}
-            </div>
+          <div className="flex items-center justify-center gap-3 text-xs">
+            {currentPayment.status === "CONFIRMED" ? (
+              <span className="font-bold text-primary-strong">Giao dịch đã xác nhận thành công</span>
+            ) : currentPayment.status === "UNDERPAID" ? (
+              <span className="font-bold text-amber-ink">Nộp thiếu tiền</span>
+            ) : currentPayment.status === "FAILED" ? (
+              <span className="font-bold text-brick-ink">Thanh toán thất bại</span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-ink/65">
+                <span className="h-2 w-2 rounded-full bg-amber animate-pulse" aria-hidden="true" />
+                <span>Chờ xác nhận ngân hàng (mô phỏng)</span>
+              </span>
+            )}
             <button
+              type="button"
               onClick={handleRecheck}
               disabled={rechecking || loading}
-              className="min-h-[36px] px-3 py-1 text-xs text-primary font-bold hover:underline cursor-pointer disabled:opacity-50 inline-flex items-center justify-center"
+              className="font-bold text-primary hover:underline cursor-pointer disabled:opacity-50"
             >
               {rechecking ? "Đang đối soát…" : "Kiểm tra lại"}
             </button>
           </div>
         </div>
 
-        {/* Status & Error messages */}
         {error && (
-          <div role="alert" className="p-3 rounded-xl bg-brick/10 border border-brick/30 text-xs text-brick text-center font-medium">
-            ⚠️ {error}
+          <div role="alert" className="rounded-2xl border border-brick/30 bg-brick/10 p-3 text-center text-xs font-medium text-brick-ink">
+            {error}
           </div>
         )}
         {statusMessage && (
-          <div role="status" className="p-3 rounded-xl bg-surface border border-line text-xs font-medium text-ink text-center">
+          <div role="status" className="rounded-2xl border border-line bg-surface/70 p-3 text-center text-xs font-medium text-ink">
             {statusMessage}
           </div>
         )}
 
-        {/* Simulation Controls for Ideathon Judges */}
-        <div className="border-t border-line pt-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-ink uppercase tracking-wider">
-              Giả lập tình huống kiểm thử (Demo):
-            </span>
-            <MockBadge label="SIMULATION" />
-          </div>
-
+        {/* Bank simulation controls */}
+        <div className="rounded-2xl border border-dashed border-line bg-surface/35 p-4 space-y-2.5">
+          <div className="text-xs font-bold text-ink/75">Giả lập ngân hàng (demo)</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             <button
+              type="button"
+              data-tour="payment-simulate-full"
               onClick={() => handleSimulate("CONFIRMED")}
               disabled={loading || rechecking}
-              className="min-h-[44px] p-2.5 rounded-xl bg-primary text-paper font-semibold hover:bg-primary-strong transition-colors cursor-pointer text-center disabled:opacity-50 flex items-center justify-center"
+              className="min-h-[42px] rounded-full bg-primary px-4 py-2 font-bold text-paper transition-colors hover:bg-primary-strong cursor-pointer disabled:opacity-50"
             >
               Giả lập: Đã nhận đủ tiền
             </button>
             <button
+              type="button"
               onClick={() => handleSimulate("UNDERPAID")}
               disabled={loading || rechecking}
-              className="min-h-[44px] p-2.5 rounded-xl bg-amber/20 text-amber-ink border border-amber/40 font-semibold hover:bg-amber/30 transition-colors cursor-pointer text-center disabled:opacity-50 flex items-center justify-center"
+              className="min-h-[42px] rounded-full border border-line bg-paper px-4 py-2 font-semibold text-ink transition-colors hover:bg-surface cursor-pointer disabled:opacity-50"
             >
               Giả lập: Nộp thiếu tiền
             </button>
-            <button
-              onClick={() => handleSimulate("OVERPAID")}
-              disabled={loading || rechecking}
-              className="min-h-[44px] p-2.5 rounded-xl bg-surface border border-line text-ink font-semibold hover:bg-line/20 transition-colors cursor-pointer text-center disabled:opacity-50 flex items-center justify-center"
-            >
-              Giả lập: Nộp thừa tiền
-            </button>
-            <button
-              onClick={() => handleSimulate("FAILED")}
-              disabled={loading || rechecking}
-              className="min-h-[44px] p-2.5 rounded-xl bg-brick/15 text-brick border border-brick/40 font-semibold hover:bg-brick/25 transition-colors cursor-pointer text-center disabled:opacity-50 flex items-center justify-center"
-            >
-              Giả lập: Thất bại / Hủy
-            </button>
           </div>
         </div>
-
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="w-full min-h-[44px] py-2.5 rounded-xl border border-line text-ink font-medium hover:bg-surface transition-colors cursor-pointer text-sm flex items-center justify-center"
-        >
-          Đóng cửa sổ
-        </button>
       </div>
     </div>
   );
