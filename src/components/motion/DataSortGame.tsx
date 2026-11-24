@@ -169,9 +169,9 @@ export function DataSortGame() {
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Vùng Off-Chain (Supabase) */}
         <div
-          className={`flex flex-col rounded-2xl border-2 p-5 transition-all ${
+          className={`flex flex-col rounded-2xl border-2 p-5 ${
             shakingZone === "offchain"
-              ? "border-brick bg-brick/10 animate-bounce"
+              ? "border-brick bg-brick/10 ring-2 ring-brick/30"
               : "border-line bg-surface/30"
           }`}
         >
@@ -209,9 +209,9 @@ export function DataSortGame() {
 
         {/* Vùng On-Chain (Stellar Soroban) */}
         <div
-          className={`flex flex-col rounded-2xl border-2 p-5 transition-all ${
+          className={`flex flex-col rounded-2xl border-2 p-5 ${
             shakingZone === "onchain"
-              ? "border-brick bg-brick/10 animate-bounce"
+              ? "border-brick bg-brick/10 ring-2 ring-brick/30"
               : "border-primary/40 bg-primary/5"
           }`}
         >

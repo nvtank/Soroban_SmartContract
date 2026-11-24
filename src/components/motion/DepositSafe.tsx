@@ -17,7 +17,7 @@ export type DepositSafeProps = {
 
 export function DepositSafe({
   state,
-  amount = 10000000,
+  amount = 12000000,
   className = "",
   onSelectState,
 }: DepositSafeProps) {
@@ -40,41 +40,41 @@ export function DepositSafe({
     const tl = gsap.timeline();
 
     if (state === "UNPAID") {
-      tl.to(safeDoor, { rotateY: 0, transformOrigin: "left center", duration: 0.4 })
-        .to([leftKey, rightKey], { rotate: 0, opacity: 0.3, duration: 0.3 })
-        .to(banknote, { y: -80, opacity: 0, duration: 0.3 });
+      tl.to(safeDoor, { rotateY: 0, transformOrigin: "left center", duration: 0.35 })
+        .to([leftKey, rightKey], { rotate: 0, opacity: 0.3, duration: 0.25 })
+        .to(banknote, { y: -80, opacity: 0, duration: 0.25 });
     } else if (state === "RECORDED") {
       // Tiền VNĐ trượt vào trong két rồi cửa đóng lại
       tl.fromTo(
         banknote,
         { y: -60, opacity: 0, scale: 0.7 },
-        { y: 0, opacity: 1, scale: 1, duration: 0.6, ease: "bounce.out" }
+        { y: 0, opacity: 1, scale: 1, duration: 0.5, ease: "power2.out" }
       )
-        .to(safeDoor, { rotateY: 0, transformOrigin: "left center", duration: 0.4 })
-        .to([leftKey, rightKey], { opacity: 0.7, rotate: 0, duration: 0.3 });
+        .to(safeDoor, { rotateY: 0, transformOrigin: "left center", duration: 0.35 })
+        .to([leftKey, rightKey], { opacity: 0.7, rotate: 0, duration: 0.25 });
     } else if (state === "REFUNDED") {
       // Hai chìa khóa cùng xoay 90 độ và két mở bung ra
-      tl.to(leftKey, { rotate: 90, opacity: 1, duration: 0.5, transformOrigin: "120px 140px" })
-        .to(rightKey, { rotate: -90, opacity: 1, duration: 0.5, transformOrigin: "200px 140px" }, "<")
+      tl.to(leftKey, { rotate: 90, opacity: 1, duration: 0.45, transformOrigin: "120px 140px" })
+        .to(rightKey, { rotate: -90, opacity: 1, duration: 0.45, transformOrigin: "200px 140px" }, "<")
         .to(
           safeDoor,
           {
             rotateY: -65,
             transformOrigin: "left center",
-            duration: 0.7,
+            duration: 0.6,
             ease: "back.out(1.2)",
           },
-          "-=0.2"
+          "-=0.15"
         )
-        .to(banknote, { y: 20, opacity: 1, scale: 1.05, duration: 0.4 });
+        .to(banknote, { y: 20, opacity: 1, scale: 1.05, duration: 0.35 });
     } else if (state === "DISPUTE") {
-      // Tranh chấp: Két đóng chặt, chìa khóa bị khóa ngược, hiệu ứng rung báo động
-      tl.to(safeDoor, { rotateY: 0, duration: 0.3 })
-        .to([leftKey, rightKey], { rotate: 45, opacity: 0.5, duration: 0.3 })
+      // Tranh chấp: Két đóng chặt, chìa khóa bị khóa ngược, rung cảnh báo ngắn
+      tl.to(safeDoor, { rotateY: 0, duration: 0.25 })
+        .to([leftKey, rightKey], { rotate: 45, opacity: 0.6, duration: 0.25 })
         .fromTo(
           safeDoor,
-          { x: -4 },
-          { x: 4, duration: 0.08, repeat: 5, yoyo: true, ease: "power1.inOut" }
+          { x: -3 },
+          { x: 3, duration: 0.08, repeat: 3, yoyo: true, ease: "power1.inOut" }
         );
     }
 
@@ -85,8 +85,8 @@ export function DepositSafe({
 
   return (
     <div className={`flex flex-col items-center gap-4 ${className}`}>
-      {/* Vỏ ngoài và hình minh họa két sắt */}
-      <div className="relative flex items-center justify-center rounded-3xl border-2 border-line bg-surface/80 p-6 shadow-xl backdrop-blur-md">
+      {/* Vỏ ngoài và hình minh họa két sắt - Bỏ backdrop-blur */}
+      <div className="relative flex items-center justify-center rounded-3xl border-2 border-line bg-surface p-6 shadow-xl">
         <svg
           viewBox="0 0 320 280"
           className="h-60 w-60 sm:h-72 sm:w-72 overflow-visible"
@@ -145,7 +145,7 @@ export function DepositSafe({
             </text>
           </g>
 
-          {/* Cánh cửa két sắt xoay (Safe Door with GSAP 3D transform) */}
+          {/* Cánh cửa két sắt xoay - Bỏ filter drop-shadow */}
           <g ref={safeDoorRef}>
             <rect
               x="45"
@@ -156,7 +156,6 @@ export function DepositSafe({
               fill="var(--paper)"
               stroke={state === "DISPUTE" ? "var(--brick)" : "var(--ink)"}
               strokeWidth="3.5"
-              filter="drop-shadow(2px 6px 12px rgba(20,33,61,0.15))"
             />
 
             {/* Núm vặn trung tâm (Center Dial) */}
@@ -188,7 +187,7 @@ export function DepositSafe({
             </g>
 
             {/* Chìa khóa trái (Landlord key) */}
-            <g ref={leftKeyRef} className="origin-center transition-transform">
+            <g ref={leftKeyRef} className="origin-center">
               <path
                 d="M 117.5 130 L 117.5 160 M 117.5 145 L 126 145 M 117.5 152 L 123 152"
                 stroke="var(--primary-strong)"
@@ -199,7 +198,7 @@ export function DepositSafe({
             </g>
 
             {/* Chìa khóa phải (Tenant key) */}
-            <g ref={rightKeyRef} className="origin-center transition-transform">
+            <g ref={rightKeyRef} className="origin-center">
               <path
                 d="M 200 130 L 200 160 M 200 145 L 191 145 M 200 152 L 194 152"
                 stroke="var(--primary-strong)"
@@ -212,7 +211,7 @@ export function DepositSafe({
 
           {/* Biểu tượng trạng thái tranh chấp nếu có */}
           {state === "DISPUTE" && (
-            <g className="animate-pulse">
+            <g>
               <rect x="75" y="18" width="170" height="28" rx="6" fill="var(--brick)" />
               <text x="160" y="37" textAnchor="middle" fill="var(--paper)" fontSize="11" fontWeight="bold">
                 KHÓA TRANH CHẤP
@@ -262,13 +261,13 @@ export function DepositSafe({
         </div>
       </div>
 
-      {/* Bộ nút bấm thử nghiệm các trạng thái két (Interactive state selector) */}
+      {/* Bộ nút bấm thử nghiệm các trạng thái két */}
       {onSelectState && (
         <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
           <button
             type="button"
             onClick={() => onSelectState("RECORDED")}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+            className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${
               state === "RECORDED"
                 ? "border-primary bg-primary text-paper"
                 : "border-line bg-paper text-ink/80 hover:border-primary"
@@ -280,7 +279,7 @@ export function DepositSafe({
           <button
             type="button"
             onClick={() => onSelectState("REFUNDED")}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+            className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${
               state === "REFUNDED"
                 ? "border-primary bg-primary text-paper"
                 : "border-line bg-paper text-ink/80 hover:border-primary"
@@ -292,7 +291,7 @@ export function DepositSafe({
           <button
             type="button"
             onClick={() => onSelectState("DISPUTE")}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+            className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${
               state === "DISPUTE"
                 ? "border-brick bg-brick text-paper"
                 : "border-line bg-paper text-ink/80 hover:border-brick"

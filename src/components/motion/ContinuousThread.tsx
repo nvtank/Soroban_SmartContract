@@ -11,45 +11,48 @@ if (typeof window !== "undefined") {
 
 export function ContinuousThread() {
   const pathRef = useRef<SVGPathElement>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return;
-    }
-
     const path = pathRef.current;
-    if (!path) return;
+    const container = containerRef.current;
+    if (!path || !container) return;
 
-    // Scrub tiến trình vẽ sợi chỉ từ đầu trang đến cuối trang
-    const ctx = gsap.context(() => {
-      gsap.fromTo(
-        path,
-        { drawSVG: "0%" },
-        {
-          drawSVG: "100%",
-          ease: "none",
-          scrollTrigger: {
-            trigger: document.body,
-            start: "top top+=200",
-            end: "bottom bottom-=300",
-            scrub: 0.5,
-          },
-        }
-      );
-    });
+    // Chỉ kích hoạt từ màn hình xl trở lên và không giảm chuyển động
+    const mm = gsap.matchMedia();
 
-    return () => ctx.revert();
+    mm.add(
+      "(min-width: 1280px) and (prefers-reduced-motion: no-preference)",
+      () => {
+        gsap.fromTo(
+          path,
+          { drawSVG: "0%" },
+          {
+            drawSVG: "100%",
+            ease: "none",
+            scrollTrigger: {
+              trigger: document.body,
+              start: "top top+=150",
+              end: "max",
+              scrub: true, // Đồng bộ không trễ đúp với Lenis
+              refreshPriority: -1,
+            },
+          }
+        );
+      }
+    );
+
+    return () => mm.revert();
   }, []);
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-[100vh] bottom-0 z-0 overflow-hidden opacity-40 md:opacity-60"
+      ref={containerRef}
+      className="hidden xl:block pointer-events-none absolute right-[max(1.5rem,calc(50%-44rem))] top-[100vh] bottom-0 z-0 w-8 overflow-hidden opacity-50"
       aria-hidden="true"
     >
       <svg
-        ref={svgRef}
-        viewBox="0 0 100 1000"
+        viewBox="0 0 32 1000"
         preserveAspectRatio="none"
         className="h-full w-full"
         fill="none"
@@ -57,16 +60,16 @@ export function ContinuousThread() {
       >
         <path
           ref={pathRef}
-          d="M 50 15 
-             C 75 80, 25 150, 50 220 
-             C 80 300, 20 380, 50 460 
-             C 75 540, 25 620, 50 700 
-             C 80 780, 30 860, 50 940 
-             L 50 990"
+          d="M 16 10 
+             C 26 80, 6 160, 16 240 
+             C 26 320, 6 400, 16 480 
+             C 26 560, 6 640, 16 720 
+             C 26 800, 6 880, 16 960 
+             L 16 990"
           stroke="var(--primary)"
-          strokeWidth="2.5"
+          strokeWidth="2"
           strokeLinecap="round"
-          strokeDasharray="6 8"
+          strokeDasharray="5 7"
           vectorEffect="non-scaling-stroke"
           className="thread-glow"
         />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type ReactNode, type MouseEvent } from "react";
+import { useRef, useEffect, type ReactNode, type MouseEvent } from "react";
 import { gsap } from "gsap";
 
 export type MagneticButtonProps = {
@@ -25,35 +25,66 @@ export function MagneticButton({
   disabled = false,
 }: MagneticButtonProps) {
   const containerRef = useRef<HTMLElement | null>(null);
+  const rectRef = useRef<DOMRect | null>(null);
+  const quickXRef = useRef<((val: number) => void) | null>(null);
+  const quickYRef = useRef<((val: number) => void) | null>(null);
 
-  const handleMouseMove = (e: MouseEvent<HTMLElement>) => {
-    if (disabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    const rect = el.getBoundingClientRect();
+    // Chỉ dùng quickTo với con trỏ chính xác
+    if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      quickXRef.current = gsap.quickTo(el, "x", { duration: 0.25, ease: "power2.out" });
+      quickYRef.current = gsap.quickTo(el, "y", { duration: 0.25, ease: "power2.out" });
+    }
+
+    return () => {
+      quickXRef.current = null;
+      quickYRef.current = null;
+    };
+  }, []);
+
+  const handleMouseEnter = () => {
+    if (disabled) return;
+    // Cache bounding client rect một lần khi rê chuột vào, không gọi mỗi frame mousemove
+    if (containerRef.current) {
+      rectRef.current = containerRef.current.getBoundingClientRect();
+    }
+  };
+
+  const handleMouseMove = (e: MouseEvent<HTMLElement>) => {
+    if (
+      disabled ||
+      !quickXRef.current ||
+      !quickYRef.current ||
+      !rectRef.current ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+
+    const rect = rectRef.current;
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     const deltaX = (e.clientX - centerX) * strength;
     const deltaY = (e.clientY - centerY) * strength;
 
-    gsap.to(el, {
-      x: deltaX,
-      y: deltaY,
-      duration: 0.25,
-      ease: "power2.out",
-    });
+    quickXRef.current(deltaX);
+    quickYRef.current(deltaY);
   };
 
   const handleMouseLeave = () => {
+    rectRef.current = null;
     const el = containerRef.current;
     if (!el) return;
 
     gsap.to(el, {
       x: 0,
       y: 0,
-      duration: 0.6,
+      duration: 0.5,
       ease: "elastic.out(1.1, 0.4)",
+      overwrite: "auto",
     });
   };
 
@@ -61,6 +92,7 @@ export function MagneticButton({
     ref: (node: HTMLButtonElement | HTMLAnchorElement | null) => {
       containerRef.current = node;
     },
+    onMouseEnter: handleMouseEnter,
     onMouseMove: handleMouseMove,
     onMouseLeave: handleMouseLeave,
     className: `relative inline-flex items-center justify-center select-none ${className}`,

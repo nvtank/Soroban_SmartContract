@@ -29,20 +29,20 @@ export function HeroSection() {
     if (!headline || !desc || !ctaGroup) return;
 
     const ctx = gsap.context(() => {
-      // Tách chữ và dòng bằng SplitText
+      // Tách chữ chỉ bằng words để không chèn thẻ lines gây vỡ dòng responsive
       try {
-        const split = new SplitText(headline, { type: "lines,words" });
+        const split = new SplitText(headline, { type: "words" });
         gsap.from(split.words, {
-          y: 40,
+          y: 35,
           opacity: 0,
           duration: 0.8,
-          stagger: 0.04,
+          stagger: 0.035,
           ease: "power3.out",
           delay: 0.1,
         });
       } catch {
-        // Fallback nếu SplitText môi trường đặc biệt
-        gsap.from(headline, { y: 30, opacity: 0, duration: 0.8, ease: "power3.out" });
+        // Fallback nếu SplitText không khả dụng
+        gsap.from(headline, { y: 25, opacity: 0, duration: 0.7, ease: "power3.out" });
       }
 
       gsap.from(desc, {
@@ -68,10 +68,9 @@ export function HeroSection() {
   return (
     <section
       ref={containerRef}
-      className="relative flex min-h-[90vh] flex-col justify-center pt-32 pb-20 overflow-hidden"
+      className="relative flex min-h-[85vh] flex-col justify-center pt-28 pb-16 overflow-hidden"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Tiêu đề khổng lồ chiếm trọn chiều ngang để không bị ngắt thành quá nhiều dòng */}
         <div className="flex flex-col items-start">
           <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary-strong">
             <ShieldCheck className="h-4 w-4" />
@@ -87,10 +86,9 @@ export function HeroSection() {
           </h1>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
+        <div className="mt-4 grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-8">
           {/* Cột trái: mô tả & CTA */}
           <div className="flex flex-col items-start lg:col-span-7">
-            {/* Mô tả giải pháp */}
             <p
               ref={descRef}
               className="mt-6 max-w-xl text-lg sm:text-xl leading-relaxed text-ink/80"
@@ -104,8 +102,8 @@ export function HeroSection() {
               className="mt-8 flex flex-wrap items-center gap-4 sm:gap-5"
             >
               <MagneticButton
-                href="/dang-nhap?demo=landlord"
-                className="rounded-2xl bg-primary px-7 py-4 text-base sm:text-lg font-bold text-paper shadow-md transition-all hover:bg-primary-strong hover:shadow-lg focus-visible:ring-4 focus-visible:ring-primary/20"
+                href="/dang-nhap?demo=landlord&next=/app"
+                className="rounded-2xl bg-primary px-7 py-4 text-base sm:text-lg font-bold text-paper shadow-md transition-colors hover:bg-primary-strong focus-visible:ring-4 focus-visible:ring-primary/20"
                 ariaLabel={marketingVi.hero.ctaPrimary}
               >
                 <span>{marketingVi.hero.ctaPrimary}</span>
@@ -122,13 +120,12 @@ export function HeroSection() {
               </MagneticButton>
             </div>
 
-            {/* Dòng ghi chú đạo đức */}
             <p className="mt-8 text-xs font-medium text-ink/60">
               * {marketingVi.hero.trustNote}
             </p>
           </div>
 
-          {/* Cột phải: Hình minh họa chìa khóa và ngôi nhà (DrawSVG Key Animation) */}
+          {/* Cột phải: Hình minh họa chìa khóa và ngôi nhà */}
           <div className="flex items-center justify-center lg:col-span-5">
             <HeroKeyAnimation />
           </div>

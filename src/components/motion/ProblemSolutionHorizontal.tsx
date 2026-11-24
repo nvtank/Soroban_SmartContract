@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { marketingVi } from "@/i18n/sections/marketing";
@@ -18,36 +19,33 @@ export function ProblemSolutionHorizontal() {
   const pairs = marketingVi.chapter02.pairs;
 
   useEffect(() => {
-    // Nếu màn hình nhỏ hoặc reduced-motion, không pin cuộn ngang mà để cuộn dọc tự nhiên
-    if (
-      window.innerWidth < 1024 ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      return;
-    }
-
     const container = containerRef.current;
     const track = trackRef.current;
     if (!container || !track) return;
 
-    const ctx = gsap.context(() => {
-      const scrollWidth = track.scrollWidth - container.clientWidth;
+    // Dùng gsap.matchMedia để tự dọn dẹp và chỉ kích hoạt khi desktop & không giảm chuyển động
+    const mm = gsap.matchMedia();
 
-      gsap.to(track, {
-        x: -scrollWidth,
-        ease: "none",
-        scrollTrigger: {
-          trigger: container,
-          pin: true,
-          scrub: 0.8,
-          start: "top top+=80",
-          end: () => `+=${scrollWidth + 400}`,
-          invalidateOnRefresh: true,
-        },
-      });
-    }, container);
+    mm.add(
+      "(min-width: 1024px) and (prefers-reduced-motion: no-preference)",
+      () => {
+        gsap.to(track, {
+          // x theo hàm để tự tính lại chính xác khi thay đổi kích thước cửa sổ
+          x: () => -(track.scrollWidth - container.clientWidth),
+          ease: "none",
+          scrollTrigger: {
+            trigger: container,
+            pin: true,
+            scrub: true, // Không trễ đúp với Lenis
+            start: "top top+=80",
+            end: () => `+=${track.scrollWidth - container.clientWidth}`,
+            invalidateOnRefresh: true,
+          },
+        });
+      }
+    );
 
-    return () => ctx.revert();
+    return () => mm.revert();
   }, []);
 
   const toggleFlip = (index: number) => {
@@ -71,11 +69,11 @@ export function ProblemSolutionHorizontal() {
         </p>
       </div>
 
-      {/* Track cuộn ngang (Pin scroll on Desktop, horizontal swipe on Mobile) */}
+      {/* Track cuộn ngang (Pin scroll trên Desktop, swipe trên Mobile) */}
       <div className="w-full overflow-x-auto lg:overflow-visible no-scrollbar pb-6">
         <div
           ref={trackRef}
-          className="flex gap-6 sm:gap-8 px-4 sm:px-6 lg:px-12 w-max items-stretch"
+          className="flex gap-6 sm:gap-8 px-4 sm:px-6 lg:px-12 w-max items-stretch will-change-transform"
         >
           {pairs.map((pair, idx) => {
             const isFlipped = activeFlippedIndex === idx;
@@ -83,7 +81,7 @@ export function ProblemSolutionHorizontal() {
             return (
               <div
                 key={idx}
-                className="relative flex w-[320px] sm:w-[420px] md:w-[480px] flex-col rounded-3xl border border-line bg-paper p-6 sm:p-8 shadow-soft transition-all"
+                className="relative flex w-[320px] sm:w-[420px] md:w-[480px] flex-col rounded-3xl border border-line bg-paper p-6 sm:p-8 shadow-soft"
               >
                 {/* Header thẻ: Cột mốc và nút lật */}
                 <div className="flex items-center justify-between border-b border-line pb-4">
@@ -126,7 +124,7 @@ export function ProblemSolutionHorizontal() {
 
                       <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-primary-strong">
                         <span>Chuyển hóa bằng RentFlow</span>
-                        <ArrowRight className="h-4 w-4 animate-pulse" />
+                        <ArrowRight className="h-4 w-4" />
                       </div>
                     </div>
                   ) : (
@@ -162,8 +160,17 @@ export function ProblemSolutionHorizontal() {
         </div>
       </div>
 
-      {/* Câu dẫn sang chương sau */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6">
+      {/* Nút Deep-Link thử bước này & Câu dẫn sang chương sau */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6 flex flex-wrap items-center justify-between gap-4">
+        <Link
+          href="/dang-nhap?demo=landlord&next=/app/hop-dong/ct-002#tong-quan"
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-paper shadow-sm hover:bg-primary-strong transition-colors"
+          data-cursor-hover="true"
+        >
+          <span>Thử bước này trong demo</span>
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+
         <p className="text-sm font-semibold text-primary-strong">
           {marketingVi.chapter02.nextBridge}
         </p>

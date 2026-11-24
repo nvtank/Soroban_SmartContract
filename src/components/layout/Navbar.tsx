@@ -32,45 +32,42 @@ export function Navbar() {
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const [activeSection, setActiveSection] = useState<string>("hero");
-  const [isCompact, setIsCompact] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
-  // Cuộn trang và thanh tiến trình đọc
+  // ScrollTrigger theo dõi cuộn để cập nhật scaleX, data-compact, data-hidden
+  // Không đọc scrollHeight hay gọi setState mỗi frame cuộn!
   useEffect(() => {
-    let lastScrollY = window.scrollY;
+    const header = navRef.current;
+    const progress = progressBarRef.current;
+    if (!header || !progress) return;
 
-    const handleScroll = () => {
-      const scrollY = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = docHeight > 0 ? (scrollY / docHeight) * 100 : 0;
+    const st = ScrollTrigger.create({
+      start: 0,
+      end: "max",
+      onUpdate: (self) => {
+        // 1. Thanh tiến trình scaleX (GPU transform, không gây reflow)
+        progress.style.transform = `scaleX(${self.progress})`;
 
-      // Cập nhật thanh tiến trình đọc
-      if (progressBarRef.current) {
-        progressBarRef.current.style.width = `${progress}%`;
-      }
-
-      // Navbar compact mode
-      if (scrollY > 60) {
-        setIsCompact(true);
-      } else {
-        setIsCompact(false);
-      }
-
-      // Smart hide / show khi cuộn
-      if (navRef.current) {
-        if (scrollY > 300 && scrollY > lastScrollY && !mobileMenuOpen) {
-          // Cuộn xuống -> ẩn nhẹ
-          navRef.current.style.transform = "translateY(-100%)";
-        } else {
-          // Cuộn lên -> hiện lại
-          navRef.current.style.transform = "translateY(0)";
+        // 2. data-compact khi cuộn quá 60px
+        const isComp = self.scroll() > 60;
+        const currentCompact = header.getAttribute("data-compact") === "true";
+        if (isComp !== currentCompact) {
+          header.setAttribute("data-compact", isComp ? "true" : "false");
         }
-      }
-      lastScrollY = scrollY;
-    };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+        // 3. Smart ẩn/hiện chỉ bằng transform qua data-hidden
+        // direction: 1 = cuộn xuống, -1 = cuộn lên
+        if (!mobileMenuOpen) {
+          const isDown = self.direction === 1 && self.scroll() > 300;
+          const currentHidden = header.getAttribute("data-hidden") === "true";
+          if (isDown !== currentHidden) {
+            header.setAttribute("data-hidden", isDown ? "true" : "false");
+          }
+        }
+      },
+    });
+
+    return () => st.kill();
   }, [mobileMenuOpen]);
 
   // ScrollTrigger quan sát từng section để cập nhật active indicator
@@ -121,19 +118,19 @@ export function Navbar() {
       const tl = gsap.timeline();
       tl.fromTo(
         menu,
-        { opacity: 0, backdropFilter: "blur(0px)" },
-        { opacity: 1, backdropFilter: "blur(24px)", duration: 0.3, ease: "power2.out" }
+        { opacity: 0 },
+        { opacity: 1, duration: 0.25, ease: "power2.out" }
       ).fromTo(
         menu.querySelectorAll(".mobile-nav-item"),
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.25, stagger: 0.05, ease: "power2.out" },
-        "-=0.15"
+        { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.2, stagger: 0.04, ease: "power2.out" },
+        "-=0.1"
       );
     } else {
       document.body.style.overflow = "";
       gsap.to(menu, {
         opacity: 0,
-        duration: 0.25,
+        duration: 0.2,
         ease: "power2.in",
         onComplete: () => {
           gsap.set(menu, { display: "none" });
@@ -146,13 +143,14 @@ export function Navbar() {
     <>
       <header
         ref={navRef}
-        className={`fixed top-[var(--demo-banner-h,2.75rem)] left-0 right-0 z-50 transition-all duration-300 ease-out ${
-          isCompact ? "py-2.5 shadow-sm" : "py-4 sm:py-5"
-        }`}
+        data-compact="false"
+        data-hidden="false"
+        className="fixed left-0 right-0 z-50 py-3 sm:py-4 transition-transform duration-250 ease-out"
         style={{
-          backgroundColor: "rgba(251, 248, 243, 0.72)",
-          backdropFilter: "blur(18px)",
-          WebkitBackdropFilter: "blur(18px)",
+          top: "var(--demo-banner-h, 2.75rem)",
+          backgroundColor: "rgba(251, 248, 243, 0.8)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
           borderBottom: "1px solid var(--line)",
         }}
       >
@@ -164,11 +162,7 @@ export function Navbar() {
             aria-label={`${vi.brand.name} - Về trang chủ`}
             data-cursor-hover="true"
           >
-            <div
-              className={`flex items-center justify-center rounded-xl bg-primary text-paper transition-all duration-300 ${
-                isCompact ? "h-9 w-9" : "h-10 w-10 sm:h-11 sm:w-11"
-              }`}
-            >
+            <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-primary text-paper transition-transform duration-200">
               <svg
                 className="h-5 w-5 sm:h-6 sm:w-6 transition-transform group-hover:rotate-12"
                 viewBox="0 0 24 24"
@@ -183,11 +177,7 @@ export function Navbar() {
               </svg>
             </div>
             <div className="flex flex-col">
-              <span
-                className={`font-sans font-extrabold tracking-tight text-ink transition-all ${
-                  isCompact ? "text-lg" : "text-xl sm:text-2xl"
-                }`}
-              >
+              <span className="font-sans font-extrabold tracking-tight text-ink text-xl sm:text-2xl">
                 {vi.brand.name}
               </span>
             </div>
@@ -215,7 +205,7 @@ export function Navbar() {
             {/* Sliding underline indicator */}
             <div
               ref={indicatorRef}
-              className="pointer-events-none absolute bottom-0 h-0.5 rounded-full bg-primary transition-all duration-300 ease-out"
+              className="pointer-events-none absolute bottom-0 h-0.5 rounded-full bg-primary transition-all duration-200 ease-out"
               aria-hidden="true"
             />
           </nav>
@@ -223,7 +213,7 @@ export function Navbar() {
           {/* CTA & Mobile Menu Toggle */}
           <div className="flex items-center gap-3">
             <MagneticButton
-              href="/dang-nhap?demo=landlord"
+              href="/dang-nhap?demo=landlord&next=/app"
               className="hidden sm:inline-flex whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-bold text-paper shadow-sm transition-colors hover:bg-primary-strong focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               ariaLabel={marketingVi.nav.tryDemo}
             >
@@ -245,23 +235,18 @@ export function Navbar() {
           </div>
         </div>
 
-        {/* Thanh tiến trình đọc ở đáy navbar */}
+        {/* Thanh tiến trình đọc ở đáy navbar - dùng scaleX */}
         <div
           ref={progressBarRef}
-          className="absolute bottom-0 left-0 h-[2px] bg-primary transition-[width] duration-75 ease-out"
-          style={{ width: "0%" }}
+          className="nav-progress-bar"
           aria-hidden="true"
         />
       </header>
 
-      {/* Fullscreen Glass Mobile Menu */}
+      {/* Fullscreen Mobile Menu */}
       <div
         ref={mobileMenuRef}
-        className="fixed inset-0 z-40 hidden flex-col justify-between px-6 pt-44 pb-10 text-ink xl:hidden"
-        style={{
-          backgroundColor: "rgba(251, 248, 243, 0.94)",
-          backdropFilter: "blur(24px)",
-        }}
+        className="fixed inset-0 z-40 hidden flex-col justify-between px-6 pt-36 pb-10 text-ink xl:hidden bg-paper/95 backdrop-blur-md"
         aria-modal="true"
         role="dialog"
       >
@@ -284,7 +269,7 @@ export function Navbar() {
 
         <div className="flex flex-col gap-3 pt-6 border-t border-line">
           <Link
-            href="/dang-nhap?demo=landlord"
+            href="/dang-nhap?demo=landlord&next=/app"
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-paper shadow-md"
           >

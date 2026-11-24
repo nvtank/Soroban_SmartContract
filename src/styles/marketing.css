@@ -1,12 +1,13 @@
 /* CSS cho khu vực Marketing & Landing của RentFlow */
 
-/* Hiệu ứng hạt giấy (Paper Noise / Subtle Grain) */
+/* Hiệu ứng hạt giấy (Paper Noise / Subtle Grain) - Dùng tile PNG nhỏ nhẹ nhàng cho GPU */
 .paper-grain {
-  background-image: radial-gradient(rgba(20, 33, 61, 0.04) 1px, transparent 0);
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAHElEQVR42mMQUbTlYhgFo2AUjIJRMApGwSgYBQBvvwB9yL/KegAAAABJRU5ErkJggg==");
+  background-repeat: repeat;
   background-size: 24px 24px;
 }
 
-/* Con trỏ tùy biến (Custom Cursor) */
+/* Con trỏ tùy biến (Custom Cursor) - Bỏ mix-blend-mode toàn trang, chỉ transform scale */
 .custom-cursor-follower {
   position: fixed;
   top: 0;
@@ -19,11 +20,7 @@
   pointer-events: none;
   z-index: 9999;
   transform: translate(-50%, -50%);
-  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-              height 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-              background-color 0.25s ease,
-              opacity 0.25s ease;
-  mix-blend-mode: multiply;
+  will-change: transform;
 }
 
 .custom-cursor-dot {
@@ -37,13 +34,7 @@
   pointer-events: none;
   z-index: 10000;
   transform: translate(-50%, -50%);
-}
-
-.custom-cursor-hover {
-  width: 56px;
-  height: 56px;
-  opacity: 0.2;
-  background-color: var(--primary-strong);
+  will-change: transform;
 }
 
 @media (hover: none) or (pointer: coarse) {
@@ -51,6 +42,41 @@
   .custom-cursor-dot {
     display: none !important;
   }
+}
+
+/* Navbar: Tắt backdrop-filter khi đang cuộn bằng Lenis để tránh vẽ lại liên tục */
+html.lenis-scrolling header {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background-color: rgba(251, 248, 243, 0.96) !important;
+}
+
+/* Thanh tiến trình đọc ở đáy navbar bằng scaleX (không gây layout reflow) */
+.nav-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--primary);
+  transform-origin: left center;
+  transform: scaleX(0);
+  will-change: transform;
+}
+
+/* Header ẩn/hiện và compact chỉ bằng transform qua data-* */
+header {
+  transition: transform 0.25s ease-out;
+}
+
+header[data-hidden="true"]:not(:focus-within) {
+  transform: translateY(-120%);
+}
+
+header[data-hidden="false"],
+header:not([data-hidden]),
+header:focus-within {
+  transform: translateY(0) !important;
 }
 
 /* Băng chạy Marquee */
@@ -67,20 +93,20 @@
   display: flex;
   width: max-content;
   animation: marqueeScroll 28s linear infinite;
+  will-change: transform;
 }
 
 .animate-marquee-track:hover {
   animation-play-state: paused;
 }
 
-/* 3D Perspective cho thẻ Nỗi đau */
+/* 3D Perspective cho thẻ Nỗi đau - Bỏ transition-all và will-change thường trực */
 .perspective-card-container {
   perspective: 1000px;
 }
 
 .tilt-card {
-  transition: transform 0.2s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.2s ease;
-  will-change: transform;
+  transform-style: preserve-3d;
 }
 
 /* Con dấu ON-CHAIN Stamp Animation */
@@ -113,9 +139,42 @@
   transform: rotateY(-75deg);
 }
 
-/* Sợi chỉ Continuous Thread */
+/* Sợi chỉ Continuous Thread - Không dùng filter drop-shadow */
 .thread-glow {
-  filter: drop-shadow(0 0 6px rgba(15, 139, 109, 0.3));
+  /* Bỏ drop-shadow filter để không rasterize lại */
+}
+
+/* Tô sáng quét qua cột RentFlow khi vào khung nhìn (Chương 05) */
+@keyframes rentflowSweep {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(200%);
+    opacity: 0;
+  }
+}
+
+.rentflow-col-highlight {
+  position: relative;
+  overflow: hidden;
+}
+
+.rentflow-col-highlight::after {
+  content: "";
+  position: absolute;
+  inset: -100% 0 -100% 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(15, 139, 109, 0.25) 50%, transparent 100%);
+  pointer-events: none;
+  transform: translateY(-100%);
+}
+
+.rentflow-col-highlight.sweeping::after {
+  animation: rentflowSweep 1.2s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
 }
 
 /* Hỗ trợ Reduced Motion */
@@ -131,5 +190,8 @@
     animation: none !important;
     transform: rotate(-6deg);
     opacity: 1;
+  }
+  .rentflow-col-highlight::after {
+    display: none !important;
   }
 }
