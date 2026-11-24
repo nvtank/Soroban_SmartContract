@@ -34,7 +34,7 @@ export function OnchainStamp({
           role={interactive ? "button" : undefined}
           tabIndex={interactive ? 0 : undefined}
           title={interactive ? "Nhấn để đóng lại con dấu" : undefined}
-          className={`animate-stamp inline-flex flex-col items-center justify-center rounded-xl border-4 border-double border-primary-strong/85 bg-primary/5 px-5 py-3 text-primary-strong shadow-sm backdrop-blur-xs ${
+          className={`animate-stamp inline-flex flex-col items-center justify-center rounded-xl border-4 border-double border-primary-strong/85 bg-primary/10 px-5 py-3 text-primary-strong shadow-sm ${
             interactive ? "cursor-pointer hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary" : ""
           }`}
           style={{

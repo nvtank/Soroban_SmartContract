@@ -106,7 +106,7 @@ export const marketingVi = {
         detail:
           "Chủ nhà nhập thông tin hợp đồng (tiền cọc, tiền thuê, ngày đến hạn, phí trễ). Hợp đồng được chuẩn hóa và tính mã băm SHA-256 có muối. Người thuê xác thực danh tính và ký điện tử qua Passkey/WebAuthn.",
         onchainAction: "Ghi nhận mã băm hợp đồng và địa chỉ ví của hai bên lên Soroban contract.",
-        deepLink: "/dang-nhap?demo=landlord&step=SIGN",
+        deepLink: "/dang-nhap?demo=landlord&next=/app/hop-dong/ct-001#tong-quan",
       },
       {
         step: "DEPOSIT",
@@ -116,7 +116,7 @@ export const marketingVi = {
         detail:
           "Người thuê quét mã VietQR tự sinh. Sau khi cổng thanh toán xác nhận đúng số tiền, backend đưa giao dịch vào hàng đợi Outbox. Soroban chuyển trạng thái tiền cọc sang RECORDED.",
         onchainAction: "Oracle ghi nhận payment_ref_hash và xác nhận cọc đã vào két.",
-        deepLink: "/dang-nhap?demo=tenant&step=DEPOSIT",
+        deepLink: "/dang-nhap?demo=tenant&next=/app/hop-dong/ct-001#tien-coc",
       },
       {
         step: "RENT",
@@ -126,7 +126,7 @@ export const marketingVi = {
         detail:
           "Đến hạn hàng tháng, VietQR kỳ thuê được phát hành tự động. Nếu thanh toán trễ, hệ thống tự tính phí phạt chính xác theo công thức quy định và cập nhật công nợ.",
         onchainAction: "Cập nhật trạng thái từng kỳ thuê và phí trễ hạn (late_fee) lên contract.",
-        deepLink: "/dang-nhap?demo=tenant&step=RENT",
+        deepLink: "/dang-nhap?demo=tenant&next=/app/hop-dong/ct-002#tien-thue",
       },
       {
         step: "SETTLE",
@@ -136,7 +136,7 @@ export const marketingVi = {
         detail:
           "Khi trả phòng, chủ nhà đề xuất hoàn cọc toàn bộ hoặc khấu trừ chi phí hợp lý. Chỉ khi cả hai bên dùng Passkey đồng thuận cùng một số tiền, két mới mở giải ngân.",
         onchainAction: "Contract phát sự kiện release_authorized khi cả hai bên khớp chữ ký.",
-        deepLink: "/dang-nhap?demo=landlord&step=SETTLE",
+        deepLink: "/dang-nhap?demo=landlord&next=/app/hop-dong/ct-002#hoan-coc",
       },
       {
         step: "DISPUTE",
@@ -146,7 +146,7 @@ export const marketingVi = {
         detail:
           "Nếu người thuê từ chối mức khấu trừ, hệ thống chuyển sang trạng thái PENDING_DISPUTE. Tiền cọc bị khóa cứng, RentFlow tuyệt đối không tự phán quyết bên nào đúng.",
         onchainAction: "Khóa cọc trên contract, chờ hai bên đàm phán hoặc trọng tài can thiệp.",
-        deepLink: "/dang-nhap?demo=tenant&step=DISPUTE",
+        deepLink: "/dang-nhap?demo=tenant&next=/app/hop-dong/ct-003#hoan-coc",
       },
     ],
     safeStatusLocked: "Két cọc: Đang khóa bảo chứng (RECORDED)",
@@ -259,7 +259,7 @@ export const marketingVi = {
         "Đề xuất mức khấu trừ hao mòn có đính kèm lý do khi trả phòng",
       ],
       cta: "Đăng nhập nhanh Chủ nhà",
-      link: "/dang-nhap?demo=landlord",
+      link: "/dang-nhap?demo=landlord&next=/app",
     },
     tenantCard: {
       role: "NGƯỜI THUÊ",
@@ -272,7 +272,7 @@ export const marketingVi = {
         "Yêu cầu hoàn cọc hoặc từ chối khấu trừ vô lý để khóa cọc",
       ],
       cta: "Đăng nhập nhanh Người thuê",
-      link: "/dang-nhap?demo=tenant",
+      link: "/dang-nhap?demo=tenant&next=/app",
     },
     demoScriptLink: "Xem kịch bản trình diễn chuẩn (Demo Script)",
   },

@@ -54,7 +54,7 @@ export function JourneyStepper({ current, disputed = false, compact = false, cla
           return (
             <div
               key={step.id}
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors ${badgeClass}`}
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ${badgeClass}`}
               title={`${step.stepNumber}: ${step.label}`}
             >
               <span>{step.stepNumber}</span>
@@ -69,7 +69,7 @@ export function JourneyStepper({ current, disputed = false, compact = false, cla
   return (
     <nav
       aria-label="Hành trình hợp đồng 5 bước"
-      className={`w-full rounded-2xl border border-line bg-surface/60 p-4 md:p-6 backdrop-blur-sm ${className}`}
+      className={`w-full rounded-2xl border border-line bg-surface/90 p-4 md:p-6 ${className}`}
     >
       <div className="flex flex-col gap-4">
         {disputed && (
@@ -93,7 +93,7 @@ export function JourneyStepper({ current, disputed = false, compact = false, cla
             return (
               <li
                 key={step.id}
-                className={`relative flex flex-col rounded-xl border p-3 transition-all ${
+                className={`relative flex flex-col rounded-xl border p-3 ${
                   isDisputedActive
                     ? "border-brick/40 bg-brick/10 text-brick-ink shadow-sm"
                     : isCurrent
@@ -111,7 +111,7 @@ export function JourneyStepper({ current, disputed = false, compact = false, cla
                       <Check className="h-3 w-3" />
                     </span>
                   ) : isCurrent ? (
-                    <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    <span className="flex h-2 w-2 rounded-full bg-primary" />
                   ) : null}
                 </div>
 

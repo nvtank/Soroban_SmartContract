@@ -3,9 +3,10 @@
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { DrawSVGPlugin } from "gsap/DrawSVGPlugin";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 if (typeof window !== "undefined") {
-  gsap.registerPlugin(DrawSVGPlugin);
+  gsap.registerPlugin(DrawSVGPlugin, ScrollTrigger);
 }
 
 export function HeroKeyAnimation() {
@@ -20,11 +21,15 @@ export function HeroKeyAnimation() {
       return;
     }
 
+    const container = containerRef.current;
     const house = housePathRef.current;
     const key = keyRef.current;
     const keyStrokes = keyStrokesRef.current;
     const glow = glowRef.current;
-    if (!house || !key || !keyStrokes || !glow) return;
+    if (!container || !house || !key || !keyStrokes || !glow) return;
+
+    let glowTween: gsap.core.Tween | null = null;
+    let st: ScrollTrigger | null = null;
 
     // Timeline vẽ nét ngôi nhà và chìa khóa tra vào ổ
     const tl = gsap.timeline({ delay: 0.3 });
@@ -33,45 +38,54 @@ export function HeroKeyAnimation() {
     tl.fromTo(
       house,
       { drawSVG: "0%" },
-      { drawSVG: "100%", duration: 1.4, ease: "power2.inOut" }
+      { drawSVG: "100%", duration: 1.3, ease: "power2.inOut" }
     )
       // 2. Vẽ nét chiếc chìa khóa
       .fromTo(
         keyStrokes,
         { drawSVG: "0%", opacity: 0 },
-        { drawSVG: "100%", opacity: 1, duration: 1.1, ease: "power2.out" },
-        "-=0.6"
+        { drawSVG: "100%", opacity: 1, duration: 1.0, ease: "power2.out" },
+        "-=0.5"
       )
       // 3. Chìa khóa di chuyển và tra vào ổ khóa
       .fromTo(
         key,
         { x: 30, y: -25, rotate: -35, transformOrigin: "center center" },
-        { x: 0, y: 0, rotate: 0, duration: 0.9, ease: "back.out(1.4)" }
+        { x: 0, y: 0, rotate: 0, duration: 0.8, ease: "back.out(1.4)" }
       )
       // 4. Chìa xoay một góc 45 độ tượng trưng cho việc vặn khóa bảo chứng
       .to(key, {
         rotate: 45,
-        duration: 0.5,
+        duration: 0.45,
         ease: "power2.inOut",
       })
-      // 5. Ổ khóa phát sáng nhẹ, khởi nguồn cho sợi chỉ
-      .fromTo(
-        glow,
-        { scale: 0, opacity: 0, transformOrigin: "center center" },
-        { scale: 1.4, opacity: 0.8, duration: 0.4, ease: "power2.out" },
-        "-=0.2"
-      )
-      .to(glow, {
-        scale: 1,
-        opacity: 0.4,
-        duration: 0.6,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut",
+      // 5. Khởi tạo glow animation lặp lại NHƯNG CHỈ CHẠY KHI TRONG KHUNG NHÌN
+      .add(() => {
+        glowTween = gsap.to(glow, {
+          scale: 1.3,
+          opacity: 0.5,
+          duration: 0.7,
+          repeat: -1,
+          yoyo: true,
+          ease: "sine.inOut",
+        });
+
+        // Tạm dừng nếu ra khỏi khung nhìn
+        st = ScrollTrigger.create({
+          trigger: container,
+          start: "top bottom",
+          end: "bottom top",
+          onLeave: () => glowTween?.pause(),
+          onEnter: () => glowTween?.play(),
+          onLeaveBack: () => glowTween?.pause(),
+          onEnterBack: () => glowTween?.play(),
+        });
       });
 
     return () => {
       tl.kill();
+      glowTween?.kill();
+      st?.kill();
     };
   }, []);
 
