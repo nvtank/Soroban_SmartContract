@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, use, useCallback } from "react";
+import React, { useState, useEffect, use, useCallback, useRef } from "react";
 import Link from "next/link";
 import { AppNavbar } from "@/components/app/app-navbar";
 import { useSession } from "@/components/app/session-context";
@@ -10,6 +10,7 @@ import { PaymentModal } from "@/components/app/payment-modal";
 import { StepUpModal } from "@/components/app/step-up-modal";
 import { OnchainDrawer } from "@/components/app/onchain-drawer";
 import { OnchainStamp } from "@/components/app/onchain-stamp";
+import { formatDate, formatDateTime } from "@/components/app/date-format";
 import {
   JourneyStepper,
   StatusBadge,
@@ -28,7 +29,12 @@ function ContractDetailContent({ id }: { id: string }) {
   const [onchainTxs, setOnchainTxs] = useState<OnchainTxDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("tong-quan");
+
+  const effectiveRole = contract?.myRole || role;
+  const isTenant = effectiveRole === "TENANT";
+  const isLandlord = effectiveRole === "LANDLORD";
 
   // Modals & Drawer
   const [activePayment, setActivePayment] = useState<PaymentDto | null>(null);
@@ -36,7 +42,7 @@ function ContractDetailContent({ id }: { id: string }) {
   const [stepUpData, setStepUpData] = useState<{
     action: "SIGN_CONTRACT" | "APPROVE_REFUND" | "RESPOND_DEDUCTION" | "RESOLVE_DISPUTE";
     title: string;
-    onSuccess: () => Promise<void>;
+    onSuccess: (stepUpToken: string) => Promise<void>;
   } | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -47,48 +53,93 @@ function ContractDetailContent({ id }: { id: string }) {
   const [disputeNoteInput, setDisputeNoteInput] = useState("Hai bên không thống nhất chi phí sửa chữa");
   const [agreedAmountInput, setAgreedAmountInput] = useState("");
 
+  const pollCountRef = useRef(0);
+  const MAX_POLLS = 15;
+
   const loadContract = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const data = await apiClient.getContractById(id, role === "TENANT" ? "TENANT" : "LANDLORD");
       setContract(data);
       const txs = await apiClient.getOnchainTxs(id);
       setOnchainTxs(txs);
-      setRefundAmountInput(data.depositAmount);
-      setAgreedAmountInput(data.depositAmount);
+      if (!refundAmountInput) setRefundAmountInput(data.depositAmount);
+      if (!agreedAmountInput) setAgreedAmountInput(data.depositAmount);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Không tìm thấy hợp đồng");
     } finally {
       setLoading(false);
     }
-  }, [id, role]);
+  }, [id, role, refundAmountInput, agreedAmountInput]);
 
   useEffect(() => {
     let ignore = false;
-    const fetchContract = async () => {
-      try {
-        const data = await apiClient.getContractById(id, role === "TENANT" ? "TENANT" : "LANDLORD");
-        const txs = await apiClient.getOnchainTxs(id);
+    apiClient
+      .getContractById(id, role === "TENANT" ? "TENANT" : "LANDLORD")
+      .then(async (data) => {
         if (!ignore) {
           setContract(data);
-          setOnchainTxs(txs);
-          setRefundAmountInput(data.depositAmount);
-          setAgreedAmountInput(data.depositAmount);
-          setLoading(false);
+          const txs = await apiClient.getOnchainTxs(id);
+          if (!ignore) {
+            setOnchainTxs(txs);
+            setRefundAmountInput(data.depositAmount);
+            setAgreedAmountInput(data.depositAmount);
+            setLoading(false);
+          }
         }
-      } catch (err: unknown) {
+      })
+      .catch((err: unknown) => {
         if (!ignore) {
           setError(err instanceof Error ? err.message : "Không tìm thấy hợp đồng");
           setLoading(false);
         }
-      }
-    };
-    fetchContract();
+      });
+
     return () => {
       ignore = true;
     };
   }, [id, role]);
+
+  // Polling with limit and unmount cleanup
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    let isActive = true;
+
+    const poll = async () => {
+      if (!isActive) return;
+      if (pollCountRef.current >= MAX_POLLS) return;
+
+      const hasPendingTx = onchainTxs.some((t) => t.status === "PENDING" || t.status === "SUBMITTED");
+      const needsPoll =
+        hasPendingTx ||
+        contract?.status === "PENDING_CONFIRMATION" ||
+        contract?.depositStatus === "UNPAID";
+
+      if (!needsPoll) return;
+
+      pollCountRef.current += 1;
+      try {
+        const data = await apiClient.getContractById(id, role === "TENANT" ? "TENANT" : "LANDLORD");
+        const txs = await apiClient.getOnchainTxs(id);
+        if (isActive) {
+          setContract(data);
+          setOnchainTxs(txs);
+        }
+      } catch {
+        // Ignored in passive background poll
+      }
+
+      if (isActive && pollCountRef.current < MAX_POLLS) {
+        timer = setTimeout(poll, 3000);
+      }
+    };
+
+    timer = setTimeout(poll, 3000);
+
+    return () => {
+      isActive = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [id, role, contract?.status, contract?.depositStatus, onchainTxs]);
 
   // Deep-linking with URL hash
   useEffect(() => {
@@ -110,85 +161,111 @@ function ContractDetailContent({ id }: { id: string }) {
 
   // Actions
   const handleConfirmContract = () => {
+    setActionError(null);
     setStepUpData({
       action: "SIGN_CONTRACT",
       title: "Ký xác nhận hợp đồng thuê",
-      onSuccess: async () => {
-        await apiClient.confirmContract(id, role === "TENANT" ? "TENANT" : "LANDLORD");
-        await loadContract();
+      onSuccess: async (stepUpToken: string) => {
+        try {
+          await apiClient.confirmContract(id, stepUpToken);
+          await loadContract();
+          switchTab("tien-coc");
+        } catch (err: unknown) {
+          console.error("[confirm contract client error]:", err);
+          setActionError(err instanceof Error ? err.message : "Ký xác nhận hợp đồng thất bại");
+        }
       },
     });
     setShowStepUp("CONFIRM");
   };
 
   const handlePayDeposit = async () => {
+    setActionError(null);
     try {
       const p = await apiClient.createDepositPayment(id);
       setActivePayment(p);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Lỗi tạo thanh toán");
+      setActionError(err instanceof Error ? err.message : "Lỗi tạo thanh toán tiền cọc");
     }
   };
 
   const handlePayRent = async (periodNo: number) => {
+    setActionError(null);
     try {
       const p = await apiClient.createRentPayment(id, periodNo);
       setActivePayment(p);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Lỗi tạo thanh toán");
+      setActionError(err instanceof Error ? err.message : "Lỗi tạo thanh toán tiền thuê");
     }
   };
 
   const handleProposeDeduction = async (e: React.FormEvent) => {
     e.preventDefault();
+    setActionError(null);
     try {
       await apiClient.proposeDeduction(id, deductionAmount, deductionReason);
       await loadContract();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Lỗi gửi đề xuất");
+      setActionError(err instanceof Error ? err.message : "Lỗi gửi đề xuất khấu trừ");
     }
   };
 
   const handleRespondDeduction = (deductionId: string, accept: boolean) => {
+    setActionError(null);
     setStepUpData({
       action: "RESPOND_DEDUCTION",
       title: accept ? "Chấp thuận khấu trừ tiền cọc" : "Từ chối khấu trừ & Chuyển sang Tranh chấp",
-      onSuccess: async () => {
-        await apiClient.respondDeduction(deductionId, accept);
-        await loadContract();
+      onSuccess: async (stepUpToken: string) => {
+        try {
+          await apiClient.respondDeduction(deductionId, accept, stepUpToken);
+          await loadContract();
+        } catch (err: unknown) {
+          setActionError(err instanceof Error ? err.message : "Phản hồi khấu trừ thất bại");
+        }
       },
     });
     setShowStepUp("RESPOND_DEDUCTION");
   };
 
   const handleOpenDispute = async () => {
+    setActionError(null);
     try {
       await apiClient.openDispute(id, disputeNoteInput);
       await loadContract();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Lỗi mở tranh chấp");
+      setActionError(err instanceof Error ? err.message : "Lỗi mở tranh chấp");
     }
   };
 
   const handleResolveDispute = () => {
+    setActionError(null);
     setStepUpData({
       action: "RESOLVE_DISPUTE",
       title: "Xác nhận số tiền giải quyết tranh chấp",
-      onSuccess: async () => {
-        await apiClient.resolveDispute(id, agreedAmountInput, role === "TENANT" ? "TENANT" : "LANDLORD");
-        await loadContract();
+      onSuccess: async (stepUpToken: string) => {
+        try {
+          await apiClient.resolveDispute(id, agreedAmountInput, stepUpToken);
+          await loadContract();
+        } catch (err: unknown) {
+          setActionError(err instanceof Error ? err.message : "Chốt thỏa thuận tranh chấp thất bại");
+        }
       },
     });
     setShowStepUp("RESOLVE_DISPUTE");
   };
 
   const handleApproveRefund = () => {
+    setActionError(null);
     setStepUpData({
       action: "APPROVE_REFUND",
       title: "Xác nhận số tiền hoàn cọc",
-      onSuccess: async () => {
-        await apiClient.approveRefund(id, refundAmountInput, role === "TENANT" ? "TENANT" : "LANDLORD");
-        await loadContract();
+      onSuccess: async (stepUpToken: string) => {
+        try {
+          await apiClient.approveRefund(id, refundAmountInput, stepUpToken);
+          await loadContract();
+        } catch (err: unknown) {
+          setActionError(err instanceof Error ? err.message : "Duyệt hoàn cọc thất bại");
+        }
       },
     });
     setShowStepUp("APPROVE_REFUND");
@@ -217,7 +294,8 @@ function ContractDetailContent({ id }: { id: string }) {
   }
 
   const isDisputed = contract.depositStatus === "PENDING_DISPUTE" || contract.disputeStatus !== "NONE";
-  const depositIsRecorded = contract.depositStatus === "RECORDED";
+  // Con dấu chỉ đóng khi có giao dịch thật CONFIRMED
+  const confirmedTx = onchainTxs.find((t) => t.status === "CONFIRMED");
 
   return (
     <div className="min-h-screen bg-paper flex flex-col">
@@ -236,12 +314,24 @@ function ContractDetailContent({ id }: { id: string }) {
 
           <button
             onClick={() => setDrawerOpen(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-surface border border-line text-xs font-bold text-ink hover:bg-line/20 transition-all cursor-pointer shadow-xs self-start sm:self-auto"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-surface border border-line text-xs font-bold text-ink hover:bg-line/20 transition-colors cursor-pointer shadow-xs self-start sm:self-auto"
           >
             <span>🔗</span> Bằng chứng On-chain
-            {depositIsRecorded && <span className="w-2 h-2 rounded-full bg-primary" />}
+            {confirmedTx && <span className="w-2 h-2 rounded-full bg-primary" />}
           </button>
         </div>
+
+        {actionError && (
+          <div role="alert" className="p-4 rounded-xl bg-brick/10 border border-brick/30 text-brick text-xs sm:text-sm flex items-center justify-between gap-2">
+            <span>⚠️ {actionError}</span>
+            <button
+              onClick={() => setActionError(null)}
+              className="text-xs font-bold hover:underline cursor-pointer"
+            >
+              Đóng
+            </button>
+          </div>
+        )}
 
         {/* Contract Header Card */}
         <section className="bg-paper rounded-panel border border-line p-6 sm:p-8 shadow-soft space-y-6">
@@ -269,7 +359,9 @@ function ContractDetailContent({ id }: { id: string }) {
               <div className="h-8 w-px bg-line" />
               <div>
                 <span className="text-ink/60 block">Tiền cọc:</span>
-                <MoneyAmount value={contract.depositAmount} size="sm" />
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <MoneyAmount value={contract.depositAmount} size="sm" />
+                </div>
               </div>
             </div>
           </div>
@@ -280,10 +372,11 @@ function ContractDetailContent({ id }: { id: string }) {
           </div>
         </section>
 
-        {/* 5 Tab Navigation */}
+        {/* 5 Tab Navigation with data-lenis-prevent */}
         <nav
           aria-label="Tabs hợp đồng"
           className="flex border-b border-line gap-2 sm:gap-6 overflow-x-auto text-xs sm:text-sm font-semibold select-none"
+          data-lenis-prevent
         >
           <button
             onClick={() => switchTab("tong-quan")}
@@ -350,15 +443,15 @@ function ContractDetailContent({ id }: { id: string }) {
                     <span>⚠️</span> Hợp đồng đang chờ ký xác nhận
                   </div>
                   <p>
-                    {role === "TENANT"
+                    {isTenant
                       ? "Chủ nhà đã tạo hợp đồng này. Vui lòng kiểm tra kỹ các điều khoản trước khi ký xác nhận."
                       : "Bạn đã tạo hợp đồng. Đang chờ Người thuê xác nhận và ký kết qua ứng dụng."}
                   </p>
                 </div>
-                {role === "TENANT" && (
+                {isTenant && (
                   <button
                     onClick={handleConfirmContract}
-                    className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-all shadow-xs cursor-pointer text-xs sm:text-sm whitespace-nowrap self-start sm:self-auto"
+                    className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors shadow-xs cursor-pointer text-xs sm:text-sm whitespace-nowrap self-start sm:self-auto"
                   >
                     Xác nhận & Ký hợp đồng
                   </button>
@@ -370,7 +463,7 @@ function ContractDetailContent({ id }: { id: string }) {
               <div className="p-4 rounded-xl bg-paper border border-line space-y-1">
                 <span className="text-xs text-ink/50">Thời hạn hợp đồng</span>
                 <div className="font-semibold text-ink">
-                  {contract.startDate} đến {contract.endDate}
+                  {formatDate(contract.startDate)} đến {formatDate(contract.endDate)}
                 </div>
               </div>
 
@@ -404,8 +497,8 @@ function ContractDetailContent({ id }: { id: string }) {
               <StatusBadge kind="deposit" status={contract.depositStatus} />
             </div>
 
-            {/* Stamp on recorded */}
-            {depositIsRecorded && (
+            {/* Stamp only when on-chain confirmed */}
+            {confirmedTx && (
               <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="space-y-1 text-center sm:text-left">
                   <div className="font-bold text-primary text-sm sm:text-base">
@@ -415,7 +508,7 @@ function ContractDetailContent({ id }: { id: string }) {
                     Khoản tiền này bị khóa ở trạng thái trung lập. Chỉ được giải ngân khi có sự đồng thuận của cả Chủ nhà và Người thuê.
                   </p>
                 </div>
-                <OnchainStamp timestamp={contract.startDate} />
+                <OnchainStamp timestamp={confirmedTx.createdAt} />
               </div>
             )}
 
@@ -430,10 +523,10 @@ function ContractDetailContent({ id }: { id: string }) {
                     Số tiền cọc cần nạp là <MoneyAmount value={contract.depositAmount} size="sm" />. Quét mã VietQR để hoàn tất nạp cọc.
                   </p>
                 </div>
-                {role === "TENANT" && (
+                {isTenant && (
                   <button
                     onClick={handlePayDeposit}
-                    className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-all shadow-xs cursor-pointer text-xs sm:text-sm whitespace-nowrap self-start sm:self-auto"
+                    className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors shadow-xs cursor-pointer text-xs sm:text-sm whitespace-nowrap self-start sm:self-auto"
                   >
                     Nạp tiền cọc ngay
                   </button>
@@ -472,7 +565,7 @@ function ContractDetailContent({ id }: { id: string }) {
               <span className="text-xs text-ink/60">{contract.rentPeriods.length} kỳ thuê</span>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" data-lenis-prevent>
               <table className="w-full text-left text-xs sm:text-sm">
                 <thead>
                   <tr className="border-b border-line text-ink/50 font-semibold">
@@ -490,7 +583,7 @@ function ContractDetailContent({ id }: { id: string }) {
                   {contract.rentPeriods.map((period) => (
                     <tr key={period.periodNo} className="hover:bg-paper/50 transition-colors">
                       <td className="py-3 px-3 font-bold text-ink">Kỳ {period.periodNo}</td>
-                      <td className="py-3 px-3 text-ink/80">{period.dueDate}</td>
+                      <td className="py-3 px-3 text-ink/80">{formatDate(period.dueDate)}</td>
                       <td className="py-3 px-3">
                         <MoneyAmount value={period.amountDue} size="sm" />
                       </td>
@@ -517,7 +610,7 @@ function ContractDetailContent({ id }: { id: string }) {
                         <StatusBadge kind="rent" status={period.status} />
                       </td>
                       <td className="py-3 px-3 text-right">
-                        {period.status !== "PAID" && role === "TENANT" && (
+                        {period.status !== "PAID" && isTenant && (
                           <button
                             onClick={() => handlePayRent(period.periodNo)}
                             className="px-3 py-1 rounded-lg bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-xs"
@@ -635,7 +728,7 @@ function ContractDetailContent({ id }: { id: string }) {
                         <p className="text-xs text-ink/80">{ded.reasonText}</p>
                       </div>
 
-                      {ded.status === "PROPOSED" && role === "TENANT" && (
+                      {ded.status === "PROPOSED" && isTenant && (
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleRespondDeduction(ded.id, true)}
@@ -657,7 +750,7 @@ function ContractDetailContent({ id }: { id: string }) {
               )}
 
               {/* Landlord Form to propose new deduction */}
-              {role === "LANDLORD" && contract.status === "ACTIVE" && (
+              {isLandlord && contract.status === "ACTIVE" && (
                 <form
                   onSubmit={handleProposeDeduction}
                   className="pt-3 border-t border-line space-y-3"
@@ -778,7 +871,7 @@ function ContractDetailContent({ id }: { id: string }) {
                 </p>
               </div>
 
-              {depositIsRecorded && <OnchainStamp timestamp={contract.startDate} />}
+              {confirmedTx && <OnchainStamp timestamp={confirmedTx.createdAt} />}
             </div>
 
             {/* Non-PII Banner */}
@@ -807,7 +900,7 @@ function ContractDetailContent({ id }: { id: string }) {
                 Các giao dịch Soroban đã ghi nhận ({onchainTxs.length}):
               </span>
 
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" data-lenis-prevent>
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-line text-ink/50 font-semibold">
@@ -829,7 +922,7 @@ function ContractDetailContent({ id }: { id: string }) {
                           {tx.txHash ? `${tx.txHash.slice(0, 10)}…${tx.txHash.slice(-6)}` : "—"}
                         </td>
                         <td className="py-3 px-3 text-ink/60">
-                          {new Date(tx.createdAt).toLocaleString("vi-VN")}
+                          {formatDateTime(tx.createdAt)}
                         </td>
                         <td className="py-3 px-3 text-right">
                           {tx.explorerUrl ? (
@@ -872,9 +965,9 @@ function ContractDetailContent({ id }: { id: string }) {
         <StepUpModal
           action={stepUpData.action}
           title={stepUpData.title}
-          onSuccess={async () => {
+          onSuccess={async (stepUpToken: string) => {
             setShowStepUp(null);
-            await stepUpData.onSuccess();
+            await stepUpData.onSuccess(stepUpToken);
           }}
           onCancel={() => setShowStepUp(null)}
         />

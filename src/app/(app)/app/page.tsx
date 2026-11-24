@@ -8,11 +8,12 @@ import { useSession } from "@/components/app/session-context";
 import { apiClient } from "@/components/app/api-client";
 import { LoadingSkeleton, EmptyState, ErrorState } from "@/components/app/ui-state";
 import { JourneyStepper, StatusBadge, MoneyAmount, MockBadge } from "@/components/shared";
+import { formatDate } from "@/components/app/date-format";
 import type { ContractSummaryDto } from "@/domain/dto";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, role } = useSession();
+  const { user, role, isLoading: sessionLoading } = useSession();
   const [contracts, setContracts] = useState<ContractSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,13 +57,11 @@ export default function DashboardPage() {
 
   // Filtered list
   const filteredContracts = contracts.filter((c) => {
-    // Filter status
     if (filter === "ACTIVE" && c.status !== "ACTIVE") return false;
     if (filter === "PENDING" && c.status !== "PENDING_CONFIRMATION") return false;
     if (filter === "DISPUTE" && c.depositStatus !== "PENDING_DISPUTE" && c.disputeStatus === "NONE") return false;
     if (filter === "ENDED" && c.status !== "ENDED") return false;
 
-    // Search query
     if (search.trim()) {
       const q = search.toLowerCase();
       const matchRoom = c.roomLabel.toLowerCase().includes(q);
@@ -101,6 +100,17 @@ export default function DashboardPage() {
     }
   });
 
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen bg-paper flex flex-col">
+        <AppNavbar />
+        <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+          <LoadingSkeleton lines={4} />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-paper flex flex-col">
       <AppNavbar />
@@ -128,14 +138,14 @@ export default function DashboardPage() {
             {role === "LANDLORD" && (
               <Link
                 href="/app/hop-dong/moi"
-                className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-all shadow-xs cursor-pointer text-sm whitespace-nowrap"
+                className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors shadow-xs cursor-pointer text-sm whitespace-nowrap"
               >
                 + Tạo hợp đồng mới
               </Link>
             )}
             <Link
               href="/bang-chung"
-              className="px-4 py-2.5 rounded-xl bg-paper border border-line text-ink font-semibold hover:bg-surface transition-all text-sm whitespace-nowrap"
+              className="px-4 py-2.5 rounded-xl bg-paper border border-line text-ink font-semibold hover:bg-surface transition-colors text-sm whitespace-nowrap"
             >
               Xem sổ cái On-chain
             </Link>
@@ -242,7 +252,7 @@ export default function DashboardPage() {
               {filteredContracts.map((c) => (
                 <div
                   key={c.id}
-                  className="bg-paper rounded-card border border-line p-5 sm:p-6 shadow-xs hover:shadow-soft transition-all flex flex-col justify-between space-y-5"
+                  className="bg-paper rounded-card border border-line p-5 sm:p-6 shadow-xs hover:shadow-soft transition-shadow flex flex-col justify-between space-y-5"
                 >
                   {/* Card top */}
                   <div className="space-y-3">
@@ -283,7 +293,7 @@ export default function DashboardPage() {
 
                   {/* Card footer */}
                   <div className="pt-3 border-t border-line flex items-center justify-between text-xs">
-                    <span className="text-ink/50">Hạn: {c.startDate} → {c.endDate}</span>
+                    <span className="text-ink/50">Hạn: {formatDate(c.startDate)} → {formatDate(c.endDate)}</span>
                     <Link
                       href={`/app/hop-dong/${c.id}`}
                       className="px-3.5 py-1.5 rounded-lg bg-primary/10 text-primary font-bold hover:bg-primary hover:text-paper transition-colors"

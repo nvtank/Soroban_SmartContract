@@ -4,21 +4,26 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { AppNavbar } from "@/components/app/app-navbar";
 import { apiClient } from "@/components/app/api-client";
-import { LoadingSkeleton, EmptyState } from "@/components/app/ui-state";
+import { LoadingSkeleton, EmptyState, ErrorState } from "@/components/app/ui-state";
 import { OnchainProofChip, MockBadge } from "@/components/shared";
+import { formatDateTime } from "@/components/app/date-format";
 import type { OnchainTxDto } from "@/domain/dto";
 
 export default function PublicProofPage() {
   const [txs, setTxs] = useState<OnchainTxDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterAction, setFilterAction] = useState<string>("ALL");
 
   const loadTxs = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const list = await apiClient.getOnchainTxs();
       setTxs(list);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Không thể tải danh sách giao dịch on-chain");
     } finally {
       setLoading(false);
     }
@@ -26,12 +31,20 @@ export default function PublicProofPage() {
 
   useEffect(() => {
     let ignore = false;
-    apiClient.getOnchainTxs().then((list) => {
-      if (!ignore) {
-        setTxs(list);
-        setLoading(false);
-      }
-    });
+    apiClient
+      .getOnchainTxs()
+      .then((list) => {
+        if (!ignore) {
+          setTxs(list);
+          setLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!ignore) {
+          setError(err instanceof Error ? err.message : "Không thể tải danh sách giao dịch on-chain");
+          setLoading(false);
+        }
+      });
     return () => {
       ignore = true;
     };
@@ -80,7 +93,7 @@ export default function PublicProofPage() {
 
         {/* Search & Filter Bar */}
         <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface/50 p-4 rounded-card border border-line">
-          <div className="flex items-center gap-2 overflow-x-auto text-xs font-semibold">
+          <div className="flex items-center gap-2 overflow-x-auto text-xs font-semibold" data-lenis-prevent>
             <button
               onClick={() => setFilterAction("ALL")}
               className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
@@ -148,13 +161,15 @@ export default function PublicProofPage() {
 
           {loading ? (
             <LoadingSkeleton lines={5} />
+          ) : error ? (
+            <ErrorState message={error} onRetry={loadTxs} />
           ) : filtered.length === 0 ? (
             <EmptyState
               title="Không tìm thấy giao dịch nào"
               description="Không có bản ghi blockchain nào khớp với bộ lọc hoặc từ khóa tra cứu."
             />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" data-lenis-prevent>
               <table className="w-full text-left text-xs sm:text-sm">
                 <thead>
                   <tr className="border-b border-line text-ink/50 font-semibold">
@@ -187,7 +202,7 @@ export default function PublicProofPage() {
                         {tx.txHash ? `${tx.txHash.slice(0, 10)}…${tx.txHash.slice(-8)}` : "—"}
                       </td>
                       <td className="py-3.5 px-3 text-xs text-ink/60">
-                        {new Date(tx.createdAt).toLocaleString("vi-VN")}
+                        {formatDateTime(tx.createdAt)}
                       </td>
                       <td className="py-3.5 px-3 text-right">
                         {tx.explorerUrl ? (
@@ -200,7 +215,7 @@ export default function PublicProofPage() {
                             Stellar Expert ↗
                           </a>
                         ) : (
-                          <span className="text-xs text-ink/40 italic">Dữ liệu mẫu</span>
+                          <span className="text-xs text-ink/40 italic">Chưa xác nhận explorer</span>
                         )}
                       </td>
                     </tr>
