@@ -141,7 +141,7 @@ type ProfileRow = {
  * Adapter bọc Supabase client thành DomainRepository.
  */
 export function createSupabaseDomainRepository(supabase: SupabaseClient): DomainRepository {
-  return {
+  const repo = {
     contracts: {
       findById: async (id: string): Promise<ContractEntity | null> => {
         const { data, error } = await supabase
@@ -188,7 +188,6 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
         if (updates.status !== undefined) row.status = updates.status;
         if (updates.tenant_id !== undefined) row.tenant_id = updates.tenant_id;
         if (updates.onchain_ref !== undefined) row.onchain_ref = updates.onchain_ref;
-        row.updated_at = new Date().toISOString();
 
         const { data, error } = await supabase
           .from("rental_contracts")
@@ -235,7 +234,6 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
           row.landlord_refund_amount = updates.landlord_refund_amount?.toString() ?? null;
         if (updates.tenant_refund_amount !== undefined)
           row.tenant_refund_amount = updates.tenant_refund_amount?.toString() ?? null;
-        row.updated_at = new Date().toISOString();
 
         const { data, error } = await supabase
           .from("deposits")
@@ -293,7 +291,6 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
         if (updates.amount_paid !== undefined) row.amount_paid = updates.amount_paid.toString();
         if (updates.late_days !== undefined) row.late_days = updates.late_days;
         if (updates.late_fee !== undefined) row.late_fee = updates.late_fee.toString();
-        row.updated_at = new Date().toISOString();
 
         const { data, error } = await supabase
           .from("rent_periods")
@@ -349,7 +346,6 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
       update: async (id: string, updates: Partial<DeductionEntity>): Promise<DeductionEntity> => {
         const row: Record<string, unknown> = {};
         if (updates.status !== undefined) row.status = updates.status;
-        row.updated_at = new Date().toISOString();
 
         const { data, error } = await supabase.from("deduction_requests").update(row).eq("id", id).select().single();
         if (error) throw error;
@@ -388,7 +384,6 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
           row.landlord_agreed_amount = updates.landlord_agreed_amount?.toString() ?? null;
         if (updates.tenant_agreed_amount !== undefined)
           row.tenant_agreed_amount = updates.tenant_agreed_amount?.toString() ?? null;
-        row.updated_at = new Date().toISOString();
 
         const { data, error } = await supabase
           .from("disputes")
@@ -551,6 +546,9 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
       },
     },
   };
+
+  (repo as any).from = supabase.from.bind(supabase);
+  return repo;
 }
 
 function mapContractRow(data: ContractRow): ContractEntity {
@@ -572,7 +570,7 @@ function mapContractRow(data: ContractRow): ContractEntity {
     status: data.status,
     onchain_ref: data.onchain_ref,
     created_at: data.created_at,
-    updated_at: data.updated_at,
+    updated_at: data.updated_at || data.created_at,
   };
 }
 
@@ -586,7 +584,7 @@ function mapDepositRow(data: DepositRow): DepositEntity {
     landlord_refund_amount: data.landlord_refund_amount != null ? BigInt(data.landlord_refund_amount) : null,
     tenant_refund_amount: data.tenant_refund_amount != null ? BigInt(data.tenant_refund_amount) : null,
     created_at: data.created_at,
-    updated_at: data.updated_at,
+    updated_at: data.updated_at || data.created_at,
   };
 }
 
@@ -601,7 +599,7 @@ function mapRentPeriodRow(data: RentPeriodRow): RentPeriodEntity {
     late_fee: BigInt(data.late_fee ?? 0),
     status: data.status,
     created_at: data.created_at,
-    updated_at: data.updated_at,
+    updated_at: data.updated_at || data.created_at,
   };
 }
 
@@ -615,7 +613,7 @@ function mapDeductionRow(data: DeductionRow): DeductionEntity {
     reason_hash: data.reason_hash,
     status: data.status,
     created_at: data.created_at,
-    updated_at: data.updated_at,
+    updated_at: data.updated_at || data.created_at,
   };
 }
 
@@ -628,7 +626,7 @@ function mapDisputeRow(data: DisputeRow): DisputeEntity {
     landlord_agreed_amount: data.landlord_agreed_amount != null ? BigInt(data.landlord_agreed_amount) : null,
     tenant_agreed_amount: data.tenant_agreed_amount != null ? BigInt(data.tenant_agreed_amount) : null,
     created_at: data.created_at,
-    updated_at: data.updated_at,
+    updated_at: data.updated_at || data.created_at,
   };
 }
 

@@ -13,10 +13,14 @@ export const POST = withApi(async (request: Request, context: { params: Promise<
   const db = createAdminSupabase();
   const repo = createSupabaseDomainRepository(db);
 
-  const updated = await confirmContract(repo, id, user, request, {
-    requireStepUp,
-    enqueueOnchain,
-  });
-
-  return ok(updated);
+  try {
+    const updated = await confirmContract(repo, id, user, request, {
+      requireStepUp,
+      enqueueOnchain,
+    });
+    return ok(updated);
+  } catch (err) {
+    console.error("[confirm route error]:", err);
+    throw err;
+  }
 });
