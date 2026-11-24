@@ -70,6 +70,12 @@ export interface StellarRpcClient {
   submitTransaction(tx: Transaction | FeeBumpTransaction): Promise<SubmitResult>;
   getTransaction(txHash: string): Promise<TxStatusResult>;
   pollTransaction(txHash: string, timeoutMs?: number, intervalMs?: number): Promise<TxStatusResult>;
+  /** Kiểm tra tài khoản đã tồn tại trên ledger hay chưa */
+  accountExists?(publicKey: string): Promise<boolean>;
+  /** Nạp tiền vào tài khoản Testnet qua Friendbot với thử lại có giới hạn */
+  fundTestnetAccount?(publicKey: string, maxAttempts?: number): Promise<boolean>;
+  /** Lấy số dư XLM của tài khoản */
+  getAccountBalanceXlm?(publicKey: string): Promise<number>;
 }
 
 export type CustodySignerCallback = <T>(

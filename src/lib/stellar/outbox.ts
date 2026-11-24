@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { Address, Keypair, authorizeEntry, Transaction, FeeBumpTransaction, xdr } from "@stellar/stellar-sdk";
+import { Address, Keypair, authorizeEntry, Transaction, FeeBumpTransaction, Networks, xdr } from "@stellar/stellar-sdk";
 import type { OnchainTxDto } from "@/domain/dto";
 import { ApiError } from "@/lib/api/http";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -49,19 +49,30 @@ async function scheduleBackgroundFlush(): Promise<void> {
       try {
         const { createAdminSupabase } = await import("@/lib/supabase/admin");
         const admin = createAdminSupabase();
-        // Mỗi vòng chỉ xử lý giao dịch đầu hàng của từng hợp đồng (giữ đúng thứ tự), nên lặp lại
-        // đến khi không còn tiến triển. Có giới hạn số vòng để không chạy vô hạn.
-        for (let round = 0; round < 24; round++) {
-          const { confirmed, failed } = await flushOnchain(admin, { limit: 5, pollTimeoutMs: 8000 });
-          if (failed > 0) break; // giao dịch lỗi chặn các giao dịch sau, chờ thử lại thủ công
-          if (confirmed > 0) continue;
-          // Không có tiến triển: chỉ chờ tiếp nếu vẫn còn giao dịch đang gửi hoặc đang chờ
+        // Mỗi vòng xử lý giao dịch đầu hàng của các hợp đồng (giữ đúng thứ tự FIFO).
+        // Lỗi của 1 hợp đồng không làm chặn các hợp đồng độc lập khác.
+        let consecutiveNoProgress = 0;
+        for (let round = 0; round < 30; round++) {
+          const { confirmed, failed } = await flushOnchain(admin, { limit: 10, pollTimeoutMs: 10000 });
+          // Kiểm tra xem còn giao dịch nào cần xử lý (PENDING hoặc SUBMITTED) không
           const { count } = await admin
             .from("onchain_txs")
             .select("id", { count: "exact", head: true })
             .in("status", ["PENDING", "SUBMITTED"]);
-          if (!count) break;
-          await new Promise((resolve) => setTimeout(resolve, 5000));
+          if (!count || count === 0) break;
+
+          if (confirmed > 0) {
+            consecutiveNoProgress = 0;
+            continue;
+          }
+
+          consecutiveNoProgress++;
+          if (consecutiveNoProgress >= 5) {
+            // Không có tiến triển trong 5 vòng liên tiếp (ví dụ tất cả các hàng đợi đều gặp lỗi chặn đầu)
+            break;
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 3000));
         }
       } catch {
         // Route /api/jobs/flush-onchain hoặc nút thử lại sẽ xử lý tiếp
@@ -72,7 +83,7 @@ async function scheduleBackgroundFlush(): Promise<void> {
   }
 }
 
-const DEFAULT_POLL_TIMEOUT_MS = 6000;
+const DEFAULT_POLL_TIMEOUT_MS = 10000;
 
 type GenericDb = {
   /** Repository bọc client Supabase (xem DomainRepository của lớp domain). */
@@ -353,7 +364,17 @@ export async function flushOnchain(
     }
 
     // TRƯỜNG HỢP A: Giao dịch là SUBMITTED -> Đối soát theo hash, không submit lại mù
-    if (head.status === "SUBMITTED" && head.tx_hash) {
+    if (head.status === "SUBMITTED") {
+      if (!head.tx_hash) {
+        // Giao dịch ở trạng thái SUBMITTED nhưng chưa có tx_hash (ví dụ worker gián đoạn trước khi gửi),
+        // đặt lại PENDING để gửi giao dịch mới an toàn.
+        await updateRecord(head.id, {
+          status: "PENDING",
+          locked_at: null,
+          locked_by: null,
+        });
+        continue;
+      }
       const checkRes = await client.getTransaction(head.tx_hash);
       if (checkRes.status === "SUCCESS") {
         await updateRecord(head.id, { status: "CONFIRMED", error: null, locked_at: null, locked_by: null });
@@ -488,34 +509,76 @@ export async function flushOnchain(
             sourcePublicKey: platformKeypair.publicKey(),
           });
 
-          // Ký Auth Entries: chỉ ký entry đúng địa chỉ của người ký, thời hạn tính từ ledger hiện tại,
-          // rồi dựng lại giao dịch vì Operation.auth là bất biến sau khi build.
+          // Ký Auth Entries và kiểm tra tài khoản:
+          // Với USER: bắt buộc kiểm tra tài khoản đã tồn tại trên mạng trước khi ký (nạp Friendbot nếu là Testnet).
           let txToSign: Transaction = transaction;
-          if (authEntries.length > 0 && head.signer.kind !== "PLATFORM") {
-            const latest = client.getLatestLedgerSequence ? await client.getLatestLedgerSequence() : 900;
-            const validUntilLedger = latest + 100;
-            const signEntriesWith = async (keypair: Keypair) => {
-              for (let i = 0; i < authEntries.length; i++) {
-                if (authEntryAddress(authEntries[i]) !== keypair.publicKey()) continue;
-                authEntries[i] = await authorizeEntry(
-                  authEntries[i],
-                  keypair,
-                  validUntilLedger,
-                  client.getNetworkPassphrase(),
-                );
+          const latest = client.getLatestLedgerSequence ? await client.getLatestLedgerSequence() : 900;
+          const validUntilLedger = latest + 100;
+          const signEntriesWith = async (keypair: Keypair) => {
+            for (let i = 0; i < authEntries.length; i++) {
+              if (authEntryAddress(authEntries[i]) !== keypair.publicKey()) continue;
+              authEntries[i] = await authorizeEntry(
+                authEntries[i],
+                keypair,
+                validUntilLedger,
+                client.getNetworkPassphrase(),
+              );
+            }
+          };
+
+          if (head.signer.kind === "USER") {
+            const signWithCustody = deps?.withCustodyKeypair ?? defaultWithCustodyKeypair;
+            await signWithCustody(db, head.signer.userId, async (keypair: Keypair) => {
+              const userPublicKey = keypair.publicKey();
+              const isTestnet =
+                client.getNetworkPassphrase() === Networks.TESTNET ||
+                client.getNetworkPassphrase() === "Test SDF Network ; September 2015";
+
+              // Kiểm tra tài khoản người dùng đã tồn tại trên mạng trước khi ký
+              if (client.accountExists) {
+                const exists = await client.accountExists(userPublicKey);
+                if (!exists) {
+                  if (!isTestnet) {
+                    throw new Error(
+                      "Ví người dùng chưa tồn tại trên mạng blockchain. Vui lòng nạp tiền trước khi thực hiện giao dịch.",
+                    );
+                  }
+                  // Trên Testnet: nạp bằng Friendbot với thử lại có giới hạn
+                  const funded = client.fundTestnetAccount
+                    ? await client.fundTestnetAccount(userPublicKey)
+                    : false;
+                  if (!funded) {
+                    throw new Error(
+                      "Không thể kích hoạt ví người dùng trên Stellar Testnet (Friendbot không phản hồi hoặc bị giới hạn tần suất). Vui lòng thử lại sau.",
+                    );
+                  }
+                  // Đợi và xác nhận tài khoản đã xuất hiện trên ledger
+                  let ready = false;
+                  for (let check = 0; check < 5; check++) {
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                    if (await client.accountExists(userPublicKey)) {
+                      ready = true;
+                      break;
+                    }
+                  }
+                  if (!ready) {
+                    throw new Error(
+                      "Ví người dùng đã được yêu cầu nạp qua Friendbot nhưng chưa ghi nhận trên ledger. Vui lòng thử lại sau vài giây.",
+                    );
+                  }
+                }
               }
-            };
 
-            if (head.signer.kind === "USER") {
-              const signWithCustody = deps?.withCustodyKeypair ?? defaultWithCustodyKeypair;
-              await signWithCustody(db, head.signer.userId, signEntriesWith);
-            } else if (head.signer.kind === "ORACLE") {
-              await signEntriesWith(oracleKeypair || platformKeypair);
-            }
+              if (authEntries.length > 0) {
+                await signEntriesWith(keypair);
+              }
+            });
+          } else if (head.signer.kind === "ORACLE" && authEntries.length > 0) {
+            await signEntriesWith(oracleKeypair || platformKeypair);
+          }
 
-            if (client.applyAuthEntries) {
-              txToSign = client.applyAuthEntries(transaction, authEntries);
-            }
+          if (authEntries.length > 0 && client.applyAuthEntries) {
+            txToSign = client.applyAuthEntries(transaction, authEntries);
           }
 
           // Ký phong bì giao dịch bằng khóa PLATFORM
@@ -645,6 +708,15 @@ export async function retryOnchainTx(
     await flushOnchain(db, { limit: 5, pollTimeoutMs: 3000 }, deps);
   } catch {
     // Background worker sẽ tiếp tục xử lý
+  }
+
+  // Lấy trạng thái mới nhất của bản ghi sau khi flush
+  if (genericDb && typeof genericDb.from === "function") {
+    const { data: latest } = await genericDb.from("onchain_txs").select("*").eq("id", txId).maybeSingle();
+    if (latest) record = latest;
+  } else if (genericDb && Array.isArray(genericDb.onchain_txs)) {
+    const latest = genericDb.onchain_txs.find((x: OnchainTxRecord) => x.id === txId);
+    if (latest) record = latest;
   }
 
   return {
