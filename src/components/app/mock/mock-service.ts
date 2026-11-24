@@ -4,6 +4,7 @@ import type {
   NotificationDto,
   OnchainTxDto,
   PaymentDto,
+  ChargeDto,
 } from "@/domain/dto";
 import {
   DEMO_USERS,
@@ -177,6 +178,7 @@ class MockService {
       ],
       deductions: [],
       dispute: null,
+      charges: [],
     };
 
     this.contracts.unshift(newContract);
@@ -236,6 +238,50 @@ class MockService {
 
     this.persist();
     return contract;
+  }
+
+  public createCharge(
+    contractId: string,
+    data: {
+      kind: "ELECTRICITY" | "WATER" | "SERVICE" | "OTHER";
+      amount: string;
+      note?: string;
+      periodNo?: number;
+    },
+  ): ChargeDto {
+    this.init();
+    const contract = this.contracts.find((c) => c.id === contractId);
+    if (!contract) throw new Error("Không tìm thấy hợp đồng");
+    if (!contract.charges) contract.charges = [];
+
+    const newCharge: ChargeDto = {
+      id: `chg-${Date.now()}`,
+      periodNo: data.periodNo ?? null,
+      kind: data.kind,
+      amount: data.amount,
+      note: data.note || null,
+      status: "UNPAID",
+      createdAt: new Date().toISOString(),
+      paidAt: null,
+    };
+    contract.charges.unshift(newCharge);
+    this.persist();
+    return newCharge;
+  }
+
+  public markChargePaid(contractId: string, chargeId: string): ChargeDto {
+    this.init();
+    const contract = this.contracts.find((c) => c.id === contractId);
+    if (!contract) throw new Error("Không tìm thấy hợp đồng");
+    if (!contract.charges) contract.charges = [];
+
+    const charge = contract.charges.find((ch) => ch.id === chargeId);
+    if (!charge) throw new Error("Không tìm thấy khoản phát sinh");
+
+    charge.status = "PAID";
+    charge.paidAt = new Date().toISOString();
+    this.persist();
+    return charge;
   }
 
   public createPayment(

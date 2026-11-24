@@ -189,6 +189,7 @@ export const INITIAL_CONTRACTS: ContractDetailDto[] = [
     ],
     deductions: [],
     dispute: null,
+    charges: [],
   },
 
   // 2. Hợp đồng đang hiệu lực (ACTIVE), cọc RECORDED, có kỳ quá hạn OVERDUE
@@ -250,6 +251,38 @@ export const INITIAL_CONTRACTS: ContractDetailDto[] = [
     ],
     deductions: [],
     dispute: null,
+    charges: [
+      {
+        id: "chg-001",
+        periodNo: 1,
+        kind: "ELECTRICITY",
+        amount: "350000",
+        note: "Tiền điện tháng 1 (chỉ số 120 kWh)",
+        status: "PAID",
+        createdAt: new Date(Date.now() - 3600000 * 650).toISOString(),
+        paidAt: new Date(Date.now() - 3600000 * 640).toISOString(),
+      },
+      {
+        id: "chg-002",
+        periodNo: 2,
+        kind: "WATER",
+        amount: "120000",
+        note: "Tiền nước sinh hoạt tháng 2",
+        status: "UNPAID",
+        createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+        paidAt: null,
+      },
+      {
+        id: "chg-003",
+        periodNo: null,
+        kind: "SERVICE",
+        amount: "200000",
+        note: "Phí dịch vụ vệ sinh và bảo trì chung",
+        status: "UNPAID",
+        createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+        paidAt: null,
+      },
+    ],
   },
 
   // 3. Hợp đồng đang có tranh chấp (PENDING_DISPUTE), khấu trừ bị từ chối
@@ -315,6 +348,7 @@ export const INITIAL_CONTRACTS: ContractDetailDto[] = [
       landlordAgreedAmount: "2500000",
       tenantAgreedAmount: "3500000",
     },
+    charges: [],
   },
 ];
 

@@ -69,6 +69,20 @@ export type DeductionDto = {
   createdAt: IsoDateTime;
 };
 
+export type ChargeKind = "ELECTRICITY" | "WATER" | "SERVICE" | "OTHER";
+export type ChargeStatus = "UNPAID" | "PAID";
+
+export type ChargeDto = {
+  id: string;
+  periodNo: number | null;
+  kind: ChargeKind;
+  amount: MoneyString;
+  note: string | null;
+  status: ChargeStatus;
+  createdAt: IsoDateTime;
+  paidAt: IsoDateTime | null;
+};
+
 export type DisputeDto = {
   status: DisputeStatus;
   openedBy: string | null;
@@ -85,6 +99,7 @@ export type ContractDetailDto = ContractSummaryDto & {
   rentPeriods: RentPeriodDto[];
   deductions: DeductionDto[];
   dispute: DisputeDto | null;
+  charges?: ChargeDto[];
 };
 
 export type PaymentDto = {

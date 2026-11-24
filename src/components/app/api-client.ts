@@ -4,7 +4,11 @@ import type {
   NotificationDto,
   OnchainTxDto,
   PaymentDto,
+  ChargeDto,
+  ChargeKind,
+  ChargeStatus,
 } from "@/domain/dto";
+export type { ChargeDto, ChargeKind, ChargeStatus };
 import { mockService, type PendingRecovery } from "./mock/mock-service";
 import { getPublicOnchainTxsAction } from "@/app/(app)/bang-chung/actions";
 import { getNotificationsAction, markNotificationReadAction } from "./notification-actions";
@@ -87,6 +91,40 @@ class ApiClient {
     return await this.request<ContractDetailDto>(`/api/contracts/${id}/confirm`, {
       method: "POST",
       headers: stepUpToken ? { "x-step-up-token": stepUpToken } : {},
+    });
+  }
+
+  // Charges (Khoản nợ phát sinh: điện, nước, dịch vụ)
+  async createCharge(
+    contractId: string,
+    data: {
+      kind: ChargeKind;
+      amount: string;
+      note?: string;
+      periodNo?: number;
+    },
+  ): Promise<ChargeDto> {
+    if (isMockEnabled()) {
+      return mockService.createCharge(contractId, data);
+    }
+    return await this.request<ChargeDto>(`/api/contracts/${contractId}/charges`, {
+      method: "POST",
+      body: JSON.stringify({
+        kind: data.kind,
+        amount: data.amount,
+        note: data.note,
+        periodNo: data.periodNo,
+      }),
+    });
+  }
+
+  async markChargePaid(contractId: string, chargeId: string): Promise<ChargeDto> {
+    if (isMockEnabled()) {
+      return mockService.markChargePaid(contractId, chargeId);
+    }
+    return await this.request<ChargeDto>(`/api/contracts/${contractId}/charges/${chargeId}/paid`, {
+      method: "POST",
+      body: JSON.stringify({}),
     });
   }
 
