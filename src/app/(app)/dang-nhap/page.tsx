@@ -14,12 +14,11 @@ function sanitizeInternalPath(url: string | null | undefined): string {
   return "/app";
 }
 
-const DEMO_PHONE_MAP: Record<string, { phone: string; role: "LANDLORD" | "TENANT" | "ADMIN_DEMO" }> = {
+const DEMO_PHONE_MAP: Record<string, { phone: string; role: "LANDLORD" | "TENANT" }> = {
   landlord: { phone: "0900000001", role: "LANDLORD" },
   tenant: { phone: "0900000002", role: "TENANT" },
   tenant1: { phone: "0900000002", role: "TENANT" },
   tenant2: { phone: "0900000003", role: "TENANT" },
-  admin: { phone: "0900000001", role: "ADMIN_DEMO" },
 };
 
 function LoginContent() {

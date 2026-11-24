@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { vi } from "@/i18n/vi";
+import Link from "next/link";
 
-/** Banner bắt buộc luôn hiển thị. Chiều cao được chia sẻ để navbar nằm ngay bên dưới. */
+/** Banner mô phỏng gọn nhẹ, bắt buộc giữ role="note" và luôn hiện trên mọi trang */
 export function DemoBanner() {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -22,8 +22,20 @@ export function DemoBanner() {
   }, []);
 
   return (
-    <div ref={ref} role="note" className="sticky top-0 z-[60] bg-ink px-4 py-2 text-center text-base text-paper">
-      {vi.demo.banner}
+    <div
+      ref={ref}
+      role="note"
+      title="Bản demo: ngân hàng và giải ngân là mô phỏng. Blockchain chạy trên Stellar Testnet, không có giá trị tiền thật."
+      className="sticky top-0 z-[60] w-full border-b border-line/60 bg-surface/90 py-1 px-3 text-center text-[11px] sm:text-xs font-medium text-ink/75 backdrop-blur-xs select-none"
+    >
+      <span>Bản demo · Ngân hàng và giải ngân là mô phỏng · Stellar Testnet</span>
+      <span className="hidden sm:inline text-ink/40"> — </span>
+      <Link
+        href="/minh-bach"
+        className="hidden sm:inline text-primary hover:underline transition-colors font-semibold ml-1"
+      >
+        Minh bạch
+      </Link>
     </div>
   );
 }
