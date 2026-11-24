@@ -5,7 +5,7 @@ import { assertRateLimit, getClientIp } from "@/lib/supabase/rate-limit";
 
 const RequestOtpSchema = z.object({
   phone: z.string().min(8).max(15).regex(/^[0-9+]+$/),
-  role: z.enum(["LANDLORD", "TENANT", "ADMIN_DEMO"]).optional(),
+  role: z.enum(["LANDLORD", "TENANT"]).optional(),
 });
 
 export const POST = withApi(async (request: Request) => {
@@ -57,7 +57,7 @@ export const POST = withApi(async (request: Request) => {
   await admin.from("auth_otps").insert({
     phone,
     code,
-    role: body.role || "TENANT",
+    role: body.role === "LANDLORD" ? "LANDLORD" : "TENANT",
     expires_at: expiresAt,
   });
 

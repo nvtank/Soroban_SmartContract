@@ -18,7 +18,11 @@ create or replace function public.check_rate_limit(
   p_key text,
   p_max_requests integer,
   p_window_seconds integer
-) returns boolean as $$
+) returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_count integer;
   v_now timestamptz := clock_timestamp();
@@ -41,4 +45,7 @@ begin
 
   return v_count <= p_max_requests;
 end;
-$$ language plpgsql security definer;
+$$;
+
+revoke execute on function public.check_rate_limit(text, integer, integer) from public, anon, authenticated;
+grant execute on function public.check_rate_limit(text, integer, integer) to service_role, postgres;

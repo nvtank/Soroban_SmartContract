@@ -9,7 +9,7 @@ import type { SessionUser } from "@/domain/dto";
 const VerifyOtpSchema = z.object({
   phone: z.string().min(8).max(15).regex(/^[0-9+]+$/),
   code: z.string().min(4).max(8),
-  role: z.enum(["LANDLORD", "TENANT", "ADMIN_DEMO"]).optional(),
+  role: z.enum(["LANDLORD", "TENANT"]).optional(),
   fullName: z.string().optional(),
 });
 
@@ -93,7 +93,7 @@ export const POST = withApi(async (request: Request) => {
   } else {
     // Create new user via seed_demo_user RPC
     const email = `${phone.replace(/\+/g, "")}@rentflow.local`;
-    const userRole = body.role || "TENANT";
+    const userRole = body.role === "LANDLORD" ? "LANDLORD" : "TENANT";
     const fullName =
       body.fullName ||
       (phone === "0900000001"

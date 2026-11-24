@@ -258,6 +258,258 @@ describe("RLS: Sensitive Tables Verification (auth_otps, auth_challenges, custod
     });
   });
 
+  describe("6. Privilege Escalation Prevention & Profiles Protection", () => {
+    it("PREVENTS authenticated user from updating their own role column to ADMIN_DEMO via PostgREST", async () => {
+      const client = await createTestUserSessionClient(emailB);
+      const { error } = await client
+        .from("profiles")
+        .update({ role: "ADMIN_DEMO" })
+        .eq("id", userBId);
+      expect(error).not.toBeNull();
+      expect(error?.message).toMatch(/permission denied/i);
+    });
+
+    it("PREVENTS authenticated user from updating their own role column to LANDLORD via PostgREST", async () => {
+      const client = await createTestUserSessionClient(emailB);
+      const { error } = await client
+        .from("profiles")
+        .update({ role: "LANDLORD" })
+        .eq("id", userBId);
+      expect(error).not.toBeNull();
+      expect(error?.message).toMatch(/permission denied/i);
+    });
+
+    it("ALLOWS authenticated user to update their safe full_name column via PostgREST", async () => {
+      const client = await createTestUserSessionClient(emailB);
+      const { error } = await client
+        .from("profiles")
+        .update({ full_name: "Tenant Updated Name" })
+        .eq("id", userBId);
+      expect(error).toBeNull();
+
+      const { data: profile } = await client
+        .from("profiles")
+        .select("full_name, role")
+        .eq("id", userBId)
+        .single();
+      expect(profile?.full_name).toBe("Tenant Updated Name");
+      expect(profile?.role).toBe("TENANT");
+    });
+
+    it("BLOCKS anonymous client from inserting or updating profiles directly", async () => {
+      const anon = createTestAnonClient();
+      const { error: insErr } = await anon.from("profiles").insert({
+        id: crypto.randomUUID(),
+        role: "ADMIN_DEMO",
+        full_name: "Anon Injected Admin",
+      });
+      expect(insErr).not.toBeNull();
+      expect(insErr?.message).toMatch(/permission denied/i);
+
+      const { error: updErr } = await anon.from("profiles").update({
+        role: "ADMIN_DEMO",
+      }).eq("id", userAId);
+      expect(updErr).not.toBeNull();
+      expect(updErr?.message).toMatch(/permission denied/i);
+    });
+
+    it("IGNORES role in signUp options.data and assigns TENANT role even if ADMIN_DEMO is requested", async () => {
+      const anon = createTestAnonClient();
+      const hackerEmail = `hacker_signup_${Date.now()}@rentflow.local`;
+      const { data: signUpData, error: signUpError } = await anon.auth.signUp({
+        email: hackerEmail,
+        password: "hacker-password-123",
+        options: {
+          data: {
+            role: "ADMIN_DEMO",
+            full_name: "Malicious Hacker",
+          },
+        },
+      });
+      expect(signUpError).toBeNull();
+      expect(signUpData.user).not.toBeNull();
+      const hackerId = signUpData.user!.id;
+
+      try {
+        // Query profile created by handle_new_user trigger via admin client
+        const { data: profile, error: profileError } = await admin
+          .from("profiles")
+          .select("id, role, full_name")
+          .eq("id", hackerId)
+          .single();
+
+        expect(profileError).toBeNull();
+        expect(profile).not.toBeNull();
+        expect(profile?.role).toBe("TENANT");
+        expect(profile?.role).not.toBe("ADMIN_DEMO");
+      } finally {
+        await admin.from("profiles").delete().eq("id", hackerId);
+        await admin.auth.admin.deleteUser(hackerId);
+      }
+    });
+  });
+
+  describe("7. PostgREST RPC Lockdown", () => {
+    it("BLOCKS anon client from executing any RPC functions via PostgREST", async () => {
+      const anon = createTestAnonClient();
+
+      const { error: errRate } = await anon.rpc("check_rate_limit", {
+        p_key: "anon_test",
+        p_max_requests: 5,
+        p_window_seconds: 60,
+      });
+      expect(errRate).not.toBeNull();
+
+      const { error: errSeed } = await anon.rpc("seed_demo_user", {
+        p_id: crypto.randomUUID(),
+        p_email: "anon_test@rentflow.local",
+        p_phone: "0999999991",
+        p_full_name: "Anon Seed Attempt",
+        p_role: "ADMIN_DEMO",
+      });
+      expect(errSeed).not.toBeNull();
+
+      const { error: errWhoami } = await anon.rpc("test_whoami");
+      expect(errWhoami).not.toBeNull();
+    });
+
+    it("BLOCKS authenticated client from executing sensitive RPC functions via PostgREST", async () => {
+      const client = await createTestUserSessionClient(emailA);
+
+      const { error: errRate } = await client.rpc("check_rate_limit", {
+        p_key: "user_test",
+        p_max_requests: 5,
+        p_window_seconds: 60,
+      });
+      expect(errRate).not.toBeNull();
+
+      const { error: errSeed } = await client.rpc("seed_demo_user", {
+        p_id: crypto.randomUUID(),
+        p_email: "user_test@rentflow.local",
+        p_phone: "0999999992",
+        p_full_name: "User Seed Attempt",
+        p_role: "ADMIN_DEMO",
+      });
+      expect(errSeed).not.toBeNull();
+
+      const { error: errWhoami } = await client.rpc("test_whoami");
+      expect(errWhoami).not.toBeNull();
+    });
+
+    it("ALLOWS internal service_role (admin) to execute functions like check_rate_limit", async () => {
+      const { data, error } = await admin.rpc("check_rate_limit", {
+        p_key: `service_role_test_${Date.now()}`,
+        p_max_requests: 5,
+        p_window_seconds: 60,
+      });
+      expect(error).toBeNull();
+      expect(data).toBe(true);
+    });
+  });
+
+  describe("8. PostgREST Business Logic Enforcement (Direct Mutation Blocked)", () => {
+    it("BLOCKS participant from modifying rental_contracts status or deposit_amount via PostgREST", async () => {
+      const clientA = await createTestUserSessionClient(emailA);
+
+      // Attempt to modify status (bypassing state machine)
+      const { error: errStatus } = await clientA
+        .from("rental_contracts")
+        .update({ status: "ENDED" })
+        .eq("id", contractABId);
+      expect(errStatus).not.toBeNull();
+      expect(errStatus?.message).toMatch(/permission denied/i);
+
+      // Attempt to modify deposit_amount
+      const { error: errDeposit } = await clientA
+        .from("rental_contracts")
+        .update({ deposit_amount: 1 })
+        .eq("id", contractABId);
+      expect(errDeposit).not.toBeNull();
+      expect(errDeposit?.message).toMatch(/permission denied/i);
+    });
+
+    it("BLOCKS client from inserting passkey_credentials directly (bypassing WebAuthn/step-up)", async () => {
+      const clientA = await createTestUserSessionClient(emailA);
+      const { error: errPasskey } = await clientA
+        .from("passkey_credentials")
+        .insert({
+          user_id: userAId,
+          credential_id: `forged_credential_${Date.now()}`,
+          public_key: "forged_pubkey",
+          counter: 0,
+        });
+      expect(errPasskey).not.toBeNull();
+      expect(errPasskey?.message).toMatch(/permission denied/i);
+    });
+
+    it("BLOCKS client from modifying recovery_requests status directly", async () => {
+      // Insert a test recovery request using admin
+      const insRec = await admin.from("recovery_requests").insert({
+        user_id: userAId,
+        phone: "0992000001",
+        status: "PENDING",
+        note: "Test recovery note",
+      }).select("id").single();
+      const recId = insRec.data!.id;
+
+      try {
+        const clientA = await createTestUserSessionClient(emailA);
+        const { error: errRecovery } = await clientA
+          .from("recovery_requests")
+          .update({ status: "APPROVED" })
+          .eq("id", recId);
+        expect(errRecovery).not.toBeNull();
+        expect(errRecovery?.message).toMatch(/permission denied/i);
+      } finally {
+        await admin.from("recovery_requests").delete().eq("id", recId);
+      }
+    });
+
+    it("BLOCKS client from modifying notification title, but ALLOWS updating read_at", async () => {
+      // Insert notification for user A via admin
+      const insNotif = await admin.from("notifications").insert({
+        user_id: userAId,
+        type: "CONTRACT_CONFIRMED",
+        title: "Original Notification Title",
+        body: "Notification body content",
+      }).select("id").single();
+      const notifId = insNotif.data!.id;
+
+      try {
+        const clientA = await createTestUserSessionClient(emailA);
+
+        // Attempt to update title -> REJECTED (permission denied for table notifications)
+        const { error: errTitle } = await clientA
+          .from("notifications")
+          .update({ title: "Forged Title By User" })
+          .eq("id", notifId);
+        expect(errTitle).not.toBeNull();
+        expect(errTitle?.message).toMatch(/permission denied/i);
+
+        // Update read_at -> ALLOWED
+        const nowIso = new Date().toISOString();
+        const { error: errReadAt } = await clientA
+          .from("notifications")
+          .update({ read_at: nowIso })
+          .eq("id", notifId);
+        expect(errReadAt).toBeNull();
+      } finally {
+        await admin.from("notifications").delete().eq("id", notifId);
+      }
+    });
+
+    it("BLOCKS anonymous client from selecting onchain_txs", async () => {
+      const anon = createTestAnonClient();
+      const { data: anonData, error: anonError } = await anon
+        .from("onchain_txs")
+        .select("*")
+        .eq("id", onchainTxId);
+      expect(anonError).not.toBeNull();
+      expect(anonError?.message).toMatch(/permission denied/i);
+      expect(anonData).toBeNull();
+    });
+  });
+
   afterAll(async () => {
     // Thorough cleanup of all test records, users, and wallets
     if (onchainTxId) await admin.from("onchain_txs").delete().eq("id", onchainTxId);
