@@ -36,14 +36,12 @@ export async function requireStepUp(
   const admin = createAdminSupabase();
 
   // 1. Check header
-  const tokenHeader = request.headers.get("x-step-up-token");
+  let tokenToVerify = request.headers.get("x-step-up-token");
 
   // In DEMO_MODE, support demo bypass token
-  if (process.env.DEMO_MODE === "true" && tokenHeader === "demo-step-up") {
+  if (process.env.DEMO_MODE === "true" && tokenToVerify === "demo-step-up") {
     return;
   }
-
-  let tokenToVerify = tokenHeader;
 
   // 2. If not in header, attempt to inspect body for stepUpToken if JSON
   if (!tokenToVerify) {
@@ -62,42 +60,44 @@ export async function requireStepUp(
     return;
   }
 
-  if (tokenToVerify) {
-    const { data: challenge } = await admin
-      .from("auth_challenges")
-      .select("id, expires_at")
-      .eq("user_id", userId)
-      .eq("type", "STEP_UP")
-      .eq("action", action)
-      .eq("challenge", tokenToVerify)
-      .gt("expires_at", new Date().toISOString())
-      .maybeSingle();
-
-    if (challenge) {
-      // Consume token once verified
-      await admin.from("auth_challenges").delete().eq("id", challenge.id);
-      return;
-    }
+  if (!tokenToVerify) {
+    throw new ApiError(
+      "FORBIDDEN",
+      { stepUpRequired: true, action },
+      "Yêu cầu xác thực bảo mật (Passkey hoặc OTP) cho hành động này.",
+    );
   }
 
-  // 3. Fallback: check recent verified step-up within 5 minutes for this user & action
-  const { data: recent } = await admin
+  // 3. Verify single-use step-up token:
+  // - Must belong to exact userId
+  // - Must match EXACT action
+  // - Must not be expired
+  const now = new Date().toISOString();
+  const { data: challenge } = await admin
     .from("auth_challenges")
-    .select("id, expires_at")
+    .select("id, action, user_id, expires_at")
     .eq("user_id", userId)
     .eq("type", "STEP_UP")
     .eq("action", action)
-    .gt("expires_at", new Date().toISOString())
+    .eq("challenge", tokenToVerify)
+    .gt("expires_at", now)
     .maybeSingle();
 
-  if (recent) {
-    await admin.from("auth_challenges").delete().eq("id", recent.id);
-    return;
+  if (!challenge) {
+    throw new ApiError(
+      "FORBIDDEN",
+      { stepUpRequired: true, action },
+      "Mã xác thực bảo mật không hợp lệ, sai hành động hoặc đã hết hạn.",
+    );
   }
 
-  throw new ApiError(
-    "FORBIDDEN",
-    { stepUpRequired: true, action },
-    "Yêu cầu xác thực bảo mật (Passkey hoặc OTP) cho hành động này.",
-  );
+  // 4. Consume immediately - single-use only! (Prevents token replay)
+  const { error } = await admin
+    .from("auth_challenges")
+    .delete()
+    .eq("id", challenge.id);
+
+  if (error) {
+    throw new ApiError("INTERNAL_ERROR", undefined, "Không thể xác thực phiên bảo mật.");
+  }
 }

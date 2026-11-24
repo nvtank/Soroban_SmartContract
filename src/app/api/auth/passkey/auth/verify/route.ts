@@ -4,6 +4,7 @@ import { withApi, parseJson, ok, ApiError } from "@/lib/api/http";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { verifyPasskeyAuth } from "@/lib/crypto/passkey";
 import { createCustodyWallet } from "@/lib/crypto/custody";
+import { assertRateLimit, getClientIp } from "@/lib/supabase/rate-limit";
 import type { SessionUser } from "@/domain/dto";
 
 const VerifyAuthSchema = z.object({
@@ -16,10 +17,20 @@ const VerifyAuthSchema = z.object({
 });
 
 export const POST = withApi(async (request: Request) => {
-  const body = await parseJson(request, VerifyAuthSchema);
   const admin = createAdminSupabase();
+  const clientIp = getClientIp(request);
 
-  const { verified, userId } = await verifyPasskeyAuth(admin, body);
+  // Rate limit: max 30 auth verify attempts per 5 minutes per IP
+  await assertRateLimit(
+    admin,
+    `passkey:auth:ver:${clientIp}`,
+    30,
+    300,
+    "Quá nhiều lần thử xác thực Passkey từ địa chỉ IP này. Vui lòng thử lại sau.",
+  );
+
+  const body = await parseJson(request, VerifyAuthSchema);
+  const { verified, userId } = await verifyPasskeyAuth(admin, body as unknown as Parameters<typeof verifyPasskeyAuth>[1]);
 
   if (!verified || !userId) {
     throw new ApiError("UNAUTHENTICATED", undefined, "Xác thực Passkey thất bại.");
@@ -51,6 +62,14 @@ export const POST = withApi(async (request: Request) => {
     cookieStore.set("rentflow_demo_user_id", user.id, {
       httpOnly: true,
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+    });
+    cookieStore.set("rentflow_demo_user_role", user.role, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 7 * 24 * 60 * 60,
     });

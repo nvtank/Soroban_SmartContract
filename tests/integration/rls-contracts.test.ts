@@ -145,6 +145,7 @@ describe("RLS: Contract Isolation between Users", () => {
     if (contractCB) await admin.from("rental_contracts").delete().eq("id", contractCB);
     for (const id of [userAId, userBId, userCId]) {
       if (id) {
+        await admin.from("custody_wallets").delete().eq("user_id", id);
         await admin.from("profiles").delete().eq("id", id);
         await admin.auth.admin.deleteUser(id);
       }
