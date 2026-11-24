@@ -6,7 +6,7 @@ Chỉ ghi những gì đã thật sự chạy. Mọi số liệu lấy từ lầ
 
 | Bộ kiểm thử | Kết quả | Lệnh |
 |---|---|---|
-| Unit và tích hợp (Vitest) | 44 tệp, **315/315 đạt** | `pnpm test` |
+| Unit và tích hợp (Vitest) | 50 tệp, **382/382 đạt** | `pnpm test` |
 | E2E trên trình duyệt thật (Playwright) | 7 tệp, **24/24 đạt**, 1 bỏ qua (kịch bản video) | `pnpm e2e` |
 | Video dự phòng kịch bản demo | 5 bước, **12.58 MB (50.16s)** tại `demo-assets/demo-backup.webm` | `pnpm e2e:video` |
 | Smart contract (Rust) | **29/29 đạt**, gồm test đối kháng và chuỗi lệnh ngẫu nhiên | `cd contracts/rentflow && cargo test` |
@@ -81,7 +81,7 @@ Các lỗi này lọt qua test đơn vị và chỉ lộ ra khi chạy thật:
 - Thiết bị di động thật và Passkey trên điện thoại thật (mới kiểm thử trên Chromium viewport 390x844 và Passkey ảo Chrome).
 - payOS thật (chưa có khóa): tạo link, webhook ký thật, đối soát.
 - Nút "Kiểm tra lại" qua giao diện ở các tình huống mạng chập chờn.
-- Hoàn cọc, giải quyết tranh chấp và `mark_overdue` đã chạy thật trên chain, nhưng chưa chạy chéo nhiều hợp đồng cùng lúc với tải lớn.
+- Thử tải đã làm ở mức nhỏ: 5 hợp đồng song song, 15 giao dịch, 15 xác nhận, 0 lỗi (`scripts/chain-stress.mjs`, Agent D). Chưa thử mức lớn hơn. Hoàn cọc, giải quyết tranh chấp và `mark_overdue` đã chạy thật trên chain, nhưng chưa chạy chéo với tải lớn.
 
 ## 7. Số đo cuộn trang chủ
 

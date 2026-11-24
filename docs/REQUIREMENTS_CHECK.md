@@ -24,7 +24,7 @@ Contract Testnet: `CCDNF4D4HRIDYSHBEOV2IYC2XQSTD7VPSFZ4NSGCT2QVDPJ7RX4UBVXU`.
 | Ghi nhận đã trả, còn thiếu, số ngày trễ | Đạt | Thiếu thì kỳ sang Thanh toán một phần. Phí trễ = tiền thuê × bps/ngày × số ngày / 10000, đã đối chiếu số liệu thật. |
 | Chủ nhà gia hạn hoặc điều chỉnh phí trễ | Đạt | Mới làm: chỉ chủ nhà, đổi hạn, miễn phí trễ, ghi `extend_due` lên chain. **Điều chỉnh phí trễ theo số tiền tùy ý chưa có**, chỉ có gia hạn kèm miễn phí trễ. |
 | Quá hạn thì cập nhật trạng thái và thông báo | Đạt | Quét quá hạn chạy tay (nút admin) hoặc bằng cron. Chưa gắn cron trên Vercel. |
-| Ghi nhận khoản nợ điện, nước, phí dịch vụ | Chưa | Hệ thống chỉ có tiền thuê và phí trễ. |
+| Ghi nhận khoản nợ điện, nước, phí dịch vụ | Một phần | Chủ nhà ghi nhận khoản nợ và đánh dấu đã nhận (chỉ trong database, không lên chain, không thanh toán qua VietQR). Có nhắc trước hạn. |
 | Khấu trừ cọc có lý do và số tiền | Đạt | Lý do lưu ở database, on-chain chỉ có hash có muối. |
 | Người thuê chấp nhận hoặc từ chối khấu trừ | Đạt | |
 
@@ -42,7 +42,7 @@ Contract Testnet: `CCDNF4D4HRIDYSHBEOV2IYC2XQSTD7VPSFZ4NSGCT2QVDPJ7RX4UBVXU`.
 | 4. Thanh toán thiếu hoặc thừa | Đạt | Chạy thật: thiếu thì chưa ghi nhận cọc, thừa thì vẫn ghi đủ và lưu phần thừa, không tự hoàn. |
 | 5. Một bên không xác nhận hoàn cọc | Đạt | Giữ Chờ hoàn cọc, không giải ngân. Có thông báo nhắc bên kia. |
 | 6. Hai bên không thống nhất khấu trừ | Đạt | Chuyển Chờ xử lý tranh chấp, khóa cọc. |
-| 7. Mất quyền truy cập, khôi phục tài khoản | Một phần | Có API và màn hình mô phỏng (OTP, eKYC giả, admin duyệt, thu hồi Passkey cũ). **Chưa chạy qua giao diện**, chỉ có test đơn vị và API. |
+| 7. Mất quyền truy cập, khôi phục tài khoản | Một phần | Có API và màn hình mô phỏng (OTP, eKYC giả, admin duyệt, thu hồi Passkey cũ). Đã chạy qua giao diện thật bằng Playwright: nhập số, OTP, eKYC giả, yêu cầu chờ quản trị duyệt, quản trị duyệt, người dùng bấm kiểm tra lại. **Chưa cấp Passkey mới trên thiết bị thật** (cần thiết bị Passkey). |
 
 ## 4. Đầu ra Demo (mục 10.6)
 
@@ -83,7 +83,7 @@ Contract Testnet: `CCDNF4D4HRIDYSHBEOV2IYC2XQSTD7VPSFZ4NSGCT2QVDPJ7RX4UBVXU`.
 - Chạy ổn định: Đạt trên local. Online: Chưa.
 - Giao dịch thật với Testnet: Đạt.
 - Luồng từ thao tác người dùng đến backend và contract: Đạt.
-- Phương án dự phòng: Một phần. Có chế độ thanh toán mô phỏng và dữ liệu có sẵn bằng chứng on-chain. **Chưa quay video dự phòng.**
+- Phương án dự phòng: Một phần. Có chế độ thanh toán mô phỏng và dữ liệu có sẵn bằng chứng on-chain. Đã có kịch bản quay tự động `pnpm e2e:video` (khoảng 50 giây, tệp webm không đưa lên git); **cần quay lại trên máy trình diễn trước buổi thi** vì dữ liệu và giao diện còn đổi.
 
 ## 6. Những điểm trong tài liệu bạn dán cần sửa lại cho khớp sản phẩm
 
@@ -103,7 +103,7 @@ Sản phẩm cung cấp tài liệu thô cho: 3.2 kiến trúc (`docs/CONTRACTS.
 
 1. Deploy Demo Online (Vercel, Supabase cloud) trước 06/12.
 2. Thử Passkey trên điện thoại thật.
-3. Quay video dự phòng.
-4. Chạy qua giao diện: khôi phục tài khoản, nút "Kiểm tra lại".
+3. Quay lại video dự phòng trên máy trình diễn.
+4. Nút "Kiểm tra lại" khi mạng chập chờn.
 5. Tìm nguồn cho hai con số PCCC.
-6. Playwright E2E chính thức, đo hiệu năng bằng Lighthouse.
+6. Đo hiệu năng bằng Lighthouse.

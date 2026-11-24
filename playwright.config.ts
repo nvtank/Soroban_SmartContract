@@ -3,8 +3,7 @@ import * as fs from "node:fs";
 
 const defaultChrome = "/run/current-system/sw/bin/google-chrome-stable";
 const chromePath =
-  process.env.PLAYWRIGHT_CHROME_PATH ||
-  (fs.existsSync(defaultChrome) ? defaultChrome : undefined);
+  process.env.PLAYWRIGHT_CHROME_PATH || (fs.existsSync(defaultChrome) ? defaultChrome : undefined);
 
 /**
  * E2E bấm chuột thật trên giao diện ở chế độ không mock, cần app đang chạy và Supabase local.
@@ -13,6 +12,8 @@ const chromePath =
  */
 export default defineConfig({
   testDir: "tests/e2e",
+  // mobile-check.spec.ts cần một máy chủ riêng ở chế độ dữ liệu mẫu (cổng 3113); chỉ chạy khi bật cờ này.
+  testIgnore: process.env.E2E_MOBILE_MOCK === "1" ? [] : ["**/mobile-check.spec.ts"],
   timeout: 300_000,
   expect: { timeout: 20_000 },
   workers: 1,
