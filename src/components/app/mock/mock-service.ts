@@ -16,7 +16,7 @@ import {
 export interface PendingRecovery {
   id: string;
   phone: string;
-  status: "PENDING" | "APPROVED" | "REJECTED";
+  status: "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED";
   createdAt: string;
 }
 
@@ -799,7 +799,7 @@ class MockService {
     if (r.status !== "APPROVED") {
       throw new Error(`Yêu cầu khôi phục chưa được phê duyệt (Trạng thái: ${r.status}).`);
     }
-    r.status = "COMPLETED" as any;
+    r.status = "COMPLETED";
     this.persist();
     return {
       requestId,

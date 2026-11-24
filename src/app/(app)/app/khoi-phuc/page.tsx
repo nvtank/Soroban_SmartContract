@@ -6,12 +6,14 @@ import { AppNavbar } from "@/components/app/app-navbar";
 import { apiClient } from "@/components/app/api-client";
 import { MockBadge } from "@/components/shared";
 
+type RecoveryStatus = "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED";
+
 export default function AccountRecoveryPage() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [phone, setPhone] = useState("0900000002");
   const [otp, setOtp] = useState("123456");
   const [requestId, setRequestId] = useState<string | null>(null);
-  const [recoveryStatus, setRecoveryStatus] = useState<"PENDING" | "APPROVED" | "REJECTED" | "COMPLETED">("PENDING");
+  const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus>("PENDING");
   const [loading, setLoading] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export default function AccountRecoveryPage() {
       try {
         const rec = await apiClient.getRecoveryById(requestId);
         if (isActive && rec && rec.status !== recoveryStatus) {
-          setRecoveryStatus(rec.status as any);
+          setRecoveryStatus(rec.status as RecoveryStatus);
         }
       } catch {
         // passive poll
@@ -53,7 +55,7 @@ export default function AccountRecoveryPage() {
         "Yêu cầu khôi phục quyền truy cập (mô phỏng).",
       );
       setRequestId(res.id);
-      setRecoveryStatus((res.status as any) || "PENDING");
+      setRecoveryStatus((res.status as RecoveryStatus) || "PENDING");
       setStep(2);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Gửi yêu cầu khôi phục thất bại.");
@@ -109,7 +111,7 @@ export default function AccountRecoveryPage() {
     try {
       const rec = await apiClient.getRecoveryById(requestId);
       if (rec) {
-        setRecoveryStatus(rec.status as any);
+        setRecoveryStatus(rec.status as RecoveryStatus);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Không thể kiểm tra trạng thái lúc này.");

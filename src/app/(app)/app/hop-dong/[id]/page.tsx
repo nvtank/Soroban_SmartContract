@@ -12,7 +12,7 @@ import { OnchainDrawer } from "@/components/app/onchain-drawer";
 import { OnchainStamp } from "@/components/app/onchain-stamp";
 import { formatDate, formatDateTime } from "@/components/app/date-format";
 import { JourneyStepper, StatusBadge, MoneyAmount, OnchainProofChip, MockBadge } from "@/components/shared";
-import type { ContractDetailDto, PaymentDto, OnchainTxDto, ChargeDto } from "@/domain/dto";
+import type { ContractDetailDto, PaymentDto, OnchainTxDto, ChargeDto, ChargeKind } from "@/domain/dto";
 
 type TabKey = "tong-quan" | "tien-coc" | "tien-thue" | "hoan-coc" | "bang-chung";
 
@@ -380,7 +380,7 @@ function ContractDetailContent({ id }: { id: string }) {
     <div className="min-h-screen bg-paper flex flex-col">
       <AppNavbar />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 min-w-0">
         {/* Breadcrumb & Quick actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-xs sm:text-sm text-ink/60">
@@ -457,7 +457,7 @@ function ContractDetailContent({ id }: { id: string }) {
         {/* 5 Tab Navigation with data-lenis-prevent */}
         <nav
           aria-label="Tabs hợp đồng"
-          className="flex border-b border-line gap-2 sm:gap-6 overflow-x-auto text-xs sm:text-sm font-semibold select-none"
+          className="flex border-b border-line gap-2 sm:gap-6 overflow-x-auto text-xs sm:text-sm font-semibold select-none w-full max-w-full min-w-0"
           data-lenis-prevent
         >
           <button
@@ -514,7 +514,7 @@ function ContractDetailContent({ id }: { id: string }) {
 
         {/* TAB 1: TỔNG QUAN */}
         {activeTab === "tong-quan" && (
-          <section className="bg-surface/40 rounded-card border border-line p-6 sm:p-8 space-y-6">
+          <section className="bg-surface/40 rounded-card border border-line p-4 sm:p-6 lg:p-8 space-y-6 w-full max-w-full min-w-0">
             <h2 className="text-lg sm:text-xl font-bold text-ink">Thông tin hợp đồng</h2>
 
             {/* Confirmation Banner if PENDING_CONFIRMATION */}
@@ -573,7 +573,7 @@ function ContractDetailContent({ id }: { id: string }) {
 
         {/* TAB 2: TIỀN CỌC */}
         {activeTab === "tien-coc" && (
-          <section className="bg-surface/40 rounded-card border border-line p-6 sm:p-8 space-y-6">
+          <section className="bg-surface/40 rounded-card border border-line p-4 sm:p-6 lg:p-8 space-y-6 w-full max-w-full min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-lg sm:text-xl font-bold text-ink">Bảo chứng tiền cọc</h2>
               <StatusBadge kind="deposit" status={contract.depositStatus} />
@@ -675,7 +675,7 @@ function ContractDetailContent({ id }: { id: string }) {
           };
 
           return (
-            <section className="bg-surface/40 rounded-card border border-line p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
+            <section className="bg-surface/40 rounded-card border border-line p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 w-full max-w-full min-w-0">
               {/* 1. DÒNG TỔNG CÔNG NỢ */}
               <div className="p-4 sm:p-6 rounded-panel bg-paper border border-line shadow-xs space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-3">
@@ -718,7 +718,7 @@ function ContractDetailContent({ id }: { id: string }) {
                   <span className="text-xs text-ink/60">{contract.rentPeriods.length} kỳ thuê</span>
                 </div>
 
-                <div className="overflow-x-auto" data-lenis-prevent>
+                <div className="overflow-x-auto w-full max-w-full min-w-0" data-lenis-prevent>
                   <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[600px]">
                     <thead>
                       <tr className="border-b border-line text-ink/50 font-semibold">
@@ -830,7 +830,7 @@ function ContractDetailContent({ id }: { id: string }) {
                 </div>
 
                 {/* Bảng các khoản phát sinh */}
-                <div className="overflow-x-auto" data-lenis-prevent>
+                <div className="overflow-x-auto w-full max-w-full min-w-0" data-lenis-prevent>
                   <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[600px]">
                     <thead>
                       <tr className="border-b border-line text-ink/50 font-semibold">
@@ -922,7 +922,7 @@ function ContractDetailContent({ id }: { id: string }) {
                         </label>
                         <select
                           value={chargeKind}
-                          onChange={(e) => setChargeKind(e.target.value as any)}
+                          onChange={(e) => setChargeKind(e.target.value as ChargeKind)}
                           className="w-full px-3 py-2.5 rounded-xl border border-line bg-surface text-ink text-xs sm:text-sm focus:outline-primary cursor-pointer"
                         >
                           <option value="ELECTRICITY">Tiền điện</option>
@@ -1122,17 +1122,17 @@ function ContractDetailContent({ id }: { id: string }) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                 <input
                   type="number"
                   value={refundAmountInput}
                   onChange={(e) => setRefundAmountInput(e.target.value)}
                   placeholder="Số tiền hoàn trả (₫)"
-                  className="px-3.5 py-2 rounded-xl border border-line bg-surface text-xs sm:text-sm font-mono w-48 focus:outline-primary"
+                  className="px-3.5 py-2.5 rounded-xl border border-line bg-surface text-xs sm:text-sm font-mono w-full sm:w-48 focus:outline-primary"
                 />
                 <button
                   onClick={handleApproveRefund}
-                  className="px-4 py-2 rounded-xl bg-primary text-paper text-xs sm:text-sm font-bold hover:bg-primary-strong transition-colors cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-primary text-paper text-xs sm:text-sm font-bold hover:bg-primary-strong transition-colors cursor-pointer text-center"
                 >
                   Xác nhận hoàn cọc
                 </button>
@@ -1228,17 +1228,17 @@ function ContractDetailContent({ id }: { id: string }) {
               </h3>
 
               {!isDisputed ? (
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <input
                     type="text"
                     value={disputeNoteInput}
                     onChange={(e) => setDisputeNoteInput(e.target.value)}
                     placeholder="Lý do mở tranh chấp..."
-                    className="flex-1 px-3.5 py-2 rounded-xl border border-line bg-surface text-xs sm:text-sm"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-line bg-surface text-xs sm:text-sm"
                   />
                   <button
                     onClick={handleOpenDispute}
-                    className="px-4 py-2 rounded-xl bg-brick/15 text-brick border border-brick/40 text-xs sm:text-sm font-bold hover:bg-brick/25 cursor-pointer whitespace-nowrap"
+                    className="px-4 py-2.5 rounded-xl bg-brick/15 text-brick border border-brick/40 text-xs sm:text-sm font-bold hover:bg-brick/25 cursor-pointer whitespace-nowrap text-center"
                   >
                     Mở tranh chấp & Khóa cọc
                   </button>
@@ -1269,17 +1269,17 @@ function ContractDetailContent({ id }: { id: string }) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                     <input
                       type="number"
                       value={agreedAmountInput}
                       onChange={(e) => setAgreedAmountInput(e.target.value)}
                       placeholder="Số tiền thỏa thuận (₫)"
-                      className="px-3.5 py-2 rounded-xl border border-line bg-surface text-xs sm:text-sm font-mono w-48"
+                      className="px-3.5 py-2.5 rounded-xl border border-line bg-surface text-xs sm:text-sm font-mono w-full sm:w-48"
                     />
                     <button
                       onClick={handleResolveDispute}
-                      className="px-4 py-2 rounded-xl bg-primary text-paper text-xs sm:text-sm font-bold hover:bg-primary-strong cursor-pointer whitespace-nowrap"
+                      className="px-4 py-2.5 rounded-xl bg-primary text-paper text-xs sm:text-sm font-bold hover:bg-primary-strong cursor-pointer whitespace-nowrap text-center"
                     >
                       Xác nhận số tiền đồng thuận
                     </button>
@@ -1296,7 +1296,7 @@ function ContractDetailContent({ id }: { id: string }) {
 
         {/* TAB 5: BẰNG CHỨNG ON-CHAIN */}
         {activeTab === "bang-chung" && (
-          <section className="bg-surface/40 rounded-card border border-line p-6 sm:p-8 space-y-6">
+          <section className="bg-surface/40 rounded-card border border-line p-4 sm:p-6 lg:p-8 space-y-6 w-full max-w-full min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg sm:text-xl font-bold text-ink">
@@ -1338,7 +1338,7 @@ function ContractDetailContent({ id }: { id: string }) {
                 Các giao dịch Soroban đã ghi nhận ({onchainTxs.length}):
               </span>
 
-              <div className="overflow-x-auto" data-lenis-prevent>
+              <div className="overflow-x-auto w-full max-w-full min-w-0" data-lenis-prevent>
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-line text-ink/50 font-semibold">

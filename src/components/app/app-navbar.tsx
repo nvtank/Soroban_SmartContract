@@ -194,7 +194,7 @@ export function AppNavbar() {
             <span className="hidden lg:inline text-xs font-semibold text-ink/80">{user?.fullName}</span>
             <button
               onClick={() => logout()}
-              className="text-xs px-2.5 py-1.5 rounded-lg border border-line hover:bg-surface text-ink/70 hover:text-ink cursor-pointer transition-colors"
+              className="hidden sm:inline-block text-xs px-2.5 py-1.5 rounded-lg border border-line hover:bg-surface text-ink/70 hover:text-ink cursor-pointer transition-colors"
               title="Đăng xuất"
             >
               Đăng xuất
@@ -204,7 +204,7 @@ export function AppNavbar() {
           {/* Mobile hamburger */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="xl:hidden p-2 rounded-lg text-ink/70 hover:bg-surface"
+            className="xl:hidden p-2 min-w-[40px] min-h-[40px] rounded-lg text-ink/70 hover:bg-surface flex items-center justify-center cursor-pointer text-lg leading-none"
             aria-label="Mở menu di động"
           >
             ☰
@@ -245,8 +245,15 @@ export function AppNavbar() {
           >
             Admin Demo
           </Link>
-          <div className="pt-2 border-t border-line">
-            <label className="text-xs text-ink/60 font-medium block mb-1">Đổi vai trò:</label>
+          <Link
+            href="/app/khoi-phuc"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block px-3 py-2 rounded-lg text-ink font-medium hover:bg-surface"
+          >
+            Khôi phục tài khoản
+          </Link>
+          <div className="pt-2 border-t border-line space-y-2">
+            <label className="text-xs text-ink/60 font-medium block">Đổi vai trò:</label>
             <select
               value={
                 user?.role === "LANDLORD"
@@ -268,6 +275,16 @@ export function AppNavbar() {
               <option value="tenant2">Người thuê (Lê Văn Cường)</option>
               <option value="admin">Admin Demo</option>
             </select>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                logout();
+              }}
+              className="w-full text-left px-3 py-2 rounded-lg text-brick font-semibold hover:bg-brick/10 transition-colors text-sm cursor-pointer"
+            >
+              Đăng xuất
+            </button>
           </div>
         </div>
       )}

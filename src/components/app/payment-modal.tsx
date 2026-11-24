@@ -156,7 +156,7 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
       aria-labelledby="payment-modal-title"
     >
       <div
-        className="w-full max-w-lg bg-paper rounded-panel border border-line shadow-soft p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-lg bg-paper rounded-panel border border-line shadow-soft p-4 sm:p-8 space-y-5 sm:space-y-6 max-h-[90vh] overflow-y-auto min-w-0"
         data-lenis-prevent
       >
         {/* Header */}
