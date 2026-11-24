@@ -31,7 +31,35 @@ export const DEMO_CONTRACTS = {
   CONTRACT_3: "10000000-0000-0000-0000-000000000003",
 };
 
+/**
+ * Kiểm tra khóa an toàn: chỉ chặn trong môi trường test (Vitest / Node test runner).
+ * KHÔNG chặn khi chạy ứng dụng thật hoặc ở runtime.
+ */
+function assertSafeTestEnvironment(): void {
+  if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.toLowerCase();
+      if (hostname !== "127.0.0.1" && hostname !== "localhost") {
+        throw new Error(
+          `[SAFETY LOCK] THAO TÁC BỊ CHẶN: Kiểm thử ghi/reset/seed DB chỉ được phép chạy trên Supabase local (127.0.0.1 hoặc localhost). URL hiện tại: ${url}`,
+        );
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith("[SAFETY LOCK]")) {
+        throw err;
+      }
+      throw new Error(
+        `[SAFETY LOCK] THAO TÁC BỊ CHẶN: URL Supabase không hợp lệ trong kiểm thử: "${url}". Phải là 127.0.0.1 hoặc localhost.`,
+      );
+    }
+  }
+}
+
 export async function seedDemoData(admin: SupabaseClient) {
+  assertSafeTestEnvironment();
+
   // 1. Ensure Auth Users and Profiles
   for (const user of Object.values(DEMO_USERS)) {
     await admin.rpc("seed_demo_user", {
@@ -42,11 +70,11 @@ export async function seedDemoData(admin: SupabaseClient) {
       p_role: user.role,
     });
 
-    // Ensure custody wallet
+    // Ensure custody wallet exists
     await createCustodyWallet(admin, user.id);
   }
 
-  // 2. Contract 1: ACTIVE, Deposit RECORDED, Normal rent
+  // 2. Contract 1: PENDING_CONFIRMATION (Chờ xác nhận)
   await admin.from("rental_contracts").upsert({
     id: DEMO_CONTRACTS.CONTRACT_1,
     landlord_id: DEMO_USERS.LANDLORD.id,
@@ -59,44 +87,24 @@ export async function seedDemoData(admin: SupabaseClient) {
     end_date: "2026-12-31",
     due_day: 5,
     late_fee_bps_per_day: 50,
-    terms_text: "Hợp đồng thuê phòng 301 tiêu chuẩn RentFlow. Giữ cọc an toàn, tự động nhắc kỳ hạn.",
+    terms_text: "Hợp đồng thuê phòng 301 tiêu chuẩn RentFlow. Đang chờ người thuê xác nhận bằng Passkey.",
     doc_hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     doc_salt: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
-    status: "ACTIVE",
+    status: "PENDING_CONFIRMATION",
   });
 
   await admin.from("deposits").upsert({
     contract_id: DEMO_CONTRACTS.CONTRACT_1,
-    status: "RECORDED",
-    paid_amount: 10000000,
+    status: "UNPAID",
+    paid_amount: 0,
     refund_amount: 0,
     deducted_amount: 0,
   });
 
-  await admin.from("rent_periods").upsert([
-    {
-      contract_id: DEMO_CONTRACTS.CONTRACT_1,
-      period_no: 1,
-      due_date: "2026-02-05",
-      amount_due: 5000000,
-      amount_paid: 5000000,
-      late_days: 0,
-      late_fee: 0,
-      status: "PAID",
-    },
-    {
-      contract_id: DEMO_CONTRACTS.CONTRACT_1,
-      period_no: 2,
-      due_date: "2026-03-05",
-      amount_due: 5000000,
-      amount_paid: 0,
-      late_days: 0,
-      late_fee: 0,
-      status: "AWAITING_PAYMENT",
-    },
-  ]);
+  // Clear any existing rent periods for contract 1 to ensure idempotency
+  await admin.from("rent_periods").delete().eq("contract_id", DEMO_CONTRACTS.CONTRACT_1);
 
-  // 3. Contract 2: ACTIVE, Rent OVERDUE (with late fee)
+  // 3. Contract 2: ACTIVE, Rent OVERDUE (Hiệu lực có kỳ quá hạn & tính phí trễ)
   await admin.from("rental_contracts").upsert({
     id: DEMO_CONTRACTS.CONTRACT_2,
     landlord_id: DEMO_USERS.LANDLORD.id,
@@ -123,6 +131,8 @@ export async function seedDemoData(admin: SupabaseClient) {
     deducted_amount: 0,
   });
 
+  // Clean & upsert rent period 1
+  await admin.from("rent_periods").delete().eq("contract_id", DEMO_CONTRACTS.CONTRACT_2);
   await admin.from("rent_periods").upsert([
     {
       contract_id: DEMO_CONTRACTS.CONTRACT_2,
@@ -136,7 +146,7 @@ export async function seedDemoData(admin: SupabaseClient) {
     },
   ]);
 
-  // 4. Contract 3: PENDING_DISPUTE / Deduction proposed
+  // 4. Contract 3: ACTIVE, Deposit PENDING_DISPUTE (Chờ tranh chấp, đề xuất khấu trừ)
   await admin.from("rental_contracts").upsert({
     id: DEMO_CONTRACTS.CONTRACT_3,
     landlord_id: DEMO_USERS.LANDLORD.id,
@@ -174,7 +184,6 @@ export async function seedDemoData(admin: SupabaseClient) {
     tenant_agreed_amount: 9000000,
   });
 
-  // Deduction request
   const deductionId = "20000000-0000-0000-0000-000000000001";
   await admin.from("deduction_requests").upsert({
     id: deductionId,
@@ -193,6 +202,8 @@ export async function seedDemoData(admin: SupabaseClient) {
 }
 
 export async function resetDemoData(admin: SupabaseClient) {
+  assertSafeTestEnvironment();
+
   // Clear non-core tables
   await admin.from("deduction_requests").delete().neq("id", "00000000-0000-0000-0000-000000000000");
   await admin.from("disputes").delete().neq("contract_id", "00000000-0000-0000-0000-000000000000");
