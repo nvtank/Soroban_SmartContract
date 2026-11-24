@@ -11,13 +11,13 @@ export function LoadingSkeleton({
     <div
       role="status"
       aria-label="Đang tải dữ liệu"
-      className={`animate-pulse space-y-4 p-6 bg-surface/40 rounded-card border border-line ${className}`}
+      className={`animate-pulse space-y-4 rounded-3xl border border-line bg-surface/40 p-6 sm:p-8 ${className}`}
     >
-      <div className="h-6 bg-line/30 rounded-md w-1/3 mb-4" />
+      <div className="h-6 w-1/3 rounded-lg bg-line/40" />
       {Array.from({ length: lines }).map((_, i) => (
         <div
           key={i}
-          className="h-4 bg-line/20 rounded-md"
+          className="h-4 rounded-lg bg-line/25"
           style={{ width: `${85 - (i % 3) * 15}%` }}
         />
       ))}
@@ -41,17 +41,15 @@ export function EmptyState({
     <div
       role="region"
       aria-label={title}
-      className="flex flex-col items-center justify-center p-8 sm:p-12 text-center rounded-card bg-surface/50 border border-line"
+      className="flex flex-col items-center justify-center rounded-3xl border border-line bg-surface/40 p-8 sm:p-12 text-center"
     >
-      <div className="w-14 h-14 rounded-full bg-paper flex items-center justify-center border border-line mb-4 shadow-xs text-ink/40 text-2xl">
-        📭
-      </div>
-      <h3 className="text-lg sm:text-xl font-bold text-ink mb-1.5">{title}</h3>
-      <p className="text-ink/60 text-sm sm:text-base max-w-md mb-6">{description}</p>
+      <h3 className="text-lg sm:text-xl font-extrabold text-ink">{title}</h3>
+      <p className="mt-1.5 max-w-md text-sm text-ink/65">{description}</p>
       {actionLabel && onAction && (
         <button
+          type="button"
           onClick={onAction}
-          className="px-5 py-2.5 rounded-xl bg-primary text-paper font-semibold hover:bg-primary-strong transition-all shadow-xs cursor-pointer focus-visible:outline-2"
+          className="mt-5 rounded-full bg-ink px-6 py-2.5 text-sm font-bold text-paper transition-colors hover:bg-ink/90 cursor-pointer"
         >
           {actionLabel}
         </button>
@@ -61,8 +59,8 @@ export function EmptyState({
 }
 
 export function ErrorState({
-  title = "Đã xảy ra lỗi",
-  message = "Không thể tải dữ liệu vào lúc này. Vui lòng kiểm tra kết nối mạng và thử lại.",
+  title = "Không tải được dữ liệu",
+  message = "Vui lòng kiểm tra kết nối và thử lại.",
   onRetry,
 }: {
   title?: string;
@@ -73,17 +71,15 @@ export function ErrorState({
     <div
       role="alert"
       aria-live="assertive"
-      className="p-6 sm:p-8 rounded-card bg-brick/10 border border-brick/30 text-ink text-center flex flex-col items-center justify-center"
+      className="flex flex-col items-center justify-center rounded-3xl border border-brick/30 bg-brick/8 p-6 sm:p-10 text-center text-ink"
     >
-      <div className="w-12 h-12 rounded-full bg-brick/20 text-brick flex items-center justify-center text-xl font-bold mb-3">
-        ⚠️
-      </div>
-      <h3 className="text-lg font-bold text-brick mb-1">{title}</h3>
-      <p className="text-sm sm:text-base text-ink/80 max-w-md mb-5">{message}</p>
+      <h3 className="text-base sm:text-lg font-extrabold text-brick-ink">{title}</h3>
+      <p className="mt-1.5 max-w-md text-sm text-ink/75">{message}</p>
       {onRetry && (
         <button
+          type="button"
           onClick={onRetry}
-          className="px-5 py-2 rounded-xl bg-brick text-paper font-semibold hover:bg-brick-ink transition-all shadow-xs cursor-pointer focus-visible:outline-2"
+          className="mt-5 rounded-full bg-brick px-5 py-2 text-sm font-bold text-paper transition-colors hover:bg-brick-ink cursor-pointer"
         >
           Thử lại
         </button>

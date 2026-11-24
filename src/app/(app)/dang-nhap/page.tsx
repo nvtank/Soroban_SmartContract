@@ -28,7 +28,9 @@ function LoginContent() {
 
   const demoParam = searchParams.get("demo");
   const initialRole =
-    demoParam === "tenant" || demoParam === "tenant1" || demoParam === "tenant2" ? "TENANT" : "LANDLORD";
+    demoParam === "tenant" || demoParam === "tenant1" || demoParam === "tenant2"
+      ? "TENANT"
+      : "LANDLORD";
   const initialPhone =
     demoParam === "tenant2"
       ? "0900000003"
@@ -44,7 +46,6 @@ function LoginContent() {
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
-  // Quick login handler
   const executeLogin = useCallback(
     async (targetPhone: string, targetCode: string, targetRole: "LANDLORD" | "TENANT" | "ADMIN_DEMO") => {
       setLoading(true);
@@ -101,7 +102,6 @@ function LoginContent() {
     [isMock, loginAs, router, searchParams, setUser],
   );
 
-  // Auto-login when safe ?demo=... is provided
   useEffect(() => {
     const demo = searchParams.get("demo");
     if (demo && DEMO_PHONE_MAP[demo]) {
@@ -147,8 +147,7 @@ function LoginContent() {
       }
 
       setStep("otp");
-      setInfoMessage(json.data?.message || "Mã OTP đã được tạo thành công.");
-      // In demo mode for fixed numbers, prefill OTP for convenience
+      setInfoMessage(json.data?.message || "Mã OTP mô phỏng đã sẵn sàng.");
       if (cleanPhone === "0900000001" || cleanPhone === "0900000002" || cleanPhone === "0900000003") {
         setOtp("123456");
       }
@@ -166,7 +165,6 @@ function LoginContent() {
       setError("Vui lòng nhập mã xác thực OTP.");
       return;
     }
-
     await executeLogin(phone.trim(), otp.trim(), role);
   };
 
@@ -178,146 +176,27 @@ function LoginContent() {
   };
 
   return (
-    <main className="min-h-screen bg-paper flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
-        <Link href="/app" className="inline-flex items-center gap-2 group">
-          <span className="w-10 h-10 rounded-2xl bg-primary text-paper flex items-center justify-center font-black text-2xl shadow-xs">
-            R
-          </span>
-          <span className="font-extrabold text-2xl sm:text-3xl tracking-tight text-ink">
-            Rent<span className="text-primary">Flow</span>
-          </span>
-        </Link>
-        <h1 className="text-xl sm:text-2xl font-extrabold text-ink">Đăng nhập tài khoản</h1>
-        <p className="text-xs sm:text-sm text-ink/70">
-          Dịch vụ bảo chứng tiền cọc và quản lý thuê nhà minh bạch
-        </p>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-surface/50 py-8 px-6 sm:px-10 rounded-panel border border-line shadow-soft space-y-6">
-          {/* Role selector tabs */}
-          <div className="flex rounded-xl bg-paper p-1 border border-line">
-            <button
-              type="button"
-              onClick={() => {
-                setRoleTab("LANDLORD");
-                setPhone("0900000001");
-                setStep("phone");
-              }}
-              className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer ${
-                role === "LANDLORD" ? "bg-primary text-paper shadow-xs" : "text-ink/60 hover:text-ink"
-              }`}
-            >
-              Chủ nhà
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRoleTab("TENANT");
-                setPhone("0900000002");
-                setStep("phone");
-              }}
-              className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer ${
-                role === "TENANT" ? "bg-primary text-paper shadow-xs" : "text-ink/60 hover:text-ink"
-              }`}
-            >
-              Người thuê
-            </button>
-          </div>
-
-          {infoMessage && (
-            <div
-              role="status"
-              className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-medium"
-            >
-              {infoMessage}
-            </div>
-          )}
-
-          {error && (
-            <div
-              role="alert"
-              className="p-3 rounded-lg bg-brick/10 border border-brick/30 text-brick text-xs font-medium"
-            >
-              {error}
-            </div>
-          )}
-
-          {/* Form */}
-          {step === "phone" ? (
-            <form onSubmit={handleRequestOtp} className="space-y-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
-                  Số điện thoại
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Ví dụ: 0900000001"
-                  className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink font-mono text-base focus:outline-primary"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs disabled:opacity-50"
-              >
-                {loading ? "Đang gửi mã…" : "Nhận mã xác thực OTP"}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className="text-xs sm:text-sm font-semibold text-ink">Mã xác thực OTP</label>
-                  <button
-                    type="button"
-                    onClick={() => setStep("phone")}
-                    className="text-xs text-primary hover:underline cursor-pointer"
-                  >
-                    Đổi SĐT ({phone})
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  maxLength={6}
-                  placeholder="123456"
-                  className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink text-center tracking-widest text-xl font-mono focus:outline-primary"
-                  required
-                />
-                <p className="text-[11px] text-ink/50 mt-1.5 text-center">
-                  Mã OTP cho tài khoản thử nghiệm demo: <strong>123456</strong>
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs disabled:opacity-50"
-              >
-                {loading ? "Đang xác thực…" : "Xác nhận & Vào ứng dụng"}
-              </button>
-            </form>
-          )}
-
-          {/* Passkey registration callout */}
-          <p className="text-xs text-ink/60">
-            Sau khi đăng nhập, bạn có thể thiết lập Passkey ở bảng điều khiển để ký các thao tác quan trọng.
+    <main className="min-h-screen bg-paper flex flex-col justify-center py-10 px-4 sm:px-6">
+      <div className="mx-auto w-full max-w-md space-y-6">
+        <div className="text-center space-y-2">
+          <Link href="/" className="inline-block font-sans text-2xl font-extrabold tracking-tight text-ink">
+            <span>Rent</span>
+            <span className="text-primary font-black">Flow</span>
+          </Link>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ink">
+            Đăng nhập tài khoản
+          </h1>
+          <p className="text-xs sm:text-sm text-ink/65">
+            Chọn nhanh một vai demo hoặc đăng nhập bằng mã OTP mô phỏng.
           </p>
+        </div>
 
-          {/* Quick Demo Login section for competition judges */}
-          <div className="border-t border-line pt-5 space-y-3">
+        <div className="rounded-[2rem] border border-line bg-paper p-6 sm:p-8 shadow-soft space-y-6">
+          {/* Quick Demo Accounts (Primary fast path for demo) */}
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-ink uppercase tracking-wider">
-                Đăng nhập nhanh cho ban giám khảo:
-              </span>
-              <MockBadge label="DEMO ACCOUNTS" />
+              <span className="text-xs font-bold text-ink/70">Vào nhanh tài khoản demo</span>
+              <MockBadge label="MÔ PHỎNG" />
             </div>
 
             <div className="space-y-2">
@@ -325,56 +204,154 @@ function LoginContent() {
                 type="button"
                 onClick={() => handleQuickDemo("landlord")}
                 disabled={loading}
-                className="w-full py-2 px-3 rounded-xl bg-paper hover:bg-surface border border-line text-left flex items-center justify-between cursor-pointer transition-colors group disabled:opacity-50"
+                className="w-full rounded-2xl border border-line bg-surface/40 px-4 py-3 text-left flex items-center justify-between gap-3 transition-colors hover:bg-surface cursor-pointer disabled:opacity-50"
               >
                 <div>
-                  <div className="text-xs font-bold text-ink group-hover:text-primary">
-                    Chủ nhà: Nguyễn Văn An
-                  </div>
-                  <div className="text-[11px] text-ink/60">0900000001 • Quản lý phòng & tạo hợp đồng</div>
+                  <div className="text-sm font-bold text-ink">Chủ nhà · Nguyễn Văn An</div>
+                  <div className="text-xs text-ink/60 font-mono">0900000001</div>
                 </div>
-                <span className="text-xs text-primary font-bold">Vào ➔</span>
+                <span className="text-xs font-bold text-primary shrink-0">Vào →</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleQuickDemo("tenant1")}
                 disabled={loading}
-                className="w-full py-2 px-3 rounded-xl bg-paper hover:bg-surface border border-line text-left flex items-center justify-between cursor-pointer transition-colors group disabled:opacity-50"
+                className="w-full rounded-2xl border border-line bg-surface/40 px-4 py-3 text-left flex items-center justify-between gap-3 transition-colors hover:bg-surface cursor-pointer disabled:opacity-50"
               >
                 <div>
-                  <div className="text-xs font-bold text-ink group-hover:text-primary">
-                    Người thuê 1: Trần Thị Bình
-                  </div>
-                  <div className="text-[11px] text-ink/60">0900000002 • Ký xác nhận & nạp cọc</div>
+                  <div className="text-sm font-bold text-ink">Người thuê 1 · Trần Thị Bình</div>
+                  <div className="text-xs text-ink/60 font-mono">0900000002</div>
                 </div>
-                <span className="text-xs text-primary font-bold">Vào ➔</span>
+                <span className="text-xs font-bold text-primary shrink-0">Vào →</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleQuickDemo("tenant2")}
                 disabled={loading}
-                className="w-full py-2 px-3 rounded-xl bg-paper hover:bg-surface border border-line text-left flex items-center justify-between cursor-pointer transition-colors group disabled:opacity-50"
+                className="w-full rounded-2xl border border-line bg-surface/40 px-4 py-3 text-left flex items-center justify-between gap-3 transition-colors hover:bg-surface cursor-pointer disabled:opacity-50"
               >
                 <div>
-                  <div className="text-xs font-bold text-ink group-hover:text-primary">
-                    Người thuê 2: Lê Văn Cường
-                  </div>
-                  <div className="text-[11px] text-ink/60">0900000003 • Có kỳ thuê quá hạn</div>
+                  <div className="text-sm font-bold text-ink">Người thuê 2 · Lê Văn Cường</div>
+                  <div className="text-xs text-ink/60 font-mono">0900000003</div>
                 </div>
-                <span className="text-xs text-primary font-bold">Vào ➔</span>
+                <span className="text-xs font-bold text-primary shrink-0">Vào →</span>
               </button>
             </div>
           </div>
 
-          {/* Account recovery link */}
-          <div className="text-center pt-2 border-t border-line">
+          <div className="border-t border-line pt-5 space-y-4">
+            {/* Role segmented control */}
+            <div className="flex rounded-full border border-line bg-surface p-1 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => {
+                  setRoleTab("LANDLORD");
+                  setPhone("0900000001");
+                  setStep("phone");
+                }}
+                className={`flex-1 rounded-full py-2 transition-colors cursor-pointer ${
+                  role === "LANDLORD" ? "bg-paper font-bold text-ink shadow-xs" : "text-ink/60 hover:text-ink"
+                }`}
+              >
+                Chủ nhà
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRoleTab("TENANT");
+                  setPhone("0900000002");
+                  setStep("phone");
+                }}
+                className={`flex-1 rounded-full py-2 transition-colors cursor-pointer ${
+                  role === "TENANT" ? "bg-paper font-bold text-ink shadow-xs" : "text-ink/60 hover:text-ink"
+                }`}
+              >
+                Người thuê
+              </button>
+            </div>
+
+            {infoMessage && (
+              <div role="status" className="rounded-2xl border border-primary/25 bg-primary/10 p-3 text-xs font-medium text-primary-strong">
+                {infoMessage}
+              </div>
+            )}
+
+            {error && (
+              <div role="alert" className="rounded-2xl border border-brick/30 bg-brick/10 p-3 text-xs font-medium text-brick-ink">
+                {error}
+              </div>
+            )}
+
+            {step === "phone" ? (
+              <form onSubmit={handleRequestOtp} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-ink/80 mb-1.5">
+                    Số điện thoại
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="0900000001"
+                    className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-2.5 font-mono text-base text-ink focus:outline-primary"
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-full bg-ink py-3 text-sm font-bold text-paper transition-colors hover:bg-ink/90 cursor-pointer disabled:opacity-50"
+                >
+                  {loading ? "Đang gửi mã…" : "Nhận mã xác thực OTP"}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOtp} className="space-y-3">
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="text-xs font-semibold text-ink/80">
+                      Mã OTP (mô phỏng · 123456)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setStep("phone")}
+                      className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                    >
+                      Đổi SĐT
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    maxLength={6}
+                    placeholder="123456"
+                    className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-2.5 text-center font-mono text-xl tracking-[0.25em] text-ink focus:outline-primary"
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-full bg-ink py-3 text-sm font-bold text-paper transition-colors hover:bg-ink/90 cursor-pointer disabled:opacity-50"
+                >
+                  {loading ? "Đang xác thực…" : "Xác nhận & Vào ứng dụng"}
+                </button>
+              </form>
+            )}
+          </div>
+
+          <div className="border-t border-line/60 pt-4 text-center">
             <Link
               href="/app/khoi-phuc"
-              className="text-xs text-ink/70 hover:text-primary transition-colors underline"
+              className="text-xs font-medium text-ink/65 hover:text-primary transition-colors underline"
             >
-              Mất thiết bị hoặc đổi số điện thoại? Khôi phục tài khoản (Mô phỏng)
+              Khôi phục tài khoản (mô phỏng)
             </Link>
           </div>
         </div>
@@ -387,7 +364,9 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center text-sm text-ink/50">Đang tải…</div>
+        <div className="min-h-screen flex items-center justify-center text-sm text-ink/50">
+          Đang tải…
+        </div>
       }
     >
       <LoginContent />

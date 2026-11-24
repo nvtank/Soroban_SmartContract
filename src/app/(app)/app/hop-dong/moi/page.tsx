@@ -1,14 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppNavbar } from "@/components/app/app-navbar";
 import { useSession } from "@/components/app/session-context";
 import { apiClient } from "@/components/app/api-client";
-import { HashPreview } from "@/components/app/hash-preview";
 import { StepUpModal } from "@/components/app/step-up-modal";
-import { MoneyAmount } from "@/components/shared";
+
+function formatVndDigits(digits: string): string {
+  const clean = digits.replace(/\D/g, "");
+  if (!clean) return "";
+  return new Intl.NumberFormat("vi-VN").format(BigInt(clean));
+}
 
 export default function NewContractPage() {
   const router = useRouter();
@@ -21,58 +25,55 @@ export default function NewContractPage() {
     startDate: "2026-12-01",
     endDate: "2027-11-30",
     dueDay: 5,
-    lateFeeRate: 0.1, // 0.1% per day = 10 bps
+    lateFeeRate: 0.1,
     tenantPhone: "0900000002",
     tenantName: "Trần Thị Bình",
     termsText:
-      "Bên thuê thanh toán tiền thuê đúng hạn trước ngày 05 hàng tháng. Giữ gìn an ninh trật tự và bảo quản trang thiết bị nội thất. Tiền cọc được bảo chứng trung lập trên RentFlow và chỉ giải ngân khi cả hai bên xác nhận hoàn tất nghiệm thu trả phòng.",
+      "Bên thuê thanh toán tiền thuê đúng hạn trước ngày 05 hàng tháng. Tiền cọc được ghi nhận trạng thái trung lập và chỉ giải ngân khi cả hai bên cùng xác nhận.",
   });
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showStepUp, setShowStepUp] = useState(false);
 
-  const validateStep1 = () => {
-    if (!formData.roomLabel.trim()) return "Vui lòng nhập tên phòng / căn hộ.";
-    if (!formData.tenantPhone.trim() || formData.tenantPhone.length < 8)
-      return "Số điện thoại người thuê phải có ít nhất 8 số.";
-    return null;
-  };
-
-  const validateStep2 = () => {
-    const rent = Number(formData.rentAmount);
-    const deposit = Number(formData.depositAmount);
-    if (isNaN(rent) || rent < 500000) return "Giá thuê tối thiểu là 500.000 ₫.";
-    if (isNaN(deposit) || deposit < 500000) return "Tiền cọc tối thiểu là 500.000 ₫.";
-    if (new Date(formData.endDate) <= new Date(formData.startDate))
-      return "Ngày kết thúc phải sau ngày bắt đầu thuê.";
-    if (formData.dueDay < 1 || formData.dueDay > 28)
-      return "Ngày thanh toán hàng tháng phải từ 1 đến 28.";
-    return null;
-  };
-
-  const handleNext = () => {
-    setError(null);
-    if (step === 1) {
-      const err = validateStep1();
-      if (err) {
-        setError(err);
-        return;
-      }
-      setStep(2);
-    } else if (step === 2) {
-      const err = validateStep2();
-      if (err) {
-        setError(err);
-        return;
-      }
-      setStep(3);
+  const fieldErrors = useMemo(() => {
+    const errs: Record<string, string> = {};
+    if (!formData.roomLabel.trim()) {
+      errs.roomLabel = "Nhập tên phòng hoặc căn hộ.";
     }
-  };
+    const phoneDigits = formData.tenantPhone.trim();
+    if (!phoneDigits || phoneDigits.length < 8) {
+      errs.tenantPhone = "Số điện thoại cần tối thiểu 8 chữ số.";
+    }
+    const rent = Number(formData.rentAmount || "0");
+    if (isNaN(rent) || rent < 500000) {
+      errs.rentAmount = "Giá thuê tối thiểu 500.000 đ.";
+    }
+    const deposit = Number(formData.depositAmount || "0");
+    if (isNaN(deposit) || deposit < 500000) {
+      errs.depositAmount = "Tiền cọc tối thiểu 500.000 đ.";
+    }
+    if (!formData.startDate || !formData.endDate || new Date(formData.endDate) <= new Date(formData.startDate)) {
+      errs.endDate = "Ngày kết thúc phải sau ngày bắt đầu.";
+    }
+    if (formData.dueDay < 1 || formData.dueDay > 28) {
+      errs.dueDay = "Chọn ngày từ 1 đến 28.";
+    }
+    if (formData.lateFeeRate < 0 || formData.lateFeeRate > 1) {
+      errs.lateFeeRate = "Mức phí từ 0% đến 1% / ngày.";
+    }
+    return errs;
+  }, [formData]);
 
-  const handleTriggerSign = () => {
+  const isValid = Object.keys(fieldErrors).length === 0;
+
+  const handleSubmitForm = (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
+    if (!isValid) {
+      setError("Vui lòng kiểm tra lại các trường báo đỏ.");
+      return;
+    }
     setShowStepUp(true);
   };
 
@@ -83,16 +84,16 @@ export default function NewContractPage() {
     try {
       const lateFeeBpsPerDay = Math.round(formData.lateFeeRate * 100);
       const created = await apiClient.createContract({
-        roomLabel: formData.roomLabel,
+        roomLabel: formData.roomLabel.trim(),
         rentAmount: formData.rentAmount,
         depositAmount: formData.depositAmount,
         startDate: formData.startDate,
         endDate: formData.endDate,
         dueDay: formData.dueDay,
         lateFeeBpsPerDay,
-        tenantPhone: formData.tenantPhone,
-        tenantName: formData.tenantName,
-        termsText: formData.termsText,
+        tenantPhone: formData.tenantPhone.trim(),
+        tenantName: formData.tenantName.trim(),
+        termsText: formData.termsText.trim(),
       });
 
       router.push(`/app/hop-dong/${created.id}`);
@@ -102,310 +103,245 @@ export default function NewContractPage() {
     }
   };
 
-  // Canonical payload representation for hash preview
-  const canonicalPreview = {
-    due_day: formData.dueDay,
-    end_date: formData.endDate,
-    late_fee_bps_per_day: Math.round(formData.lateFeeRate * 100),
-    rent_amount: formData.rentAmount,
-    deposit_amount: formData.depositAmount,
-    room_label: formData.roomLabel,
-    start_date: formData.startDate,
-    terms_text: formData.termsText,
-  };
-
   return (
     <div className="min-h-screen bg-paper flex flex-col">
       <AppNavbar />
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-ink/60">
-          <Link href="/app" className="hover:text-primary transition-colors">
-            Bảng điều khiển
+      <main className="flex-1 mx-auto max-w-2xl w-full px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        <div className="space-y-2">
+          <Link href="/app" className="inline-block text-xs font-semibold text-ink/60 hover:text-ink">
+            ← Bảng điều khiển
           </Link>
-          <span>/</span>
-          <span className="text-ink font-semibold">Tạo hợp đồng mới</span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ink">
+            Tạo hợp đồng mới
+          </h1>
+          <p className="text-sm text-ink/65">
+            Điền thông tin phòng và điều khoản để gửi người thuê ký xác nhận.
+          </p>
         </div>
 
-        {/* Role Check Warning if not Landlord */}
         {role !== "LANDLORD" && role !== "ADMIN_DEMO" && (
-          <div className="p-4 rounded-xl bg-amber/15 border border-amber/40 flex items-center justify-between text-xs sm:text-sm text-amber-ink">
-            <span>Bạn đang xem với vai trò Người thuê. Chỉ Chủ nhà mới có quyền lập hợp đồng cho thuê mới.</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber/35 bg-amber/12 p-4 text-xs sm:text-sm text-amber-ink">
+            <span>Chỉ tài khoản Chủ nhà mới lập được hợp đồng mới.</span>
             <button
+              type="button"
               onClick={() => loginAs("landlord")}
-              className="px-3 py-1 rounded-lg bg-amber text-paper font-bold cursor-pointer whitespace-nowrap"
+              className="rounded-full bg-ink px-4 py-1.5 text-xs font-bold text-paper cursor-pointer"
             >
-              Chuyển sang Chủ nhà
+              Đổi sang Chủ nhà
             </button>
           </div>
         )}
 
-        {/* Wizard Header */}
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">
-            Tạo hợp đồng cho thuê mới
-          </h1>
-          <p className="text-xs sm:text-sm text-ink/70">
-            Hợp đồng sau khi tạo sẽ được băm SHA-256 có salt và ghi nhận trạng thái lên sổ cái Stellar Testnet.
-          </p>
-        </div>
+        {error && (
+          <div role="alert" className="rounded-2xl border border-brick/30 bg-brick/10 p-4 text-xs sm:text-sm font-semibold text-brick-ink">
+            {error}
+          </div>
+        )}
 
-        {/* Step indicator */}
-        <div className="flex items-center justify-between border-b border-line pb-4 text-xs sm:text-sm">
-          <div className={`font-bold ${step >= 1 ? "text-primary" : "text-ink/40"}`}>
-            1. Bất động sản & Người thuê
-          </div>
-          <div className={`font-bold ${step >= 2 ? "text-primary" : "text-ink/40"}`}>
-            2. Giá thuê & Kỳ hạn
-          </div>
-          <div className={`font-bold ${step >= 3 ? "text-primary" : "text-ink/40"}`}>
-            3. Điều khoản & Ký số
-          </div>
-        </div>
+        <form onSubmit={handleSubmitForm} className="space-y-6 pb-8">
+          {/* Group 1: Room & Tenant */}
+          <section className="rounded-[2rem] border border-line bg-paper p-6 sm:p-7 shadow-xs space-y-4">
+            <h2 className="text-base font-extrabold text-ink">1. Phòng & Người thuê</h2>
 
-        {/* Form Content */}
-        <div className="bg-surface/50 rounded-panel border border-line p-6 sm:p-8 shadow-soft space-y-6">
-          {error && (
-            <div role="alert" className="p-3.5 rounded-xl bg-brick/10 border border-brick/30 text-brick text-xs sm:text-sm font-semibold">
-              ⚠️ {error}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-ink/80">Tên phòng / căn hộ</label>
+              <input
+                type="text"
+                value={formData.roomLabel}
+                onChange={(e) => setFormData({ ...formData, roomLabel: e.target.value })}
+                placeholder="Ví dụ: Phòng 302 - Căn hộ Kim Mã"
+                className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-2.5 text-sm text-ink focus:outline-primary"
+                required
+              />
+              {fieldErrors.roomLabel && (
+                <p className="text-xs font-medium text-brick-ink">{fieldErrors.roomLabel}</p>
+              )}
             </div>
-          )}
 
-          {/* STEP 1 */}
-          {step === 1 && (
-            <div className="space-y-4">
-              <h2 className="text-base sm:text-lg font-bold text-ink">
-                1. Thông tin bất động sản & Người thuê
-              </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-ink/80">Số điện thoại người thuê</label>
+                <input
+                  type="tel"
+                  value={formData.tenantPhone}
+                  onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
+                  placeholder="0900000002"
+                  className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-2.5 font-mono text-sm text-ink focus:outline-primary"
+                  required
+                />
+                {fieldErrors.tenantPhone && (
+                  <p className="text-xs font-medium text-brick-ink">{fieldErrors.tenantPhone}</p>
+                )}
+              </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs sm:text-sm font-semibold text-ink block">
-                  Tên phòng / Mã căn hộ *
-                </label>
+                <label className="block text-xs font-semibold text-ink/80">Họ tên người thuê</label>
                 <input
                   type="text"
-                  value={formData.roomLabel}
-                  onChange={(e) => setFormData({ ...formData, roomLabel: e.target.value })}
-                  placeholder="Ví dụ: Phòng 302 - Căn hộ Dịch vụ Kim Mã"
-                  className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink text-sm sm:text-base focus:outline-primary"
+                  value={formData.tenantName}
+                  onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
+                  placeholder="Trần Thị Bình"
+                  className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-2.5 text-sm text-ink focus:outline-primary"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Group 2: Amounts & Schedule */}
+          <section className="rounded-[2rem] border border-line bg-paper p-6 sm:p-7 shadow-xs space-y-4">
+            <h2 className="text-base font-extrabold text-ink">2. Số tiền & Kỳ hạn</h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-ink/80">Giá thuê hàng tháng</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formatVndDigits(formData.rentAmount)}
+                    onChange={(e) =>
+                      setFormData({ ...formData, rentAmount: e.target.value.replace(/\D/g, "") })
+                    }
+                    placeholder="6.500.000"
+                    className="w-full rounded-2xl border border-line bg-surface/35 pl-4 pr-10 py-2.5 tabular font-bold text-base text-ink focus:outline-primary"
+                    required
+                  />
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-ink/50">
+                    đ
+                  </span>
+                </div>
+                {fieldErrors.rentAmount && (
+                  <p className="text-xs font-medium text-brick-ink">{fieldErrors.rentAmount}</p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-ink/80">Tiền cọc bảo chứng</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formatVndDigits(formData.depositAmount)}
+                    onChange={(e) =>
+                      setFormData({ ...formData, depositAmount: e.target.value.replace(/\D/g, "") })
+                    }
+                    placeholder="6.500.000"
+                    className="w-full rounded-2xl border border-line bg-surface/35 pl-4 pr-10 py-2.5 tabular font-bold text-base text-ink focus:outline-primary"
+                    required
+                  />
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-ink/50">
+                    đ
+                  </span>
+                </div>
+                {fieldErrors.depositAmount && (
+                  <p className="text-xs font-medium text-brick-ink">{fieldErrors.depositAmount}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-ink/80">Ngày bắt đầu</label>
+                <input
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-2.5 text-sm text-ink focus:outline-primary"
                   required
                 />
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-semibold text-ink block">
-                    Số điện thoại người thuê *
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.tenantPhone}
-                    onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
-                    placeholder="Ví dụ: 0900000002"
-                    className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink font-mono text-sm sm:text-base focus:outline-primary"
-                    required
-                  />
-                  <p className="text-[11px] text-ink/50">
-                    Người thuê sẽ nhận thông báo và link ký xác nhận qua số này.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-semibold text-ink block">
-                    Họ và tên người thuê (dự kiến)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.tenantName}
-                    onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
-                    placeholder="Ví dụ: Trần Thị Bình"
-                    className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink text-sm sm:text-base focus:outline-primary"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-ink/80">Ngày kết thúc</label>
+                <input
+                  type="date"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-2.5 text-sm text-ink focus:outline-primary"
+                  required
+                />
+                {fieldErrors.endDate && (
+                  <p className="text-xs font-medium text-brick-ink">{fieldErrors.endDate}</p>
+                )}
               </div>
             </div>
-          )}
 
-          {/* STEP 2 */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <h2 className="text-base sm:text-lg font-bold text-ink">
-                2. Giá thuê, Tiền cọc & Lịch thanh toán
-              </h2>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-semibold text-ink block">
-                    Giá thuê hàng tháng (₫) *
-                  </label>
-                  <input
-                    type="number"
-                    step="100000"
-                    value={formData.rentAmount}
-                    onChange={(e) => setFormData({ ...formData, rentAmount: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink font-mono text-sm sm:text-base focus:outline-primary"
-                    required
-                  />
-                  <div className="pt-1">
-                    <MoneyAmount value={formData.rentAmount} size="sm" />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-semibold text-ink block">
-                    Tiền cọc bảo chứng (₫) *
-                  </label>
-                  <input
-                    type="number"
-                    step="100000"
-                    value={formData.depositAmount}
-                    onChange={(e) => setFormData({ ...formData, depositAmount: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink font-mono text-sm sm:text-base focus:outline-primary"
-                    required
-                  />
-                  <div className="pt-1">
-                    <MoneyAmount value={formData.depositAmount} size="sm" />
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-ink/80">Ngày thu hàng tháng (1–28)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={formData.dueDay}
+                  onChange={(e) => setFormData({ ...formData, dueDay: Number(e.target.value) })}
+                  className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-2.5 font-mono text-sm text-ink focus:outline-primary"
+                  required
+                />
+                {fieldErrors.dueDay && (
+                  <p className="text-xs font-medium text-brick-ink">{fieldErrors.dueDay}</p>
+                )}
               </div>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-semibold text-ink block">
-                    Ngày bắt đầu thuê *
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink text-sm focus:outline-primary"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-semibold text-ink block">
-                    Ngày kết thúc thuê *
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink text-sm focus:outline-primary"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-semibold text-ink block">
-                    Ngày thanh toán mỗi tháng (1 - 28) *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="28"
-                    value={formData.dueDay}
-                    onChange={(e) => setFormData({ ...formData, dueDay: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink font-mono text-sm focus:outline-primary"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-semibold text-ink block">
-                    Phí phạt chậm trả (% / ngày) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.05"
-                    min="0"
-                    max="1"
-                    value={formData.lateFeeRate}
-                    onChange={(e) => setFormData({ ...formData, lateFeeRate: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink font-mono text-sm focus:outline-primary"
-                    required
-                  />
-                  <p className="text-[11px] text-ink/50">
-                    {formData.lateFeeRate}% / ngày tương đương {Math.round(formData.lateFeeRate * 100)} bps.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3 */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <h2 className="text-base sm:text-lg font-bold text-ink">
-                3. Điều khoản & Xem trước mã băm bảo chứng
-              </h2>
 
               <div className="space-y-1.5">
-                <label className="text-xs sm:text-sm font-semibold text-ink block">
-                  Điều khoản bổ sung
-                </label>
-                <textarea
-                  rows={4}
-                  value={formData.termsText}
-                  onChange={(e) => setFormData({ ...formData, termsText: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink text-xs sm:text-sm focus:outline-primary"
-                  placeholder="Ghi rõ quy định về điện nước, bảo quản tài sản..."
+                <label className="block text-xs font-semibold text-ink/80">Phí chậm trả (% / ngày)</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  min={0}
+                  max={1}
+                  value={formData.lateFeeRate}
+                  onChange={(e) => setFormData({ ...formData, lateFeeRate: Number(e.target.value) })}
+                  className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-2.5 font-mono text-sm text-ink focus:outline-primary"
+                  required
                 />
+                {fieldErrors.lateFeeRate && (
+                  <p className="text-xs font-medium text-brick-ink">{fieldErrors.lateFeeRate}</p>
+                )}
               </div>
-
-              {/* Hash Preview Component */}
-              <HashPreview
-                content={canonicalPreview}
-                label="Xem trước mã băm SHA-256 dự kiến đưa lên Stellar Testnet"
-              />
             </div>
-          )}
+          </section>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between pt-4 border-t border-line">
-            {step > 1 ? (
-              <button
-                type="button"
-                onClick={() => setStep((s) => (s - 1) as 1 | 2)}
-                className="px-5 py-2.5 rounded-xl border border-line text-ink font-semibold hover:bg-surface transition-colors cursor-pointer text-sm"
-              >
-                Quay lại
-              </button>
-            ) : (
-              <div />
-            )}
+          {/* Group 3: Terms */}
+          <section className="rounded-[2rem] border border-line bg-paper p-6 sm:p-7 shadow-xs space-y-3">
+            <h2 className="text-base font-extrabold text-ink">3. Điều khoản thỏa thuận</h2>
+            <textarea
+              rows={4}
+              value={formData.termsText}
+              onChange={(e) => setFormData({ ...formData, termsText: e.target.value })}
+              className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-3 text-sm text-ink leading-relaxed focus:outline-primary"
+              placeholder="Ghi rõ quy định bàn giao và bảo quản tài sản…"
+            />
+            <p className="text-xs text-ink/55">
+              Khi ký, nội dung hợp đồng được băm SHA-256 kèm muối để làm bằng chứng đối chiếu, không lưu thông tin cá nhân lên chuỗi.
+            </p>
+          </section>
 
-            {step < 3 ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                className="px-6 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs"
-              >
-                Tiếp tục ➔
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleTriggerSign}
-                disabled={loading}
-                className="px-6 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs disabled:opacity-50"
-              >
-                {loading ? "Đang xử lý…" : "Ký & Khởi tạo hợp đồng"}
-              </button>
-            )}
+          {/* Sticky / Clear Action Footer */}
+          <div className="sticky bottom-3 z-20 flex items-center justify-between gap-3 rounded-full border border-line bg-paper/95 p-2 pl-5 shadow-soft backdrop-blur-md">
+            <Link
+              href="/app"
+              className="text-xs sm:text-sm font-semibold text-ink/70 hover:text-ink transition-colors"
+            >
+              Hủy
+            </Link>
+            <button
+              type="submit"
+              disabled={loading || !isValid}
+              className="rounded-full bg-ink px-6 py-2.5 text-sm font-bold text-paper transition-colors hover:bg-ink/90 cursor-pointer disabled:opacity-50"
+            >
+              {loading ? "Đang tạo…" : "Ký & Tạo hợp đồng"}
+            </button>
           </div>
-        </div>
+        </form>
       </main>
 
-      {/* Step up signature modal */}
       {showStepUp && (
         <StepUpModal
           action="SIGN_CONTRACT"
-          title="Ký khởi tạo hợp đồng cho thuê"
-          description="Chữ ký bảo mật Passkey/OTP của bạn sẽ xác nhận nội dung hợp đồng và tạo giao dịch on-chain đầu tiên."
+          title="Ký khởi tạo hợp đồng"
+          description="Xác thực để tạo hợp đồng và gửi cho người thuê xác nhận."
           onSuccess={handleFinalSubmit}
           onCancel={() => setShowStepUp(false)}
         />

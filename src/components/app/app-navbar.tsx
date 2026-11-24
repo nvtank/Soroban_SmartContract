@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { Bell, ChevronDown } from "lucide-react";
 import { useSession } from "./session-context";
 import { apiClient } from "./api-client";
 import type { NotificationDto } from "@/domain/dto";
@@ -14,19 +15,53 @@ export function AppNavbar() {
 
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
   const [showNotifs, setShowNotifs] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const notifRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let ignore = false;
-    apiClient.getNotifications().then((list) => {
-      if (!ignore) {
-        setNotifications(list);
-      }
-    });
+    apiClient
+      .getNotifications()
+      .then((list) => {
+        if (!ignore) {
+          setNotifications(list);
+        }
+      })
+      .catch(() => {});
     return () => {
       ignore = true;
     };
   }, [pathname]);
+
+  useEffect(() => {
+    if (!showNotifs && !showUserMenu) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowNotifs(false);
+        setShowUserMenu(false);
+      }
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (notifRef.current && !notifRef.current.contains(target)) {
+        setShowNotifs(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onMouseDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [showNotifs, showUserMenu]);
 
   const unreadCount = notifications.filter((n) => !n.readAt).length;
 
@@ -38,149 +73,115 @@ export function AppNavbar() {
     setNotifications(updated);
   };
 
-  const handleRoleSwitch = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value as "landlord" | "tenant1" | "tenant2" | "admin";
+  const handleQuickSwitch = async (val: "landlord" | "tenant1" | "tenant2") => {
+    setShowUserMenu(false);
     await loginAs(val);
     router.refresh();
   };
 
+  const handleTourStart = () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("rentflow:tour-start"));
+    }
+  };
+
+  const roleLabel =
+    role === "LANDLORD" ? "Chủ nhà" : role === "ADMIN_DEMO" ? "Quản trị" : "Người thuê";
+
+  const cleanName = (user?.fullName || "Tài khoản").replace(/\s*\([^)]*\)\s*/g, "").trim();
+
   return (
-    <header className="sticky top-[var(--demo-banner-h,2.75rem)] z-40 w-full backdrop-blur-xl bg-[rgba(251,248,243,0.9)] border-b border-line shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Left: Brand & Links */}
-        <div className="flex items-center gap-6">
-          <Link href="/app" className="flex items-center gap-2 group">
-            <span className="w-8 h-8 rounded-xl bg-primary text-paper flex items-center justify-center font-extrabold text-lg shadow-xs group-hover:scale-105 transition-transform">
-              R
-            </span>
-            <span className="font-extrabold text-xl tracking-tight text-ink">
-              Rent<span className="text-primary">Flow</span>
-            </span>
+    <header
+      className="sticky z-40 w-full px-3 sm:px-6 pt-2.5 pb-1"
+      style={{ top: "var(--demo-banner-h, 1.75rem)" }}
+    >
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 rounded-full border border-line bg-paper/90 px-3.5 py-1.5 sm:px-5 sm:py-2 shadow-soft backdrop-blur-md">
+        {/* Left: Brand & Current Role */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Link
+            href="/app"
+            className="font-sans text-sm sm:text-base font-extrabold tracking-tight text-ink hover:text-primary transition-colors shrink-0"
+          >
+            <span>Rent</span>
+            <span className="text-primary font-black">Flow</span>
           </Link>
 
-          <nav className="hidden xl:flex items-center gap-1 whitespace-nowrap text-sm font-medium">
-            <Link
-              href="/app"
-              className={`px-3 py-1.5 rounded-lg transition-colors ${
-                pathname === "/app"
-                  ? "bg-primary/10 text-primary font-semibold"
-                  : "text-ink/70 hover:text-ink hover:bg-surface"
-              }`}
-            >
-              Bảng điều khiển
-            </Link>
-            {role === "LANDLORD" && (
-              <Link
-                href="/app/hop-dong/moi"
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
-                  pathname === "/app/hop-dong/moi"
-                    ? "bg-primary/10 text-primary font-semibold"
-                    : "text-ink/70 hover:text-ink hover:bg-surface"
-                }`}
-              >
-                + Tạo hợp đồng
-              </Link>
-            )}
-            <Link
-              href="/bang-chung"
-              className={`px-3 py-1.5 rounded-lg transition-colors ${
-                pathname === "/bang-chung"
-                  ? "bg-primary/10 text-primary font-semibold"
-                  : "text-ink/70 hover:text-ink hover:bg-surface"
-              }`}
-            >
-              Bằng chứng On-chain
-            </Link>
-            <Link
-              href="/app/admin-demo"
-              className={`px-3 py-1.5 rounded-lg transition-colors ${
-                pathname === "/app/admin-demo"
-                  ? "bg-primary/10 text-primary font-semibold"
-                  : "text-ink/70 hover:text-ink hover:bg-surface"
-              }`}
-            >
-              Admin Demo
-            </Link>
-          </nav>
+          <span
+            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold shrink-0 ${
+              role === "LANDLORD"
+                ? "border-ink/15 bg-ink/6 text-ink"
+                : "border-primary/25 bg-primary/10 text-primary-strong"
+            }`}
+          >
+            {roleLabel}
+          </span>
         </div>
 
-        {/* Right: Quick Role Switcher, Notifications, User Info */}
-        <div className="flex items-center gap-3">
-          {/* Quick role switcher dropdown for Ideathon judges */}
-          <div className="hidden sm:flex items-center gap-1.5 bg-surface/70 px-2 py-1 rounded-xl border border-line text-xs">
-            <span className="text-ink/60 font-medium">Vai trò:</span>
-            <select
-              value={
-                user?.role === "LANDLORD"
-                  ? "landlord"
-                  : user?.id === "00000000-0000-0000-0000-000000000003" || user?.phone === "0900000003"
-                    ? "tenant2"
-                    : user?.role === "ADMIN_DEMO"
-                      ? "admin"
-                      : "tenant1"
-              }
-              onChange={handleRoleSwitch}
-              className="bg-transparent text-ink font-semibold focus:outline-none cursor-pointer"
-              aria-label="Chọn vai trò người dùng"
-            >
-              <option value="landlord">Chủ nhà (Nguyễn Văn An)</option>
-              <option value="tenant1">Người thuê (Trần Thị Bình)</option>
-              <option value="tenant2">Người thuê (Lê Văn Cường)</option>
-              <option value="admin">Admin Demo</option>
-            </select>
-          </div>
+        {/* Right: Tour trigger, Notifications, User menu */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <button
+            type="button"
+            data-tour="nav-tour"
+            onClick={handleTourStart}
+            className="rounded-full border border-line bg-surface/60 px-2.5 sm:px-3 py-1 text-xs font-semibold text-ink transition-colors hover:border-ink/30 hover:bg-surface cursor-pointer"
+          >
+            Hướng dẫn
+          </button>
 
-          {/* Notifications bell */}
-          <div className="relative">
+          {/* Notifications */}
+          <div ref={notifRef} className="relative">
             <button
-              onClick={() => setShowNotifs(!showNotifs)}
-              className="p-2 rounded-xl text-ink/70 hover:text-ink hover:bg-surface transition-colors relative cursor-pointer"
+              type="button"
+              onClick={() => {
+                setShowUserMenu(false);
+                setShowNotifs((v) => !v);
+              }}
+              className="relative flex h-8 w-8 items-center justify-center rounded-full text-ink/75 transition-colors hover:bg-surface hover:text-ink cursor-pointer"
               aria-label="Thông báo"
+              aria-expanded={showNotifs}
             >
-              <span className="text-xl">🔔</span>
+              <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-brick text-paper text-[10px] font-bold flex items-center justify-center">
-                  {unreadCount}
+                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brick px-1 text-[10px] font-bold text-paper">
+                  {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
             </button>
 
-            {/* Notifications Dropdown */}
             {showNotifs && (
               <div
-                className="absolute right-0 mt-2 w-80 sm:w-96 rounded-card bg-paper border border-line shadow-soft p-4 z-50"
+                className="fixed sm:absolute right-3 sm:right-0 left-3 sm:left-auto mt-2 sm:w-88 rounded-2xl border border-line bg-paper p-4 shadow-soft z-50"
                 data-lenis-prevent
               >
-                <div className="flex items-center justify-between pb-3 border-b border-line mb-3">
-                  <h4 className="font-bold text-ink text-sm">Thông báo ({unreadCount} mới)</h4>
+                <div className="flex items-center justify-between border-b border-line pb-2.5 mb-2.5">
+                  <span className="text-xs font-bold text-ink">
+                    Thông báo {unreadCount > 0 ? `(${unreadCount} mới)` : ""}
+                  </span>
                   {unreadCount > 0 && (
                     <button
+                      type="button"
                       onClick={handleMarkAllRead}
-                      className="text-xs text-primary hover:underline cursor-pointer"
+                      className="text-xs font-semibold text-primary hover:underline cursor-pointer"
                     >
-                      Đã đọc tất cả
+                      Đã đọc hết
                     </button>
                   )}
                 </div>
-                <div className="max-h-72 overflow-y-auto space-y-2.5" data-lenis-prevent>
+                <div className="max-h-64 overflow-y-auto space-y-2" data-lenis-prevent>
                   {notifications.length === 0 ? (
-                    <p className="text-xs text-ink/50 py-4 text-center">Không có thông báo nào.</p>
+                    <p className="py-5 text-center text-xs text-ink/50">Chưa có thông báo mới.</p>
                   ) : (
-                    notifications.map((n) => (
+                    notifications.slice(0, 8).map((n) => (
                       <div
                         key={n.id}
-                        className={`p-2.5 rounded-xl border text-xs transition-colors ${
-                          n.readAt ? "bg-surface/30 border-line text-ink/70" : "bg-primary/5 border-primary/20 text-ink"
+                        className={`rounded-xl border p-2.5 text-xs ${
+                          n.readAt
+                            ? "border-line/60 bg-surface/25 text-ink/65"
+                            : "border-primary/20 bg-primary/6 text-ink"
                         }`}
                       >
-                        <div className="font-semibold mb-0.5">{n.title}</div>
-                        <div className="text-ink/70 line-clamp-2">{n.body}</div>
-                        <div className="text-[10px] text-ink/40 mt-1">
-                          {new Date(n.createdAt).toLocaleTimeString("vi-VN", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </div>
+                        <div className="font-semibold">{n.title}</div>
+                        <div className="mt-0.5 text-ink/70 line-clamp-2">{n.body}</div>
                       </div>
                     ))
                   )}
@@ -189,105 +190,109 @@ export function AppNavbar() {
             )}
           </div>
 
-          {/* User profile / Logout */}
-          <div className="flex items-center gap-2">
-            <span className="hidden lg:inline text-xs font-semibold text-ink/80">{user?.fullName}</span>
-            <button
-              onClick={() => logout()}
-              className="hidden sm:inline-block text-xs px-2.5 py-1.5 rounded-lg border border-line hover:bg-surface text-ink/70 hover:text-ink cursor-pointer transition-colors"
-              title="Đăng xuất"
-            >
-              Đăng xuất
-            </button>
-          </div>
-
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="xl:hidden p-2 min-w-[40px] min-h-[40px] rounded-lg text-ink/70 hover:bg-surface flex items-center justify-center cursor-pointer text-lg leading-none"
-            aria-label="Mở menu di động"
-          >
-            ☰
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div className="xl:hidden border-t border-line bg-paper px-4 py-3 space-y-2" data-lenis-prevent>
-          <Link
-            href="/app"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block px-3 py-2 rounded-lg text-ink font-medium hover:bg-surface"
-          >
-            Bảng điều khiển
-          </Link>
-          {role === "LANDLORD" && (
-            <Link
-              href="/app/hop-dong/moi"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block px-3 py-2 rounded-lg text-primary font-semibold hover:bg-surface"
-            >
-              + Tạo hợp đồng mới
-            </Link>
-          )}
-          <Link
-            href="/bang-chung"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block px-3 py-2 rounded-lg text-ink font-medium hover:bg-surface"
-          >
-            Bằng chứng On-chain
-          </Link>
-          <Link
-            href="/app/admin-demo"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block px-3 py-2 rounded-lg text-ink font-medium hover:bg-surface"
-          >
-            Admin Demo
-          </Link>
-          <Link
-            href="/app/khoi-phuc"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block px-3 py-2 rounded-lg text-ink font-medium hover:bg-surface"
-          >
-            Khôi phục tài khoản
-          </Link>
-          <div className="pt-2 border-t border-line space-y-2">
-            <label className="text-xs text-ink/60 font-medium block">Đổi vai trò:</label>
-            <select
-              value={
-                user?.role === "LANDLORD"
-                  ? "landlord"
-                  : user?.id === "00000000-0000-0000-0000-000000000003" || user?.phone === "0900000003"
-                    ? "tenant2"
-                    : user?.role === "ADMIN_DEMO"
-                      ? "admin"
-                      : "tenant1"
-              }
-              onChange={(e) => {
-                handleRoleSwitch(e);
-                setMobileMenuOpen(false);
-              }}
-              className="w-full bg-surface p-2 rounded-lg border border-line text-sm text-ink"
-            >
-              <option value="landlord">Chủ nhà (Nguyễn Văn An)</option>
-              <option value="tenant1">Người thuê (Trần Thị Bình)</option>
-              <option value="tenant2">Người thuê (Lê Văn Cường)</option>
-              <option value="admin">Admin Demo</option>
-            </select>
+          {/* User Menu */}
+          <div ref={userMenuRef} className="relative">
             <button
               type="button"
               onClick={() => {
-                setMobileMenuOpen(false);
-                logout();
+                setShowNotifs(false);
+                setShowUserMenu((v) => !v);
               }}
-              className="w-full text-left px-3 py-2 rounded-lg text-brick font-semibold hover:bg-brick/10 transition-colors text-sm cursor-pointer"
+              className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-2.5 py-1 text-xs font-semibold text-ink transition-colors hover:bg-surface cursor-pointer"
+              aria-label="Menu người dùng"
+              aria-expanded={showUserMenu}
             >
-              Đăng xuất
+              <span className="max-w-28 truncate hidden sm:inline">{cleanName}</span>
+              <span className="sm:hidden font-bold">{cleanName.split(" ").pop()?.slice(0, 6) || "Tài khoản"}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-ink/60" />
             </button>
+
+            {showUserMenu && (
+              <div
+                className="absolute right-0 mt-2 w-60 rounded-2xl border border-line bg-paper p-2 shadow-soft z-50 text-xs"
+                data-lenis-prevent
+              >
+                <div className="px-3 py-2 border-b border-line/60">
+                  <div className="font-bold text-ink truncate">{cleanName}</div>
+                  <div className="text-[11px] text-ink/55 font-mono">
+                    {user?.phone || "—"} · {roleLabel}
+                  </div>
+                </div>
+
+                <div className="py-1 space-y-0.5">
+                  <Link
+                    href="/app"
+                    onClick={() => setShowUserMenu(false)}
+                    className={`block rounded-xl px-3 py-2 font-semibold transition-colors ${
+                      pathname === "/app" ? "bg-surface text-ink" : "text-ink/80 hover:bg-surface"
+                    }`}
+                  >
+                    Bảng điều khiển
+                  </Link>
+                  <Link
+                    href="/bang-chung"
+                    onClick={() => setShowUserMenu(false)}
+                    className={`block rounded-xl px-3 py-2 font-semibold transition-colors ${
+                      pathname === "/bang-chung" ? "bg-surface text-ink" : "text-ink/80 hover:bg-surface"
+                    }`}
+                  >
+                    Bằng chứng on-chain
+                  </Link>
+                  <Link
+                    href="/app/khoi-phuc"
+                    onClick={() => setShowUserMenu(false)}
+                    className={`block rounded-xl px-3 py-2 font-semibold transition-colors ${
+                      pathname === "/app/khoi-phuc" ? "bg-surface text-ink" : "text-ink/80 hover:bg-surface"
+                    }`}
+                  >
+                    Khôi phục tài khoản
+                  </Link>
+                </div>
+
+                <div className="border-t border-line/60 pt-1.5 mt-1">
+                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-ink/45">
+                    Đổi vai demo
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickSwitch("landlord")}
+                    className="w-full text-left rounded-xl px-3 py-1.5 font-medium text-ink/80 hover:bg-surface cursor-pointer"
+                  >
+                    Chủ nhà · Nguyễn Văn An
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickSwitch("tenant1")}
+                    className="w-full text-left rounded-xl px-3 py-1.5 font-medium text-ink/80 hover:bg-surface cursor-pointer"
+                  >
+                    Người thuê 1 · Trần Thị Bình
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickSwitch("tenant2")}
+                    className="w-full text-left rounded-xl px-3 py-1.5 font-medium text-ink/80 hover:bg-surface cursor-pointer"
+                  >
+                    Người thuê 2 · Lê Văn Cường
+                  </button>
+                </div>
+
+                <div className="border-t border-line/60 pt-1 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      logout();
+                    }}
+                    className="w-full text-left rounded-xl px-3 py-2 font-semibold text-brick hover:bg-brick/10 transition-colors cursor-pointer"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </header>
   );
 }

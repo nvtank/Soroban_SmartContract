@@ -4,7 +4,6 @@ import { useState } from "react";
 
 /**
  * Đăng ký Passkey thật (WebAuthn) cho tài khoản đang đăng nhập.
- * Phải nằm TRONG ứng dụng vì máy chủ chỉ cấp tùy chọn đăng ký cho người đã có phiên đăng nhập.
  */
 export function PasskeySetup() {
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
@@ -41,33 +40,30 @@ export function PasskeySetup() {
   };
 
   return (
-    <section
-      aria-label="Thiết lập Passkey"
-      className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface/50 p-4"
-    >
-      <div className="space-y-0.5">
-        <p className="text-sm font-bold text-ink">Thiết lập Passkey để ký các thao tác quan trọng</p>
-        <p className="text-xs text-ink/70">
-          Ký hợp đồng, duyệt hoàn cọc và chốt tranh chấp bằng vân tay hoặc Face ID, không cần mật khẩu.
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-paper px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-xs sm:text-sm font-semibold text-ink">
+          Passkey ký giao dịch
+          <span className="font-normal text-ink/60"> · Dùng vân tay hoặc thiết bị để ký hợp đồng và hoàn cọc.</span>
         </p>
         {error && (
-          <p role="alert" className="text-xs font-semibold text-brick-ink">
+          <p role="alert" className="mt-1 text-xs font-medium text-brick-ink">
             {error}
           </p>
         )}
       </div>
       {state === "done" ? (
-        <span className="text-sm font-bold text-primary-strong">Đã kích hoạt Passkey trên thiết bị này</span>
+        <span className="text-xs font-bold text-primary-strong">Đã kích hoạt</span>
       ) : (
         <button
           type="button"
           onClick={register}
           disabled={state === "loading"}
-          className="rounded-lg border border-primary px-4 py-2 text-sm font-bold text-primary-strong hover:bg-primary/10 disabled:opacity-60"
+          className="rounded-full border border-line bg-surface/60 px-3.5 py-1.5 text-xs font-bold text-ink transition-colors hover:border-ink/30 hover:bg-surface disabled:opacity-60 cursor-pointer shrink-0"
         >
           {state === "loading" ? "Đang xử lý…" : "Đăng ký Passkey"}
         </button>
       )}
-    </section>
+    </div>
   );
 }

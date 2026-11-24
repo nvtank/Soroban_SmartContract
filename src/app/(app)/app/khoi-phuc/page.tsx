@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { AppNavbar } from "@/components/app/app-navbar";
+import { useSession } from "@/components/app/session-context";
 import { apiClient } from "@/components/app/api-client";
 import { MockBadge } from "@/components/shared";
 
 type RecoveryStatus = "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED";
 
 export default function AccountRecoveryPage() {
+  const { role } = useSession();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [phone, setPhone] = useState("0900000002");
   const [otp, setOtp] = useState("123456");
@@ -19,7 +21,6 @@ export default function AccountRecoveryPage() {
   const [error, setError] = useState<string | null>(null);
   const [newPasskeyCreated, setNewPasskeyCreated] = useState(false);
 
-  // Poll status at step 4
   useEffect(() => {
     if (step !== 4 || !requestId || recoveryStatus === "APPROVED" || recoveryStatus === "COMPLETED") {
       return;
@@ -128,10 +129,8 @@ export default function AccountRecoveryPage() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Gọi route reissue của recovery API
       await apiClient.reissueRecovery(requestId);
 
-      // 2. Cấp lại Passkey bằng startRegistration thật (WebAuthn)
       if (typeof window === "undefined" || !window.PublicKeyCredential) {
         throw new Error("Trình duyệt này không hỗ trợ Passkey (WebAuthn).");
       }
@@ -139,9 +138,7 @@ export default function AccountRecoveryPage() {
       const optRes = await fetch("/api/auth/passkey/register/options", { method: "POST" });
       const optJson = await optRes.json().catch(() => ({}));
       if (!optRes.ok || optJson.error) {
-        throw new Error(
-          optJson.error?.message || "Chưa thể khởi tạo đăng ký Passkey (yêu cầu người dùng có phiên đăng nhập trên hệ thống).",
-        );
+        throw new Error(optJson.error?.message || "Chưa thể khởi tạo đăng ký Passkey.");
       }
 
       const { startRegistration } = await import("@simplewebauthn/browser");
@@ -170,54 +167,66 @@ export default function AccountRecoveryPage() {
     <div className="min-h-screen bg-paper flex flex-col">
       <AppNavbar />
 
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-6 sm:space-y-8">
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">
-              Khôi phục tài khoản RentFlow
+      <main className="flex-1 mx-auto max-w-xl w-full px-4 sm:px-6 py-8 space-y-6">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ink">
+              Khôi phục tài khoản
             </h1>
             <MockBadge label="MÔ PHỎNG" />
           </div>
-          <p className="text-xs sm:text-sm text-ink/70 max-w-xl mx-auto leading-relaxed">
-            Quy trình hỗ trợ người dùng khi mất thiết bị hoặc đổi số điện thoại để lấy lại quyền truy cập ví cọc. Trong bản demo Ideathon, quy trình OTP và eKYC được mô phỏng an toàn.
+          <p className="text-xs sm:text-sm text-ink/65">
+            Cấp lại quyền ký khi mất thiết bị. OTP và eKYC trong bản demo là mô phỏng.
           </p>
         </div>
 
-        {/* Stepper responsive */}
-        <div className="grid grid-cols-4 gap-1 sm:gap-2 text-center text-[11px] sm:text-xs font-semibold border-b border-line pb-4 select-none">
-          <div className={step >= 1 ? "text-primary font-bold" : "text-ink/40"}>1. Nhập SĐT</div>
-          <div className={step >= 2 ? "text-primary font-bold" : "text-ink/40"}>2. Mã OTP</div>
-          <div className={step >= 3 ? "text-primary font-bold" : "text-ink/40"}>3. eKYC mô phỏng</div>
-          <div className={step >= 4 ? "text-primary font-bold" : "text-ink/40"}>4. Duyệt & Cấp lại</div>
+        {/* Stepper */}
+        <div className="grid grid-cols-4 gap-2 text-xs font-semibold">
+          {[
+            { n: 1, label: "1. SĐT" },
+            { n: 2, label: "2. OTP" },
+            { n: 3, label: "3. eKYC" },
+            { n: 4, label: "4. Duyệt" },
+          ].map((s) => (
+            <div
+              key={s.n}
+              className={`rounded-full border py-1.5 text-center ${
+                step >= s.n
+                  ? "border-primary/30 bg-primary/10 font-bold text-primary-strong"
+                  : "border-line bg-surface/40 text-ink/45"
+              }`}
+            >
+              {s.label}
+            </div>
+          ))}
         </div>
 
         {error && (
-          <div role="alert" className="p-3.5 rounded-xl bg-brick/10 border border-brick/30 text-brick text-xs sm:text-sm font-semibold text-center">
-            ⚠️ {error}
+          <div role="alert" className="rounded-2xl border border-brick/30 bg-brick/10 p-3.5 text-xs sm:text-sm font-medium text-brick-ink">
+            {error}
           </div>
         )}
 
-        <div className="bg-surface/50 rounded-panel border border-line p-5 sm:p-8 shadow-soft space-y-6">
-          {/* STEP 1: SĐT */}
+        <div className="rounded-[2rem] border border-line bg-paper p-6 sm:p-8 shadow-soft space-y-6">
           {step === 1 && (
             <form onSubmit={handleStep1} className="space-y-4">
               <div className="space-y-1">
-                <h2 className="text-base font-bold text-ink">
-                  1. Nhập số điện thoại tài khoản cần khôi phục
+                <h2 className="text-base sm:text-lg font-extrabold text-ink">
+                  1. Nhập số điện thoại cần khôi phục
                 </h2>
                 <p className="text-xs text-ink/60">
-                  Hệ thống sẽ tra cứu tài khoản và phát hành mã OTP xác thực mô phỏng.
+                  Hệ thống phát hành mã OTP mô phỏng cho tài khoản tương ứng.
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-ink/80 block">Số điện thoại:</label>
+                <label className="block text-xs font-semibold text-ink/80">Số điện thoại</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Ví dụ: 0900000002"
-                  className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink font-mono text-base focus:outline-primary"
+                  placeholder="0900000002"
+                  className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-2.5 font-mono text-base text-ink focus:outline-primary"
                   required
                 />
               </div>
@@ -225,101 +234,80 @@ export default function AccountRecoveryPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs disabled:opacity-50"
+                className="w-full rounded-full bg-ink py-3 text-sm font-bold text-paper hover:bg-ink/90 transition-colors cursor-pointer disabled:opacity-50"
               >
-                {loading ? "Đang gửi yêu cầu…" : "Gửi mã xác thực OTP ➔"}
+                {loading ? "Đang gửi…" : "Gửi mã xác thực OTP"}
               </button>
             </form>
           )}
 
-          {/* STEP 2: OTP */}
           {step === 2 && (
             <form onSubmit={handleStep2} className="space-y-4">
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold text-ink">
-                    2. Xác thực mã OTP gửi về số điện thoại
-                  </h2>
-                  <MockBadge label="MÔ PHỎNG" />
-                </div>
+                <h2 className="text-base sm:text-lg font-extrabold text-ink">
+                  2. Xác thực mã OTP
+                </h2>
                 <p className="text-xs text-ink/60">
-                  Mã xác thực đã được gửi tới số điện thoại <strong>{phone}</strong>.
+                  Mã OTP mô phỏng cho <strong>{phone}</strong> (mã demo: <strong className="font-mono">123456</strong>).
                 </p>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-ink/80 block">Mã OTP 6 số:</label>
-                <input
-                  type="text"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  maxLength={6}
-                  className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink text-center tracking-widest text-xl font-mono focus:outline-primary"
-                  required
-                />
-                <div className="flex items-center justify-center gap-1.5 text-[11px] text-ink/60 pt-1">
-                  <span>Mã OTP demo cố định:</span>
-                  <strong className="text-primary font-mono font-bold">123456</strong>
-                  <MockBadge label="MÔ PHỎNG" />
-                </div>
-              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                maxLength={6}
+                className="w-full rounded-2xl border border-line bg-surface/35 px-4 py-3 text-center font-mono text-xl tracking-[0.25em] text-ink focus:outline-primary"
+                required
+              />
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="px-4 py-2.5 rounded-xl border border-line text-ink/70 hover:bg-surface text-xs font-semibold cursor-pointer"
+                  className="rounded-full border border-line px-5 py-2.5 text-xs font-semibold text-ink hover:bg-surface cursor-pointer"
                 >
                   Quay lại
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 py-3 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs disabled:opacity-50"
+                  className="flex-1 rounded-full bg-ink py-2.5 text-sm font-bold text-paper hover:bg-ink/90 transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  {loading ? "Đang xác thực…" : "Xác nhận OTP ➔"}
+                  {loading ? "Đang xác thực…" : "Xác nhận OTP"}
                 </button>
               </div>
             </form>
           )}
 
-          {/* STEP 3: eKYC Simulated */}
           {step === 3 && (
             <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-bold text-ink">3. Xác thực danh tính điện tử eKYC</h2>
-                <MockBadge label="MÔ PHỎNG" />
+              <div className="space-y-1">
+                <h2 className="text-base sm:text-lg font-extrabold text-ink">
+                  3. Xác thực danh tính điện tử eKYC
+                </h2>
+                <p className="text-xs text-ink/60">
+                  Bản demo không thu thập ảnh CCCD thật; bước đối soát dưới đây là mô phỏng.
+                </p>
               </div>
 
-              <div className="p-4 rounded-xl bg-amber/15 border border-amber/40 text-xs text-amber-ink space-y-1">
-                <strong>Lưu ý bảo mật:</strong> Bản demo không chụp hay tải ảnh CCCD thật của người dùng. Hệ thống sử dụng hình ảnh và đối soát khuôn mặt mô phỏng để bảo vệ quyền riêng tư.
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-5 rounded-card bg-paper border border-dashed border-line text-center space-y-2">
-                  <div className="text-3xl">🪪</div>
-                  <div className="text-xs font-bold text-ink">Chụp mặt trước CCCD</div>
-                  <div className="flex items-center justify-center gap-1 text-[11px] text-primary font-semibold">
-                    <span>✓ Đã quét mô phỏng</span>
-                    <MockBadge label="MÔ PHỎNG" />
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-line bg-surface/35 p-4 space-y-1">
+                  <div className="text-sm font-bold text-ink">Chụp mặt trước CCCD</div>
+                  <div className="text-xs font-semibold text-primary-strong">Đã kiểm tra (mô phỏng)</div>
                 </div>
-
-                <div className="p-5 rounded-card bg-paper border border-dashed border-line text-center space-y-2">
-                  <div className="text-3xl">🤳</div>
-                  <div className="text-xs font-bold text-ink">Quét khuôn mặt sinh trắc học</div>
-                  <div className="flex items-center justify-center gap-1 text-[11px] text-primary font-semibold">
-                    <span>✓ Khớp 99.2% mô phỏng</span>
-                    <MockBadge label="MÔ PHỎNG" />
-                  </div>
+                <div className="rounded-2xl border border-line bg-surface/35 p-4 space-y-1">
+                  <div className="text-sm font-bold text-ink">Quét khuôn mặt sinh trắc học</div>
+                  <div className="text-xs font-semibold text-primary-strong">Khớp mẫu (mô phỏng)</div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="px-4 py-2.5 rounded-xl border border-line text-ink/70 hover:bg-surface text-xs font-semibold cursor-pointer"
+                  className="rounded-full border border-line px-5 py-2.5 text-xs font-semibold text-ink hover:bg-surface cursor-pointer"
                 >
                   Quay lại
                 </button>
@@ -327,109 +315,78 @@ export default function AccountRecoveryPage() {
                   type="button"
                   onClick={handleStep3}
                   disabled={loading}
-                  className="flex-1 py-3 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs disabled:opacity-50"
+                  className="flex-1 rounded-full bg-ink py-2.5 text-sm font-bold text-paper hover:bg-ink/90 transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  {loading ? "Đang xử lý…" : "Hoàn tất xác thực eKYC mô phỏng ➔"}
+                  {loading ? "Đang xử lý…" : "Hoàn tất xác thực eKYC mô phỏng"}
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP 4: Admin Approval & Passkey Reset */}
           {step === 4 && (
-            <div className="space-y-6 text-center py-4">
-              <div className="w-14 h-14 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center text-3xl">
-                {recoveryStatus === "APPROVED" || recoveryStatus === "COMPLETED" || newPasskeyCreated ? "✓" : "⏳"}
-              </div>
-
+            <div className="space-y-5">
               <div className="space-y-1">
-                <h2 className="text-lg font-bold text-ink">
+                <h2 className="text-base sm:text-lg font-extrabold text-ink">
                   {newPasskeyCreated || recoveryStatus === "COMPLETED"
-                    ? "Khôi phục tài khoản hoàn tất!"
+                    ? "Khôi phục tài khoản hoàn tất"
                     : recoveryStatus === "APPROVED"
-                    ? "Yêu cầu khôi phục đã được phê duyệt!"
-                    : "Yêu cầu khôi phục đang chờ Ban Quản trị duyệt"}
+                      ? "Yêu cầu khôi phục đã được phê duyệt"
+                      : "Yêu cầu khôi phục đang chờ Ban Quản trị duyệt"}
                 </h2>
-                <p className="text-xs sm:text-sm text-ink/70 max-w-md mx-auto leading-relaxed">
+                <p className="text-xs sm:text-sm text-ink/65">
                   {newPasskeyCreated || recoveryStatus === "COMPLETED"
-                    ? `Passkey mới đã được kích hoạt thành công trên thiết bị này cho số điện thoại ${phone}.`
+                    ? `Passkey mới đã kích hoạt cho số ${phone}.`
                     : recoveryStatus === "APPROVED"
-                    ? `Ban Quản trị đã duyệt yêu cầu và thu hồi Passkey cũ. Bạn hãy nhấn nút bên dưới để cấp lại Passkey mới.`
-                    : `Yêu cầu khôi phục cho số điện thoại ${phone} đã được gửi lên hệ thống và đang chờ Admin phê duyệt.`}
+                      ? "Quản trị viên đã duyệt yêu cầu. Bấm nút bên dưới để đăng ký Passkey mới."
+                      : `Yêu cầu cho số ${phone} đã ghi nhận và đang chờ quản trị viên phê duyệt.`}
                 </p>
-                {requestId && (
-                  <p className="text-[11px] font-mono text-ink/50 pt-1">
-                    Mã yêu cầu: {requestId}
-                  </p>
-                )}
               </div>
 
-              {/* Status indicator & check button */}
               {recoveryStatus === "PENDING" && (
-                <div className="p-4 rounded-xl bg-surface border border-line text-xs space-y-3 max-w-md mx-auto">
-                  <div className="flex items-center justify-center gap-2 text-ink font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-amber animate-ping" />
-                    <span>Trạng thái: Đang chờ duyệt (PENDING)</span>
-                  </div>
-                  <div className="flex items-center justify-center gap-3 flex-wrap">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface/40 p-4 text-xs">
+                  <span className="font-semibold text-amber-ink">Đang chờ duyệt (PENDING)</span>
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={checkStatus}
                       disabled={isCheckingStatus}
-                      className="px-3 py-1.5 rounded-lg border border-line bg-paper text-ink font-semibold hover:bg-surface text-xs cursor-pointer"
+                      className="rounded-full border border-line bg-paper px-3.5 py-1.5 font-bold text-ink hover:bg-surface cursor-pointer"
                     >
                       {isCheckingStatus ? "Đang kiểm tra…" : "Kiểm tra lại trạng thái"}
                     </button>
-                    <Link
-                      href="/app/admin-demo"
-                      className="px-3.5 py-1.5 rounded-lg bg-ink text-paper font-bold hover:bg-ink/90 transition-colors inline-flex items-center gap-1.5"
-                    >
-                      <span>Mở Admin Demo để Duyệt</span>
-                      <MockBadge label="DEMO" />
-                    </Link>
+                    {role === "ADMIN_DEMO" && (
+                      <Link
+                        href="/app/admin-demo"
+                        className="rounded-full bg-ink px-3.5 py-1.5 font-bold text-paper"
+                      >
+                        Trang duyệt
+                      </Link>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* Passkey re-enrollment */}
-              <div className="pt-4 border-t border-line space-y-3 max-w-md mx-auto">
-                <h3 className="text-xs font-bold text-ink uppercase tracking-wider">
-                  Cấp lại chữ ký Passkey mới (WebAuthn):
-                </h3>
-                {newPasskeyCreated || recoveryStatus === "COMPLETED" ? (
-                  <div className="space-y-3">
-                    <div className="p-3.5 rounded-xl bg-primary/15 border border-primary/30 text-xs font-bold text-primary">
-                      ✓ Đã cấp và kích hoạt Passkey mới thành công trên thiết bị này!
-                    </div>
-                    <Link
-                      href="/dang-nhap"
-                      className="inline-block px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors text-xs"
-                    >
-                      Quay lại trang Đăng nhập ➔
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={handleCreateNewPasskey}
-                      disabled={loading || recoveryStatus !== "APPROVED"}
-                      className="w-full px-5 py-3 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-xs sm:text-sm disabled:opacity-50 shadow-xs"
-                    >
-                      {loading
-                        ? "Đang đăng ký Passkey…"
-                        : recoveryStatus === "APPROVED"
-                        ? "Thiết lập Passkey mới trên thiết bị này (WebAuthn)"
-                        : "Chờ Admin duyệt để kích hoạt Passkey"}
-                    </button>
-                    {recoveryStatus !== "APPROVED" && (
-                      <p className="text-[11px] text-ink/50">
-                        Nút thiết lập Passkey sẽ tự động mở khóa ngay khi Admin phê duyệt yêu cầu.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
+              {newPasskeyCreated || recoveryStatus === "COMPLETED" ? (
+                <Link
+                  href="/app"
+                  className="inline-flex w-full items-center justify-center rounded-full bg-primary py-3 text-sm font-bold text-paper hover:bg-primary-strong"
+                >
+                  Về bảng điều khiển
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCreateNewPasskey}
+                  disabled={loading || recoveryStatus !== "APPROVED"}
+                  className="w-full rounded-full bg-primary py-3 text-sm font-bold text-paper hover:bg-primary-strong transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {loading
+                    ? "Đang đăng ký Passkey…"
+                    : recoveryStatus === "APPROVED"
+                      ? "Thiết lập Passkey mới trên thiết bị này"
+                      : "Chờ phê duyệt để thiết lập Passkey mới"}
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { Fingerprint, X } from "lucide-react";
 import { MockBadge } from "@/components/shared";
 
 export interface StepUpModalProps {
@@ -13,8 +14,8 @@ export interface StepUpModalProps {
 
 export function StepUpModal({
   action,
-  title = "Xác thực bảo mật bước nâng cao",
-  description = "Thao tác này tạo ra cam kết tài chính và pháp lý, yêu cầu chữ ký số cá nhân để xác nhận.",
+  title = "Xác nhận chữ ký",
+  description = "Xác thực bước hai để ghi nhận cam kết của bạn.",
   onSuccess,
   onCancel,
 }: StepUpModalProps) {
@@ -23,11 +24,18 @@ export function StepUpModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+
   const handleVerify = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Chế độ xem trước giao diện (dữ liệu mẫu): không có máy chủ để cấp mã
       if (process.env.NEXT_PUBLIC_UI_MOCK === "true") {
         await new Promise((resolve) => setTimeout(resolve, 300));
         await onSuccess("demo-step-up");
@@ -37,7 +45,7 @@ export function StepUpModal({
       let credential: unknown = undefined;
       if (method === "passkey") {
         if (typeof window === "undefined" || !window.PublicKeyCredential) {
-          throw new Error("Trình duyệt này không hỗ trợ Passkey. Hãy dùng OTP mô phỏng.");
+          throw new Error("Trình duyệt chưa hỗ trợ Passkey. Hãy chuyển sang OTP (mô phỏng).");
         }
         const optRes = await fetch("/api/auth/passkey/auth/options", { method: "POST" });
         const optJson = await optRes.json().catch(() => ({}));
@@ -49,7 +57,7 @@ export function StepUpModal({
           credential = await startAuthentication({ optionsJSON: optJson.data });
         } catch {
           throw new Error(
-            "Không xác thực được Passkey (chưa đăng ký hoặc bạn đã hủy). Bạn có thể đăng ký Passkey ở trang đăng nhập hoặc dùng OTP mô phỏng.",
+            "Chưa xác thực được Passkey trên thiết bị này. Bạn có thể chuyển sang tab OTP (mô phỏng).",
           );
         }
       } else if (otp.length < 6) {
@@ -78,105 +86,110 @@ export function StepUpModal({
   return (
     <div
       data-action={action}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink/50 p-0 sm:p-4 backdrop-blur-xs"
       role="dialog"
       aria-modal="true"
       aria-labelledby="step-up-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
     >
-      <div className="w-full max-w-md bg-paper rounded-panel border border-line shadow-soft p-6 space-y-5">
-        <div className="flex items-center justify-between border-b border-line pb-3">
-          <div className="flex items-center gap-2">
-            <h3 id="step-up-title" className="text-lg font-bold text-ink">
-              {title}
-            </h3>
-            {method === "otp" && <MockBadge />}
+      <div className="w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] border border-line bg-paper p-6 sm:p-7 shadow-soft space-y-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 id="step-up-title" className="text-lg font-extrabold text-ink">
+                {title}
+              </h3>
+              {method === "otp" && <MockBadge label="MÔ PHỎNG" />}
+            </div>
+            <p className="text-xs text-ink/65">{description}</p>
           </div>
           <button
+            type="button"
             onClick={onCancel}
-            className="text-ink/40 hover:text-ink cursor-pointer p-1 text-lg leading-none"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink cursor-pointer shrink-0"
             aria-label="Đóng"
           >
-            ✕
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <p className="text-xs sm:text-sm text-ink/70">{description}</p>
-
-        {/* Method selection */}
-        <div className="flex rounded-xl bg-surface p-1 border border-line">
+        {/* Method segmented control */}
+        <div className="flex rounded-full border border-line bg-surface p-1 text-xs font-semibold">
           <button
             type="button"
             onClick={() => setMethod("passkey")}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              method === "passkey"
-                ? "bg-paper text-primary shadow-xs font-bold"
-                : "text-ink/60 hover:text-ink"
+            className={`flex-1 rounded-full py-2 transition-colors cursor-pointer ${
+              method === "passkey" ? "bg-paper font-bold text-ink shadow-xs" : "text-ink/60 hover:text-ink"
             }`}
           >
-            🔑 Passkey (Khuyên dùng)
+            Passkey
           </button>
           <button
             type="button"
+            data-tour="stepup-otp-tab"
             onClick={() => setMethod("otp")}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              method === "otp" ? "bg-paper text-primary shadow-xs font-bold" : "text-ink/60 hover:text-ink"
+            className={`flex-1 rounded-full py-2 transition-colors cursor-pointer ${
+              method === "otp" ? "bg-paper font-bold text-ink shadow-xs" : "text-ink/60 hover:text-ink"
             }`}
           >
-            📱 OTP (mô phỏng)
+            OTP (mô phỏng)
           </button>
         </div>
 
         {method === "passkey" ? (
-          <div className="p-5 rounded-card bg-surface/40 border border-line text-center space-y-3">
-            <div className="w-12 h-12 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center text-2xl">
-              👆
+          <div className="rounded-2xl border border-line bg-surface/40 p-5 text-center space-y-2">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-primary/12 text-primary">
+              <Fingerprint className="h-5 w-5" />
             </div>
-            <div className="text-sm font-bold text-ink">Chạm cảm biến vân tay hoặc Face ID</div>
+            <div className="text-sm font-bold text-ink">Xác thực bằng Passkey trên thiết bị</div>
             <p className="text-xs text-ink/60">
-              Chữ ký bảo mật WebAuthn sẽ được kiểm chứng và ký ủy quyền giao dịch custody tại server.
+              Dùng vân tay, khuôn mặt hoặc thiết bị bảo mật đã đăng ký.
             </p>
           </div>
         ) : (
           <div className="space-y-2">
-            <label className="text-xs font-medium text-ink/80 block">
-              Nhập mã OTP 6 số (mô phỏng, chưa gửi SMS thật; mã thử nghiệm 123456):
+            <label htmlFor="stepup-otp-field" className="block text-xs font-semibold text-ink/80">
+              Mã OTP 6 số (mô phỏng · mã demo: 123456)
             </label>
             <input
+              id="stepup-otp-field"
+              data-tour="stepup-otp-input"
               type="text"
+              inputMode="numeric"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
               maxLength={6}
-              className="w-full text-center tracking-widest text-lg font-mono p-2.5 rounded-xl border border-line bg-paper text-ink focus:outline-primary"
+              className="w-full rounded-2xl border border-line bg-surface/40 p-3 text-center font-mono text-xl tracking-[0.3em] text-ink focus:outline-primary"
               placeholder="123456"
             />
-            <p className="text-[11px] text-ink/50 text-center">
-              (Mã thử nghiệm demo: <strong>123456</strong>)
-            </p>
           </div>
         )}
 
         {error && (
           <div
             role="alert"
-            className="p-2.5 rounded-lg bg-brick/10 border border-brick/30 text-xs text-brick text-center font-medium"
+            className="rounded-2xl border border-brick/30 bg-brick/10 p-3 text-center text-xs font-medium text-brick-ink"
           >
-            ⚠️ {error}
+            {error}
           </div>
         )}
 
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2.5 pt-1">
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl border border-line text-ink font-semibold hover:bg-surface transition-colors cursor-pointer text-sm"
+            className="flex-1 rounded-full border border-line py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-surface cursor-pointer"
           >
             Hủy
           </button>
           <button
             type="button"
+            data-tour="stepup-submit"
             onClick={handleVerify}
             disabled={loading}
-            className="flex-1 py-2.5 rounded-xl bg-primary text-paper font-semibold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs disabled:opacity-50"
+            className="flex-1 rounded-full bg-ink py-2.5 text-sm font-bold text-paper transition-colors hover:bg-ink/90 cursor-pointer disabled:opacity-50"
           >
             {loading ? "Đang xác thực…" : "Xác nhận & Ký"}
           </button>
