@@ -18,6 +18,20 @@ export const POST = withApi(async (request: Request) => {
   const admin = createAdminSupabase();
   const clientIp = getClientIp(request);
 
+  // Ba số demo công khai (chủ nhà, hai người thuê) dùng mã cố định 123456 và không gửi SMS,
+  // nên không cần lưu mã hay giới hạn tần suất. Nếu giới hạn, nhiều người cùng thử demo
+  // (cùng số, cùng mạng) sẽ bị chặn lẫn nhau. Số quản trị và số thật vẫn qua giới hạn bên dưới.
+  const isPublicDemoNumber = phone === "0900000001" || phone === "0900000002" || phone === "0900000003";
+  if (process.env.DEMO_MODE === "true" && isPublicDemoNumber) {
+    return ok({
+      success: true,
+      phone,
+      isDemo: true,
+      expiresInSeconds: 300,
+      message: "Mã OTP mô phỏng đã được tạo (gắn nhãn demo: mã 123456 cho số thử nghiệm).",
+    });
+  }
+
   // Durable rate limiting across serverless instances:
   // 1. Per phone: max 3 requests per 5 minutes (300s)
   await assertRateLimit(

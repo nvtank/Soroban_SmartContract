@@ -118,10 +118,10 @@ export function TourPopup({
       data-tour-placement={position.placement}
       className={
         isSheet
-          ? "fixed inset-x-3 bottom-3 z-[9995] rounded-2xl border border-line bg-paper p-4 shadow-soft outline-none"
+          ? "fixed inset-x-3 z-[9995] rounded-2xl border border-line bg-paper p-4 shadow-soft outline-none"
           : "fixed z-[9995] w-[340px] max-w-[calc(100vw-24px)] rounded-2xl border border-line bg-paper p-5 shadow-soft outline-none"
       }
-      style={isSheet ? undefined : { top: position.top, left: position.left }}
+      style={isSheet ? { top: position.top } : { top: position.top, left: position.left }}
     >
       {/* Mũi tên chỉ vào phần tử đích (chỉ trên màn hình >= 640px) */}
       {arrowStyle && (

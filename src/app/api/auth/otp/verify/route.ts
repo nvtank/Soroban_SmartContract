@@ -25,11 +25,13 @@ export const POST = withApi(async (request: Request) => {
   const admin = createAdminSupabase();
   const clientIp = getClientIp(request);
 
-  // Rate limit verification attempts by IP across serverless instances: max 20 per 5 minutes
+  // Giới hạn số lần xác thực theo IP (mặc định 20 lần mỗi 5 phút). Có thể nâng bằng OTP_VERIFY_IP_LIMIT,
+  // ví dụ khi nhiều người dùng chung một mạng (cùng IP) trong buổi trình diễn. Giới hạn 5 lần sai mỗi mã vẫn giữ.
+  const ipLimit = Math.max(1, Number(process.env.OTP_VERIFY_IP_LIMIT) || 20);
   await assertRateLimit(
     admin,
     `otp:ver:ip:${clientIp}`,
-    20,
+    ipLimit,
     300,
     "Quá nhiều lần thử xác thực từ địa chỉ IP này. Vui lòng thử lại sau.",
   );

@@ -107,7 +107,7 @@ export function AppNavbar() {
           </Link>
 
           <span
-            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold shrink-0 ${
+            className={`hidden sm:inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold shrink-0 ${
               role === "LANDLORD"
                 ? "border-ink/15 bg-ink/6 text-ink"
                 : "border-primary/25 bg-primary/10 text-primary-strong"

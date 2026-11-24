@@ -29,6 +29,7 @@ function buildTourDisabledOrigins(urlString: string): string[] {
  */
 export default defineConfig({
   testDir: "tests/e2e",
+  globalSetup: "./tests/e2e/global-setup.ts",
   // mobile-check.spec.ts cần một máy chủ riêng ở chế độ dữ liệu mẫu (cổng 3113); chỉ chạy khi bật cờ này.
   testIgnore: process.env.E2E_MOBILE_MOCK === "1" ? [] : ["**/mobile-check.spec.ts"],
   timeout: 300_000,

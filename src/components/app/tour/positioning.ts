@@ -82,8 +82,16 @@ export function computePopupPosition(
   padding = SPOTLIGHT_PADDING,
 ): PopupPosition {
   if (viewport.width < MOBILE_BREAKPOINT) {
+    // Tấm popup nằm ở đáy hoặc đỉnh màn hình, phía nào KHÔNG che vùng sáng.
+    // (Nút đích trong hộp thoại cố định không cuộn được, nên không thể luôn đặt ở đáy.)
+    const hole = computeSpotlightBox(targetRect, viewport, padding);
+    const bottomTop = Math.round(viewport.height - popupSize.height - VIEWPORT_MARGIN);
+    const fitsBelow = hole.bottom + POPUP_GAP <= bottomTop;
+    const fitsAbove = hole.top - POPUP_GAP >= VIEWPORT_MARGIN + popupSize.height;
+    const spaceBelow = viewport.height - hole.bottom;
+    const useTop = !fitsBelow && (fitsAbove || hole.top > spaceBelow);
     return {
-      top: Math.max(VIEWPORT_MARGIN, Math.round(viewport.height - popupSize.height - VIEWPORT_MARGIN)),
+      top: useTop ? VIEWPORT_MARGIN : Math.max(VIEWPORT_MARGIN, bottomTop),
       left: VIEWPORT_MARGIN,
       placement: "sheet",
       arrowOffset: 0,

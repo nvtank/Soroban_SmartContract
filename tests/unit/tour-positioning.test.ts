@@ -121,6 +121,21 @@ describe("tour positioning logic", () => {
     expect(pos.left).toBe(VIEWPORT_MARGIN);
   });
 
+  it("never covers the target on mobile: sheet moves to the top when the target sits low", () => {
+    const viewport = { width: 390, height: 844 };
+    const popup = { width: 366, height: 230 };
+    // Nút gửi trong hộp thoại cố định ở nửa dưới màn hình (không cuộn được)
+    const lowTarget = makeRect(200, 640, 170, 44);
+    const low = computePopupPosition(lowTarget, popup, viewport);
+    expect(low.placement).toBe("sheet");
+    expect(low.top + popup.height).toBeLessThanOrEqual(lowTarget.top);
+
+    // Nút ở nửa trên: tấm popup ở đáy và không chạm nút
+    const highTarget = makeRect(20, 120, 350, 50);
+    const high = computePopupPosition(highTarget, popup, viewport);
+    expect(high.top).toBeGreaterThanOrEqual(highTarget.top + highTarget.height);
+  });
+
   it("detects rect changes and scroll-into-view threshold accurately", () => {
     const r1 = makeRect(100, 200, 150, 40);
     const r2 = makeRect(100.2, 200.1, 150, 40);
