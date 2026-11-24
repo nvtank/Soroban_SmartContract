@@ -1,20 +1,16 @@
 "use server";
 
-import { cookies } from "next/headers";
 import type { SessionUser } from "@/domain/dto";
 import { getOptionalUser } from "@/lib/supabase/session";
+import { DEMO_USERS } from "@/lib/supabase/demo-accounts";
+import { clearDemoSessionCookie, setDemoSessionCookie } from "@/lib/supabase/demo-session-cookie";
 
 export async function getServerSessionUser(): Promise<SessionUser | null> {
   return await getOptionalUser();
 }
 
 export async function logoutServerAction(): Promise<void> {
-  try {
-    const cookieStore = await cookies();
-    cookieStore.delete("rentflow_demo_user_id");
-  } catch {
-    // Ignore in non-cookie environments
-  }
+  await clearDemoSessionCookie();
 }
 
 export async function switchDemoUserAction(
@@ -24,27 +20,19 @@ export async function switchDemoUserAction(
     return null;
   }
 
-  const userIds: Record<string, string> = {
-    landlord: "00000000-0000-0000-0000-000000000001",
-    tenant1: "00000000-0000-0000-0000-000000000002",
-    tenant2: "00000000-0000-0000-0000-000000000003",
-    admin: "00000000-0000-0000-0000-000000000001",
-  };
+  // Ánh xạ tới tài khoản demo do seed tạo; admin trỏ tới ADMIN_DEMO thật.
+  const accounts = {
+    landlord: DEMO_USERS.LANDLORD,
+    tenant1: DEMO_USERS.TENANT_1,
+    tenant2: DEMO_USERS.TENANT_2,
+    admin: DEMO_USERS.ADMIN,
+  } as const;
 
-  const targetId = userIds[userKey];
-  if (!targetId) return null;
+  const target = accounts[userKey];
+  if (!target) return null;
 
-  try {
-    const cookieStore = await cookies();
-    cookieStore.set("rentflow_demo_user_id", targetId, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60,
-    });
-  } catch {
-    // Ignore
-  }
+  const issued = await setDemoSessionCookie(target.id);
+  if (!issued) return null;
 
   return await getOptionalUser();
 }

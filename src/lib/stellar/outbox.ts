@@ -13,6 +13,8 @@ const MAX_RETRIES = 5;
 const DEFAULT_POLL_TIMEOUT_MS = 6000;
 
 type GenericDb = {
+  /** Repository bọc client Supabase (xem DomainRepository của lớp domain). */
+  db?: GenericDb;
   rpc?: (
     name: string,
     params?: unknown,
@@ -150,8 +152,16 @@ export async function enqueueOnchain(
     created_at: now,
   };
 
+  const mockTarget = db as { onchain_txs?: OnchainTxRecord[] } | null | undefined;
+  if (mockTarget && Array.isArray(mockTarget.onchain_txs)) {
+    mockTarget.onchain_txs.push(record);
+    return { id };
+  }
+
   let genericDb = db as GenericDb | null | undefined;
-  if (!genericDb || typeof genericDb.from !== "function") {
+  if (genericDb?.db && typeof genericDb.db.from === "function") {
+    genericDb = genericDb.db;
+  } else if (!genericDb || typeof genericDb.from !== "function") {
     try {
       const { createAdminSupabase } = await import("@/lib/supabase/admin");
       genericDb = createAdminSupabase() as unknown as GenericDb;
@@ -165,8 +175,6 @@ export async function enqueueOnchain(
     if (error) {
       throw new ApiError("INTERNAL_ERROR", error, "Lỗi khi lưu giao dịch on-chain vào outbox");
     }
-  } else if (genericDb && Array.isArray((genericDb as any).onchain_txs)) {
-    (genericDb as any).onchain_txs.push(record);
   }
 
   return { id };

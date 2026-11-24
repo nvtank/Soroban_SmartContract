@@ -1,8 +1,9 @@
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import type { SessionUser } from "@/domain/dto";
 import { ApiError } from "@/lib/api/http";
 import { createServerSupabase } from "./server";
 import { createAdminSupabase } from "./admin";
+import { DEMO_SESSION_COOKIE, verifyDemoSessionToken } from "./demo-session";
 
 export async function getOptionalUser(): Promise<SessionUser | null> {
   const admin = createAdminSupabase();
@@ -42,50 +43,31 @@ export async function getOptionalUser(): Promise<SessionUser | null> {
     // Proceed to check fallback/demo headers
   }
 
-  // 2. Demo mode session support
-  if (process.env.DEMO_MODE === "true") {
-    try {
-      const cookieStore = await cookies();
-      const demoUserId = cookieStore.get("rentflow_demo_user_id")?.value;
-      if (demoUserId) {
-        const { data: profile } = await admin
-          .from("profiles")
-          .select("id, role, full_name, phone")
-          .eq("id", demoUserId)
-          .maybeSingle();
+  // 2. Phiên RentFlow: cookie do server ký HMAC sau khi xác thực OTP/Passkey.
+  // Tài khoản demo chỉ hợp lệ khi DEMO_MODE=true (kiểm tra trong verifyDemoSessionToken).
+  // Cookie hoặc header không ký KHÔNG bao giờ được tin.
+  try {
+    const cookieStore = await cookies();
+    const session = verifyDemoSessionToken(cookieStore.get(DEMO_SESSION_COOKIE)?.value);
+    if (session) {
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("id, role, full_name, phone")
+        .eq("id", session.uid)
+        .maybeSingle();
 
-        if (profile) {
-          return {
-            id: profile.id,
-            role: profile.role,
-            fullName: profile.full_name,
-            phone: profile.phone,
-          };
-        }
+      // Vai trò trong DB phải khớp vai trò đã ký
+      if (profile && profile.role === session.role) {
+        return {
+          id: profile.id,
+          role: profile.role,
+          fullName: profile.full_name,
+          phone: profile.phone,
+        };
       }
-
-      // Check header in server context / testing
-      const headerStore = await headers();
-      const demoHeaderId = headerStore.get("x-demo-user-id");
-      if (demoHeaderId) {
-        const { data: profile } = await admin
-          .from("profiles")
-          .select("id, role, full_name, phone")
-          .eq("id", demoHeaderId)
-          .maybeSingle();
-
-        if (profile) {
-          return {
-            id: profile.id,
-            role: profile.role,
-            fullName: profile.full_name,
-            phone: profile.phone,
-          };
-        }
-      }
-    } catch {
-      // Ignored
     }
+  } catch {
+    // Ngoài ngữ cảnh request
   }
 
   return null;

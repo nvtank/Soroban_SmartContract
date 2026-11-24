@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { DEMO_SESSION_COOKIE, verifySessionToken } from "@/lib/supabase/demo-session";
 
 function isOriginAllowed(originHeader: string, request: NextRequest): boolean {
   try {
@@ -88,18 +89,16 @@ export function proxy(request: NextRequest) {
       return new NextResponse("Not Found", { status: 404 });
     }
 
-    const demoUserId = request.cookies.get("rentflow_demo_user_id")?.value;
-    const demoUserRole = request.cookies.get("rentflow_demo_user_role")?.value;
-    const supabaseCookie = request.cookies.getAll().some((c) => c.name.startsWith("sb-"));
+    const session = verifySessionToken(request.cookies.get(DEMO_SESSION_COOKIE)?.value);
 
-    if (!demoUserId && !supabaseCookie) {
+    if (!session) {
       const loginUrl = new URL("/dang-nhap", request.url);
       loginUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(loginUrl);
     }
 
-    // Role check: must be ADMIN_DEMO
-    if (demoUserRole !== "ADMIN_DEMO") {
+    // Vai trò lấy từ phiên đã ký, không tin cookie hay header do client gửi
+    if (session.role !== "ADMIN_DEMO") {
       return new NextResponse(
         "Forbidden: Khu vực quản trị chỉ dành cho tài khoản có quyền ADMIN_DEMO.",
         { status: 403 },
@@ -111,10 +110,11 @@ export function proxy(request: NextRequest) {
 
   // 3. Protect all other /app/** routes at the server
   if (pathname.startsWith("/app")) {
-    const demoCookie = request.cookies.get("rentflow_demo_user_id");
+    // Chỉ để điều hướng về trang đăng nhập; quyền thật luôn được kiểm tra lại ở API.
+    const session = verifySessionToken(request.cookies.get(DEMO_SESSION_COOKIE)?.value);
     const supabaseCookie = request.cookies.getAll().some((c) => c.name.startsWith("sb-"));
 
-    if (!demoCookie && !supabaseCookie) {
+    if (!session && !supabaseCookie) {
       const loginUrl = new URL("/dang-nhap", request.url);
       loginUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(loginUrl);

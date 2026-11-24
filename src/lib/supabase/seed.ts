@@ -1,29 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createCustodyWallet } from "@/lib/crypto/custody";
 
-export const DEMO_USERS = {
-  LANDLORD: {
-    id: "00000000-0000-0000-0000-000000000001",
-    email: "landlord.demo@rentflow.local",
-    phone: "0900000001",
-    fullName: "Nguyễn Văn An (Chủ nhà Demo)",
-    role: "LANDLORD" as const,
-  },
-  TENANT_1: {
-    id: "00000000-0000-0000-0000-000000000002",
-    email: "tenant1.demo@rentflow.local",
-    phone: "0900000002",
-    fullName: "Trần Thị Bình (Người thuê Demo 1)",
-    role: "TENANT" as const,
-  },
-  TENANT_2: {
-    id: "00000000-0000-0000-0000-000000000003",
-    email: "tenant2.demo@rentflow.local",
-    phone: "0900000003",
-    fullName: "Lê Văn Cường (Người thuê Demo 2)",
-    role: "TENANT" as const,
-  },
-};
+import { DEMO_USERS } from "./demo-accounts";
+
+export { DEMO_USERS };
 
 export const DEMO_CONTRACTS = {
   CONTRACT_1: "10000000-0000-0000-0000-000000000001",

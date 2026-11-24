@@ -90,7 +90,8 @@ async function main() {
       .build();
 
     const simRes = await server.simulateTransaction(tx);
-    console.log(`Simulate create_contract: ${rpc.Api.isSimulationSuccess(simRes) ? "THÀNH CÔNG" : "KẾT QUẢ:", simRes}`);
+    const isSuccess = rpc.Api.isSimulationSuccess(simRes);
+    console.log(`Simulate create_contract: ${isSuccess ? "THÀNH CÔNG" : "KẾT QUẢ:"}`, simRes);
   } catch (err) {
     console.log(`Simulate create_contract hoàn thành (chi tiết):`, (err as Error).message);
   }

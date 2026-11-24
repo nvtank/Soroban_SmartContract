@@ -43,7 +43,7 @@ if (typeof (Object as unknown as Record<string, unknown>).groupBy !== "function"
 
 // Polyfill globalThis.WebSocket for Node 20 if needed
 if (typeof globalThis.WebSocket === "undefined") {
-  (globalThis as any).WebSocket = class MockWebSocket {
+  (globalThis as unknown as { WebSocket: unknown }).WebSocket = class MockWebSocket {
     constructor() {}
     addEventListener() {}
     removeEventListener() {}
