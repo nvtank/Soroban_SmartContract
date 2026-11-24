@@ -7,6 +7,8 @@ Chỉ ghi những gì đã thật sự chạy. Mọi số liệu lấy từ lầ
 | Bộ kiểm thử | Kết quả | Lệnh |
 |---|---|---|
 | Unit và tích hợp (Vitest) | 44 tệp, **315/315 đạt** | `pnpm test` |
+| E2E trên trình duyệt thật (Playwright) | 7 tệp, **24/24 đạt**, 1 bỏ qua (kịch bản video) | `pnpm e2e` |
+| Video dự phòng kịch bản demo | 5 bước, **12.58 MB (50.16s)** tại `demo-assets/demo-backup.webm` | `pnpm e2e:video` |
 | Smart contract (Rust) | **29/29 đạt**, gồm test đối kháng và chuỗi lệnh ngẫu nhiên | `cd contracts/rentflow && cargo test` |
 | TypeScript | 0 lỗi | `pnpm typecheck` |
 | ESLint | 0 lỗi | `pnpm lint` |
@@ -26,12 +28,33 @@ Trạng thái đọc ngược từ contract sau luồng từ chối khấu trừ
 
 Giao dịch được bọc `FeeBumpTransaction` (CAP-15), tài khoản nền tảng trả phí, đã kiểm tra bao bì giao dịch trên chain.
 
-## 3. Giao diện trình duyệt thật (Chrome)
+## 3. Giao diện trình duyệt thật (Playwright Chrome E2E)
 
-- Đăng nhập OTP bằng giao diện: đạt.
-- Duyệt 10 trang x 3 cỡ màn hình (1440, 1100, 390 pixel) ở chế độ dữ liệu mẫu: không lỗi console, không tràn ngang, banner mô phỏng luôn hiện.
-- Duyệt dashboard, chi tiết hợp đồng và các tab của cả hai vai ở chế độ thật: không lỗi.
-- Passkey bằng thiết bị Passkey ảo của Chrome: đăng ký đạt, ký xác nhận hợp đồng đạt, mã bước hai là mã thật dùng một lần (không phải mã demo), hợp đồng chuyển sang Đang hiệu lực.
+Bộ kiểm thử E2E tự động trên trình duyệt thật (Playwright nối trực tiếp app local và Stellar Testnet) đạt **24/24 bài test** trên 6 bộ kịch bản nghiệp vụ (thời gian chạy ~1.7 phút):
+
+1. **Luồng trình diễn chính 7 bước (`tests/e2e/demo-flow.spec.ts` - 7/7 đạt):**
+   - Khởi tạo kịch bản demo qua `POST /api/demo/prepare` và chờ tối thiểu 10 giao dịch xác nhận trên Testnet.
+   - Bước 1: Người thuê ký xác nhận hợp đồng Phòng 301, chuyển trạng thái sang Đang hiệu lực.
+   - Bước 2: Người thuê nạp cọc bằng VietQR mô phỏng (bấm "Giả lập: Đã nhận đủ tiền"), cọc chuyển sang Đã ghi nhận.
+   - Bước 3: Chủ nhà xem kỳ quá hạn Phòng 402, thực hiện gia hạn thanh toán, phí phạt trễ được miễn.
+   - Bước 4: Hoàn cọc hai bên cùng ký duyệt (người thuê xác nhận, cọc chưa giải ngân; chủ nhà duyệt tiếp cùng số tiền, cọc mới chuyển Đã hoàn trả).
+   - Bước 5: Kiểm tra tính trung lập trong tranh chấp tại Phòng 102, hệ thống không tự trừ tiền hay kết luận bên nào đúng.
+   - Bằng chứng on-chain: Bảng giao dịch hiển thị link Stellar Expert thật và **không lọt bất kỳ PII nào** (không số điện thoại, không họ tên).
+2. **Nộp thiếu rồi nộp đủ (`tests/e2e/payment-partial.spec.ts` - 1/1 đạt):**
+   - Hộp thoại VietQR mô phỏng hiển thị chính xác nhãn nộp thiếu (`UNDERPAID`), sau đó chuyển trạng thái thành công (`CONFIRMED`) khi nộp đủ.
+3. **Phân quyền vai trò trên giao diện (`tests/e2e/role-permissions.spec.ts` - 2/2 đạt):**
+   - Chủ nhà thấy nút tạo hợp đồng, form đề xuất khấu trừ, nhưng không thấy nút "Nộp tiền" của người thuê.
+   - Người thuê thấy nút nộp tiền, nhưng không thấy nút tạo hợp đồng, gia hạn hay form đề xuất khấu trừ của chủ nhà.
+4. **Banner mô phỏng và loại bỏ thuật ngữ Web3 (`tests/e2e/web3-jargon-and-banner.spec.ts` - 7/7 đạt):**
+   - Banner mô phỏng hiển thị trên mọi trang (`/`, `/dang-nhap`, `/app`, `/bang-chung`, `/minh-bach`).
+   - Toàn bộ giao diện `/app/**` không chứa các từ khóa Web3 (`XLM`, `gas`, `seed phrase`) ngoài ngăn Bằng chứng on-chain.
+5. **Giao diện di động 390x844 (`tests/e2e/mobile-viewport.spec.ts` - 5/5 đạt):**
+   - Kiểm tra các màn hình chính không tràn ngang, nút bấm chính thao tác tốt. Phát hiện hiện tượng tràn ngang do thanh cuộn tab ở `/app/hop-dong/[id]` (đã lưu ảnh `test-results/mobile-overflow-contract-detail.png`).
+6. **Khôi phục tài khoản (`tests/e2e/recovery.spec.ts` - 2/2 đạt):**
+   - Khách vãng lai truy cập `/app/khoi-phuc` bị route guard chuyển hướng về `/dang-nhap`.
+   - Người dùng đăng nhập thực hiện trọn vẹn 4 bước khôi phục (nhập SĐT -> OTP -> eKYC mô phỏng -> Admin cấp lại Passkey mô phỏng).
+7. **Video kịch bản demo (`tests/e2e/demo-video.spec.ts` - `pnpm e2e:video`):**
+   - Chạy tự động toàn bộ 5 bước theo `docs/DEMO_SCRIPT.md` với `slowMo: 400`, tự động xuất video `demo-assets/demo-backup.webm` (12.58 MB, thời lượng 50.16s).
 
 ## 4. Bảy tình huống lỗi
 
@@ -55,10 +78,9 @@ Các lỗi này lọt qua test đơn vị và chỉ lộ ra khi chạy thật:
 ## 6. Chưa kiểm thử
 
 - Hiệu năng online, tải, độ ổn định lâu dài.
-- Lighthouse, thiết bị di động thật, Passkey trên điện thoại thật.
+- Thiết bị di động thật và Passkey trên điện thoại thật (mới kiểm thử trên Chromium viewport 390x844 và Passkey ảo Chrome).
 - payOS thật (chưa có khóa): tạo link, webhook ký thật, đối soát.
-- Khôi phục tài khoản và nút "Kiểm tra lại" qua giao diện.
-- Playwright E2E chính thức (mới có kịch bản API và một kịch bản trình duyệt cho Passkey).
+- Nút "Kiểm tra lại" qua giao diện ở các tình huống mạng chập chờn.
 - Hoàn cọc, giải quyết tranh chấp và `mark_overdue` đã chạy thật trên chain, nhưng chưa chạy chéo nhiều hợp đồng cùng lúc với tải lớn.
 
 ## 7. Số đo cuộn trang chủ

@@ -69,6 +69,8 @@ Script từ chối chạy nếu thư mục `contracts/` chưa commit và không 
 ```bash
 pnpm test                       # unit và tích hợp (xóa dữ liệu demo, chạy xong cần chuẩn bị lại)
 pnpm typecheck && pnpm lint
+pnpm e2e                        # E2E Playwright trên trình duyệt thật (24 test tự động)
+pnpm e2e:video                  # quay và xuất video kịch bản demo (demo-assets/demo-backup.webm)
 node scripts/e2e-flow.mjs       # luồng chính trên app đang chạy
 node scripts/e2e-extra.mjs      # phạt trễ, hoàn cọc, tranh chấp, gia hạn
 node scripts/scan-secrets.mjs   # quét bí mật
