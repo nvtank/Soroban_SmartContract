@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { withApi, parseJson, ok, ApiError } from "@/lib/api/http";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createCustodyWallet } from "@/lib/crypto/custody";
+import { assertRateLimit, getClientIp } from "@/lib/supabase/rate-limit";
 import type { SessionUser } from "@/domain/dto";
 
 const VerifyOtpSchema = z.object({
@@ -17,6 +18,16 @@ export const POST = withApi(async (request: Request) => {
   const phone = body.phone.trim();
   const code = body.code.trim();
   const admin = createAdminSupabase();
+  const clientIp = getClientIp(request);
+
+  // Rate limit verification attempts by IP across serverless instances: max 20 per 5 minutes
+  await assertRateLimit(
+    admin,
+    `otp:ver:ip:${clientIp}`,
+    20,
+    300,
+    "Quá nhiều lần thử xác thực từ địa chỉ IP này. Vui lòng thử lại sau.",
+  );
 
   const isDemo = process.env.DEMO_MODE === "true";
   const isFixedDemoNumber =
@@ -125,14 +136,22 @@ export const POST = withApi(async (request: Request) => {
   // Ensure custody wallet exists
   await createCustodyWallet(admin, user.id);
 
-  // Set session cookie
+  // Set session cookie with explicit SameSite and httpOnly
   try {
     const cookieStore = await cookies();
     cookieStore.set("rentflow_demo_user_id", user.id, {
       httpOnly: true,
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 7 * 24 * 60 * 60, // 7 days
+    });
+    cookieStore.set("rentflow_demo_user_role", user.role, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60,
     });
   } catch {
     // In unit tests or non-Next request context
