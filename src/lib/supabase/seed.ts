@@ -195,6 +195,30 @@ export async function seedDemoData(admin: SupabaseClient) {
     status: "PROPOSED",
   });
 
+  // 5. Demo on-chain txs for transparency explorer
+  await admin.from("onchain_txs").upsert([
+    {
+      id: "30000000-0000-0000-0000-000000000001",
+      contract_id: DEMO_CONTRACTS.CONTRACT_1,
+      action: "create_contract",
+      payload_hash: "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      status: "CONFIRMED",
+      tx_hash: "a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0",
+      retry_count: 0,
+      created_at: "2026-01-01T08:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-0000-0000-000000000002",
+      contract_id: DEMO_CONTRACTS.CONTRACT_1,
+      action: "record_deposit_paid",
+      payload_hash: "2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      status: "CONFIRMED",
+      tx_hash: "b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef01",
+      retry_count: 0,
+      created_at: "2026-01-01T08:30:00.000Z",
+    },
+  ]);
+
   return {
     users: DEMO_USERS,
     contracts: DEMO_CONTRACTS,

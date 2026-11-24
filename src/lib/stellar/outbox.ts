@@ -150,14 +150,23 @@ export async function enqueueOnchain(
     created_at: now,
   };
 
-  const genericDb = db as GenericDb | null | undefined;
+  let genericDb = db as GenericDb | null | undefined;
+  if (!genericDb || typeof genericDb.from !== "function") {
+    try {
+      const { createAdminSupabase } = await import("@/lib/supabase/admin");
+      genericDb = createAdminSupabase() as unknown as GenericDb;
+    } catch {
+      // ignore
+    }
+  }
+
   if (genericDb && typeof genericDb.from === "function") {
     const { error } = await genericDb.from("onchain_txs").insert(record);
     if (error) {
       throw new ApiError("INTERNAL_ERROR", error, "Lỗi khi lưu giao dịch on-chain vào outbox");
     }
-  } else if (genericDb && Array.isArray(genericDb.onchain_txs)) {
-    genericDb.onchain_txs.push(record);
+  } else if (genericDb && Array.isArray((genericDb as any).onchain_txs)) {
+    (genericDb as any).onchain_txs.push(record);
   }
 
   return { id };

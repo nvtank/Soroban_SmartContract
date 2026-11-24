@@ -8,26 +8,40 @@ import { MockBadge } from "@/components/shared";
 
 export default function AccountRecoveryPage() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [phone, setPhone] = useState("0987654321");
+  const [phone, setPhone] = useState("0900000002");
   const [otp, setOtp] = useState("123456");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [newPasskeyCreated, setNewPasskeyCreated] = useState(false);
 
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    if (!phone || phone.trim().length < 8) {
+      setError("Số điện thoại không hợp lệ");
+      return;
+    }
     setStep(2);
   };
 
   const handleStep2 = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    if (!otp || otp.trim().length < 4) {
+      setError("Vui lòng nhập mã OTP 6 số");
+      return;
+    }
     setStep(3);
   };
 
   const handleStep3 = async () => {
     setLoading(true);
+    setError(null);
     try {
-      await apiClient.submitRecovery(phone);
+      await apiClient.submitRecovery(phone, "Yêu cầu khôi phục quyền truy cập (eKYC mô phỏng hoàn tất)");
       setStep(4);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Gửi yêu cầu khôi phục thất bại");
     } finally {
       setLoading(false);
     }
@@ -38,7 +52,7 @@ export default function AccountRecoveryPage() {
     setTimeout(() => {
       setLoading(false);
       setNewPasskeyCreated(true);
-    }, 800);
+    }, 600);
   };
 
   return (
@@ -65,6 +79,12 @@ export default function AccountRecoveryPage() {
           <div className={step >= 3 ? "text-primary" : "text-ink/40"}>3. eKYC mô phỏng</div>
           <div className={step >= 4 ? "text-primary" : "text-ink/40"}>4. Duyệt & Cấp lại</div>
         </div>
+
+        {error && (
+          <div role="alert" className="p-3.5 rounded-xl bg-brick/10 border border-brick/30 text-brick text-xs sm:text-sm font-semibold text-center">
+            ⚠️ {error}
+          </div>
+        )}
 
         <div className="bg-surface/50 rounded-panel border border-line p-6 sm:p-8 shadow-soft space-y-6">
           {/* STEP 1: SĐT */}
@@ -151,7 +171,7 @@ export default function AccountRecoveryPage() {
                 type="button"
                 onClick={handleStep3}
                 disabled={loading}
-                className="w-full py-3 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs"
+                className="w-full py-3 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs disabled:opacity-50"
               >
                 {loading ? "Đang xử lý…" : "Gửi yêu cầu khôi phục tới Admin"}
               </button>
@@ -196,7 +216,7 @@ export default function AccountRecoveryPage() {
                     type="button"
                     onClick={handleCreateNewPasskey}
                     disabled={loading}
-                    className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-xs"
+                    className="px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-xs disabled:opacity-50"
                   >
                     {loading ? "Đang tạo…" : "Thiết lập Passkey mới trên thiết bị này"}
                   </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { PaymentDto } from "@/domain/dto";
 import { apiClient } from "./api-client";
 import { MockBadge } from "@/components/shared";
@@ -13,36 +13,90 @@ export interface PaymentModalProps {
 }
 
 export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: PaymentModalProps) {
+  const [currentPayment, setCurrentPayment] = useState<PaymentDto>(payment);
   const [loading, setLoading] = useState(false);
   const [rechecking, setRechecking] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [outcomeStatus, setOutcomeStatus] = useState<string>(payment.status);
+  const [error, setError] = useState<string | null>(null);
+
+  const pollCountRef = useRef(0);
+  const MAX_POLLS = 15;
+
+  // Polling payment status with limit and cleanup on unmount
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    let isActive = true;
+
+    const poll = async () => {
+      if (!isActive) return;
+      if (currentPayment.status === "CONFIRMED" || currentPayment.status === "FAILED") {
+        return;
+      }
+
+      if (pollCountRef.current >= MAX_POLLS) {
+        setStatusMessage("Đã dừng tự động kiểm tra. Vui lòng bấm 'Kiểm tra lại' để đối soát.");
+        return;
+      }
+
+      pollCountRef.current += 1;
+      try {
+        const updated = await apiClient.getPaymentById(payment.id);
+        if (isActive && updated) {
+          setCurrentPayment(updated);
+          if (updated.status === "CONFIRMED") {
+            setStatusMessage("Thanh toán đã được xác nhận thành công!");
+            setTimeout(() => {
+              if (isActive) {
+                onSuccess();
+                onClose();
+              }
+            }, 1000);
+            return;
+          }
+        }
+      } catch {
+        // Ignored during passive poll
+      }
+
+      if (isActive) {
+        timer = setTimeout(poll, 3000);
+      }
+    };
+
+    timer = setTimeout(poll, 3000);
+
+    return () => {
+      isActive = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [payment.id, currentPayment.status, onSuccess, onClose]);
 
   const handleSimulate = async (outcome: "CONFIRMED" | "UNDERPAID" | "OVERPAID" | "FAILED") => {
     setLoading(true);
     setStatusMessage(null);
+    setError(null);
     try {
       const res = await apiClient.simulatePayment(payment.id, outcome);
-      setOutcomeStatus(res.payment.status);
+      setCurrentPayment(res.payment);
 
       if (outcome === "CONFIRMED") {
-        setStatusMessage("Thanh toán thành công! Hệ thống đã ghi nhận và khởi tạo hàng đợi on-chain.");
+        setStatusMessage("Thanh toán thành công! Giao dịch đã được ghi nhận vào outbox on-chain.");
         setTimeout(() => {
           onSuccess();
           onClose();
         }, 1200);
       } else if (outcome === "UNDERPAID") {
-        setStatusMessage("Đã nhận 5.000 ₫. Nộp thiếu so với yêu cầu thử nghiệm. Trạng thái: Nộp thiếu.");
+        setStatusMessage("Đã nhận tiền thiếu so với số yêu cầu. Trạng thái: Nộp thiếu (UNDERPAID).");
         onSuccess();
       } else if (outcome === "OVERPAID") {
-        setStatusMessage("Đã nhận 15.000 ₫. Nộp thừa. Phần dư đã được ghi nhận đối soát.");
+        setStatusMessage("Đã nhận tiền thừa so với số yêu cầu. Trạng thái: Nộp thừa (OVERPAID). Phần dư được lưu lại đối soát.");
         onSuccess();
       } else if (outcome === "FAILED") {
         setStatusMessage("Thanh toán thất bại hoặc người dùng đã hủy giao dịch.");
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi xử lý";
-      setStatusMessage(`Lỗi: ${msg}`);
+      const msg = err instanceof Error ? err.message : "Lỗi xử lý giao dịch";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -50,24 +104,41 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
 
   const handleRecheck = async () => {
     setRechecking(true);
-    // Simulate webhook reconciliation delay
-    setTimeout(() => {
+    setStatusMessage(null);
+    setError(null);
+    try {
+      const res = await apiClient.recheckPayment(payment.id);
+      setCurrentPayment(res);
+      if (res.status === "CONFIRMED") {
+        setStatusMessage("Đối soát thành công: Giao dịch đã được thanh toán đầy đủ!");
+        setTimeout(() => {
+          onSuccess();
+          onClose();
+        }, 1000);
+      } else {
+        setStatusMessage(`Kết quả đối soát: Trạng thái hiện tại là ${res.status}.`);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Không thể đối soát lúc này. Vui lòng thử lại.");
+    } finally {
       setRechecking(false);
-      setStatusMessage("Hệ thống đã đối soát với cổng thanh toán. Trạng thái hiện tại: " + outcomeStatus);
-    }, 1000);
+    }
   };
 
-  const formattedRealAmount = new Intl.NumberFormat("vi-VN").format(Number(payment.businessAmount));
-  const formattedTestAmount = new Intl.NumberFormat("vi-VN").format(Number(payment.expectedAmount));
+  const formattedRealAmount = new Intl.NumberFormat("vi-VN").format(Number(currentPayment.businessAmount));
+  const formattedTestAmount = new Intl.NumberFormat("vi-VN").format(Number(currentPayment.expectedAmount));
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60"
       role="dialog"
       aria-modal="true"
       aria-labelledby="payment-modal-title"
     >
-      <div className="w-full max-w-lg bg-paper rounded-panel border border-line shadow-soft p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+      <div
+        className="w-full max-w-lg bg-paper rounded-panel border border-line shadow-soft p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto"
+        data-lenis-prevent
+      >
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-line pb-4">
           <div>
@@ -78,7 +149,7 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
               <MockBadge label="MÔ PHỎNG" />
             </div>
             <p className="text-xs sm:text-sm text-ink/70">
-              {payment.kind === "DEPOSIT" ? "Nạp tiền cọc bảo chứng cho: " : "Thanh toán tiền thuê cho: "}
+              {currentPayment.kind === "DEPOSIT" ? "Nạp tiền cọc bảo chứng cho: " : "Thanh toán tiền thuê cho: "}
               <strong className="text-ink">{roomLabel}</strong>
             </p>
           </div>
@@ -104,7 +175,7 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
         {/* QR Display */}
         <div className="flex flex-col items-center justify-center p-6 bg-surface/50 rounded-card border border-line text-center space-y-3">
           {/* VietQR Mock SVG Canvas */}
-          <div className="p-4 bg-white rounded-2xl shadow-sm border border-line/40 inline-block">
+          <div className="p-4 bg-white rounded-2xl shadow-xs border border-line/40 inline-block">
             <svg
               className="w-44 h-44 sm:w-52 sm:h-52"
               viewBox="0 0 200 200"
@@ -161,22 +232,39 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
 
           <div className="space-y-1">
             <div className="flex items-center justify-center gap-2 text-xs font-medium text-ink/70">
-              <span className="w-2 h-2 rounded-full bg-amber animate-ping" />
-              <span>Đang chờ xác nhận từ ngân hàng…</span>
+              {currentPayment.status === "CONFIRMED" ? (
+                <span className="text-primary font-bold">✓ Giao dịch đã xác nhận thành công</span>
+              ) : currentPayment.status === "UNDERPAID" ? (
+                <span className="text-amber-ink font-bold">⚠️ Trạng thái: Nộp thiếu tiền</span>
+              ) : currentPayment.status === "OVERPAID" ? (
+                <span className="text-primary font-bold">ℹ️ Trạng thái: Nộp thừa tiền</span>
+              ) : currentPayment.status === "FAILED" ? (
+                <span className="text-brick font-bold">✕ Trạng thái: Thất bại / Hủy</span>
+              ) : (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-amber animate-ping" />
+                  <span>Đang chờ xác nhận từ ngân hàng…</span>
+                </>
+              )}
             </div>
             <button
               onClick={handleRecheck}
-              disabled={rechecking}
-              className="text-xs text-primary font-bold hover:underline cursor-pointer"
+              disabled={rechecking || loading}
+              className="text-xs text-primary font-bold hover:underline cursor-pointer disabled:opacity-50"
             >
               {rechecking ? "Đang đối soát…" : "Kiểm tra lại"}
             </button>
           </div>
         </div>
 
-        {/* Status message */}
+        {/* Status & Error messages */}
+        {error && (
+          <div role="alert" className="p-3 rounded-xl bg-brick/10 border border-brick/30 text-xs text-brick text-center font-medium">
+            ⚠️ {error}
+          </div>
+        )}
         {statusMessage && (
-          <div className="p-3 rounded-xl bg-surface border border-line text-xs font-medium text-ink text-center">
+          <div role="status" className="p-3 rounded-xl bg-surface border border-line text-xs font-medium text-ink text-center">
             {statusMessage}
           </div>
         )}
@@ -193,29 +281,29 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
           <div className="grid grid-cols-2 gap-2 text-xs">
             <button
               onClick={() => handleSimulate("CONFIRMED")}
-              disabled={loading}
-              className="p-2.5 rounded-xl bg-primary text-paper font-semibold hover:bg-primary-strong transition-colors cursor-pointer text-center"
+              disabled={loading || rechecking}
+              className="p-2.5 rounded-xl bg-primary text-paper font-semibold hover:bg-primary-strong transition-colors cursor-pointer text-center disabled:opacity-50"
             >
               Giả lập: Đã nhận đủ tiền
             </button>
             <button
               onClick={() => handleSimulate("UNDERPAID")}
-              disabled={loading}
-              className="p-2.5 rounded-xl bg-amber/20 text-amber-ink border border-amber/40 font-semibold hover:bg-amber/30 transition-colors cursor-pointer text-center"
+              disabled={loading || rechecking}
+              className="p-2.5 rounded-xl bg-amber/20 text-amber-ink border border-amber/40 font-semibold hover:bg-amber/30 transition-colors cursor-pointer text-center disabled:opacity-50"
             >
               Giả lập: Nộp thiếu tiền
             </button>
             <button
               onClick={() => handleSimulate("OVERPAID")}
-              disabled={loading}
-              className="p-2.5 rounded-xl bg-surface border border-line text-ink font-semibold hover:bg-line/20 transition-colors cursor-pointer text-center"
+              disabled={loading || rechecking}
+              className="p-2.5 rounded-xl bg-surface border border-line text-ink font-semibold hover:bg-line/20 transition-colors cursor-pointer text-center disabled:opacity-50"
             >
               Giả lập: Nộp thừa tiền
             </button>
             <button
               onClick={() => handleSimulate("FAILED")}
-              disabled={loading}
-              className="p-2.5 rounded-xl bg-brick/15 text-brick border border-brick/40 font-semibold hover:bg-brick/25 transition-colors cursor-pointer text-center"
+              disabled={loading || rechecking}
+              className="p-2.5 rounded-xl bg-brick/15 text-brick border border-brick/40 font-semibold hover:bg-brick/25 transition-colors cursor-pointer text-center disabled:opacity-50"
             >
               Giả lập: Thất bại / Hủy
             </button>

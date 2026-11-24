@@ -8,7 +8,7 @@ export interface OnchainStampProps {
 export function OnchainStamp({ className = "", timestamp }: OnchainStampProps) {
   return (
     <div
-      className={`inline-block border-2 border-primary/80 text-primary px-3 py-1.5 rounded-lg font-extrabold uppercase tracking-widest text-xs sm:text-sm select-none transform -rotate-3 shadow-xs bg-paper/90 backdrop-blur-xs ${className}`}
+      className={`inline-block border-2 border-primary/80 text-primary px-3 py-1.5 rounded-lg font-extrabold uppercase tracking-widest text-xs sm:text-sm select-none transform -rotate-3 shadow-xs bg-paper ${className}`}
       style={{
         boxShadow: "0 0 0 2px rgba(15, 139, 109, 0.2)",
       }}

@@ -8,6 +8,7 @@ import { useSession } from "@/components/app/session-context";
 import { apiClient } from "@/components/app/api-client";
 import { HashPreview } from "@/components/app/hash-preview";
 import { StepUpModal } from "@/components/app/step-up-modal";
+import { MoneyAmount } from "@/components/shared";
 
 export default function NewContractPage() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function NewContractPage() {
     endDate: "2027-11-30",
     dueDay: 5,
     lateFeeRate: 0.1, // 0.1% per day = 10 bps
-    tenantPhone: "0987654321",
+    tenantPhone: "0900000002",
     tenantName: "Trần Thị Bình",
     termsText:
       "Bên thuê thanh toán tiền thuê đúng hạn trước ngày 05 hàng tháng. Giữ gìn an ninh trật tự và bảo quản trang thiết bị nội thất. Tiền cọc được bảo chứng trung lập trên RentFlow và chỉ giải ngân khi cả hai bên xác nhận hoàn tất nghiệm thu trả phòng.",
@@ -34,8 +35,8 @@ export default function NewContractPage() {
 
   const validateStep1 = () => {
     if (!formData.roomLabel.trim()) return "Vui lòng nhập tên phòng / căn hộ.";
-    if (!formData.tenantPhone.trim() || formData.tenantPhone.length < 10)
-      return "Số điện thoại người thuê phải có ít nhất 10 số.";
+    if (!formData.tenantPhone.trim() || formData.tenantPhone.length < 8)
+      return "Số điện thoại người thuê phải có ít nhất 8 số.";
     return null;
   };
 
@@ -128,7 +129,7 @@ export default function NewContractPage() {
         </div>
 
         {/* Role Check Warning if not Landlord */}
-        {role !== "LANDLORD" && (
+        {role !== "LANDLORD" && role !== "ADMIN_DEMO" && (
           <div className="p-4 rounded-xl bg-amber/15 border border-amber/40 flex items-center justify-between text-xs sm:text-sm text-amber-ink">
             <span>Bạn đang xem với vai trò Người thuê. Chỉ Chủ nhà mới có quyền lập hợp đồng cho thuê mới.</span>
             <button
@@ -201,7 +202,7 @@ export default function NewContractPage() {
                     type="tel"
                     value={formData.tenantPhone}
                     onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
-                    placeholder="Ví dụ: 0987654321"
+                    placeholder="Ví dụ: 0900000002"
                     className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink font-mono text-sm sm:text-base focus:outline-primary"
                     required
                   />
@@ -246,6 +247,9 @@ export default function NewContractPage() {
                     className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink font-mono text-sm sm:text-base focus:outline-primary"
                     required
                   />
+                  <div className="pt-1">
+                    <MoneyAmount value={formData.rentAmount} size="sm" />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -260,6 +264,9 @@ export default function NewContractPage() {
                     className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-ink font-mono text-sm sm:text-base focus:outline-primary"
                     required
                   />
+                  <div className="pt-1">
+                    <MoneyAmount value={formData.depositAmount} size="sm" />
+                  </div>
                 </div>
               </div>
 
@@ -384,7 +391,7 @@ export default function NewContractPage() {
                 type="button"
                 onClick={handleTriggerSign}
                 disabled={loading}
-                className="px-6 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs"
+                className="px-6 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-sm shadow-xs disabled:opacity-50"
               >
                 {loading ? "Đang xử lý…" : "Ký & Khởi tạo hợp đồng"}
               </button>

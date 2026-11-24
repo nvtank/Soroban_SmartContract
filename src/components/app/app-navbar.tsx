@@ -17,7 +17,15 @@ export function AppNavbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    apiClient.getNotifications().then((list) => setNotifications(list));
+    let ignore = false;
+    apiClient.getNotifications().then((list) => {
+      if (!ignore) {
+        setNotifications(list);
+      }
+    });
+    return () => {
+      ignore = true;
+    };
   }, [pathname]);
 
   const unreadCount = notifications.filter((n) => !n.readAt).length;
@@ -30,14 +38,14 @@ export function AppNavbar() {
     setNotifications(updated);
   };
 
-  const handleRoleSwitch = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleRoleSwitch = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value as "landlord" | "tenant1" | "tenant2" | "admin";
-    loginAs(val);
+    await loginAs(val);
     router.refresh();
   };
 
   return (
-    <header className="sticky top-[var(--demo-banner-h,2.75rem)] z-40 w-full backdrop-blur-xl bg-[rgba(251,248,243,0.85)] border-b border-line shadow-xs">
+    <header className="sticky top-[var(--demo-banner-h,2.75rem)] z-40 w-full backdrop-blur-xl bg-[rgba(251,248,243,0.9)] border-b border-line shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Left: Brand & Links */}
         <div className="flex items-center gap-6">
@@ -105,7 +113,7 @@ export function AppNavbar() {
               value={
                 user?.role === "LANDLORD"
                   ? "landlord"
-                  : user?.id === "user_tenant_02"
+                  : user?.id === "00000000-0000-0000-0000-000000000003" || user?.phone === "0900000003"
                     ? "tenant2"
                     : user?.role === "ADMIN_DEMO"
                       ? "admin"
@@ -139,7 +147,10 @@ export function AppNavbar() {
 
             {/* Notifications Dropdown */}
             {showNotifs && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-card bg-paper border border-line shadow-soft p-4 z-50">
+              <div
+                className="absolute right-0 mt-2 w-80 sm:w-96 rounded-card bg-paper border border-line shadow-soft p-4 z-50"
+                data-lenis-prevent
+              >
                 <div className="flex items-center justify-between pb-3 border-b border-line mb-3">
                   <h4 className="font-bold text-ink text-sm">Thông báo ({unreadCount} mới)</h4>
                   {unreadCount > 0 && (
@@ -151,7 +162,7 @@ export function AppNavbar() {
                     </button>
                   )}
                 </div>
-                <div className="max-h-72 overflow-y-auto space-y-2.5">
+                <div className="max-h-72 overflow-y-auto space-y-2.5" data-lenis-prevent>
                   {notifications.length === 0 ? (
                     <p className="text-xs text-ink/50 py-4 text-center">Không có thông báo nào.</p>
                   ) : (
@@ -182,10 +193,7 @@ export function AppNavbar() {
           <div className="flex items-center gap-2">
             <span className="hidden lg:inline text-xs font-semibold text-ink/80">{user?.fullName}</span>
             <button
-              onClick={() => {
-                logout();
-                router.push("/dang-nhap");
-              }}
+              onClick={() => logout()}
               className="text-xs px-2.5 py-1.5 rounded-lg border border-line hover:bg-surface text-ink/70 hover:text-ink cursor-pointer transition-colors"
               title="Đăng xuất"
             >
@@ -206,7 +214,7 @@ export function AppNavbar() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="xl:hidden border-t border-line bg-paper px-4 py-3 space-y-2">
+        <div className="xl:hidden border-t border-line bg-paper px-4 py-3 space-y-2" data-lenis-prevent>
           <Link
             href="/app"
             onClick={() => setMobileMenuOpen(false)}
@@ -243,7 +251,7 @@ export function AppNavbar() {
               value={
                 user?.role === "LANDLORD"
                   ? "landlord"
-                  : user?.id === "user_tenant_02"
+                  : user?.id === "00000000-0000-0000-0000-000000000003" || user?.phone === "0900000003"
                     ? "tenant2"
                     : user?.role === "ADMIN_DEMO"
                       ? "admin"

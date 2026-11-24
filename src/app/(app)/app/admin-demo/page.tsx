@@ -12,11 +12,16 @@ export default function AdminDemoPage() {
   const [recoveries, setRecoveries] = useState<PendingRecovery[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    setPaymentMode(apiClient.getPaymentMode());
-    const recs = await apiClient.getPendingRecoveries();
-    setRecoveries(recs);
+    try {
+      setPaymentMode(apiClient.getPaymentMode());
+      const recs = await apiClient.getPendingRecoveries();
+      setRecoveries(recs);
+    } catch {
+      // Ignored
+    }
   }, []);
 
   useEffect(() => {
@@ -26,7 +31,7 @@ export default function AdminDemoPage() {
         setPaymentMode(apiClient.getPaymentMode());
         setRecoveries(recs);
       }
-    });
+    }).catch(() => {});
     return () => {
       ignore = true;
     };
@@ -35,10 +40,14 @@ export default function AdminDemoPage() {
   const handleReset = async () => {
     if (!confirm("Bạn có chắc chắn muốn đặt lại toàn bộ dữ liệu demo về trạng thái ban đầu?")) return;
     setLoading(true);
+    setError(null);
+    setMessage(null);
     try {
       await apiClient.resetDemo();
       setMessage("Đã đặt lại dữ liệu demo thành công.");
       await loadData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Đặt lại dữ liệu thất bại");
     } finally {
       setLoading(false);
     }
@@ -46,10 +55,14 @@ export default function AdminDemoPage() {
 
   const handleSeed = async () => {
     setLoading(true);
+    setError(null);
+    setMessage(null);
     try {
       await apiClient.seedDemo();
       setMessage("Đã nạp thành công 3 hợp đồng mẫu ở các trạng thái khác nhau.");
       await loadData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Nạp dữ liệu mẫu thất bại");
     } finally {
       setLoading(false);
     }
@@ -57,9 +70,13 @@ export default function AdminDemoPage() {
 
   const handleOverdueScan = async () => {
     setLoading(true);
+    setError(null);
+    setMessage(null);
     try {
       const res = await apiClient.runOverdueScan();
       setMessage(`Đã quét xong. Cập nhật ${res.updatedCount} kỳ thuê quá hạn và tự động tính phí trễ.`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Quét quá hạn thất bại");
     } finally {
       setLoading(false);
     }
@@ -67,9 +84,13 @@ export default function AdminDemoPage() {
 
   const handleFlushOnchain = async () => {
     setLoading(true);
+    setError(null);
+    setMessage(null);
     try {
       const res = await apiClient.flushOnchain();
       setMessage(`Worker Outbox đã xử lý. Đã ghi nhận thành công ${res.confirmedCount} giao dịch on-chain.`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Đẩy giao dịch on-chain thất bại");
     } finally {
       setLoading(false);
     }
@@ -82,9 +103,17 @@ export default function AdminDemoPage() {
   };
 
   const handleApproveRecovery = async (id: string) => {
-    await apiClient.approveRecovery(id);
-    setMessage("Đã duyệt yêu cầu khôi phục tài khoản.");
-    await loadData();
+    setLoading(true);
+    setError(null);
+    try {
+      await apiClient.approveRecovery(id);
+      setMessage("Đã duyệt yêu cầu khôi phục tài khoản.");
+      await loadData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Duyệt yêu cầu khôi phục thất bại");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -108,7 +137,7 @@ export default function AdminDemoPage() {
 
           <Link
             href="/app"
-            className="px-4 py-2 rounded-xl bg-surface border border-line text-ink font-semibold text-xs sm:text-sm hover:bg-line/20 self-start sm:self-auto"
+            className="px-4 py-2 rounded-xl bg-surface border border-line text-ink font-semibold text-xs sm:text-sm hover:bg-line/20 self-start sm:self-auto transition-colors"
           >
             Vào ứng dụng App ➔
           </Link>
@@ -118,6 +147,15 @@ export default function AdminDemoPage() {
           <div role="status" className="p-4 rounded-xl bg-primary/10 border border-primary/30 text-xs sm:text-sm text-primary font-semibold flex items-center justify-between">
             <span>✓ {message}</span>
             <button onClick={() => setMessage(null)} className="cursor-pointer text-ink/40 hover:text-ink">
+              ✕
+            </button>
+          </div>
+        )}
+
+        {error && (
+          <div role="alert" className="p-4 rounded-xl bg-brick/10 border border-brick/30 text-xs sm:text-sm text-brick font-semibold flex items-center justify-between">
+            <span>⚠️ {error}</span>
+            <button onClick={() => setError(null)} className="cursor-pointer text-ink/40 hover:text-ink">
               ✕
             </button>
           </div>
@@ -138,14 +176,14 @@ export default function AdminDemoPage() {
               <button
                 onClick={handleSeed}
                 disabled={loading}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-xs sm:text-sm text-center shadow-xs"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-xs sm:text-sm text-center shadow-xs disabled:opacity-50"
               >
                 Nạp dữ liệu mẫu chuẩn (Seed)
               </button>
               <button
                 onClick={handleReset}
                 disabled={loading}
-                className="py-2.5 px-4 rounded-xl border border-brick/40 text-brick bg-brick/10 font-bold hover:bg-brick/20 transition-colors cursor-pointer text-xs sm:text-sm text-center"
+                className="py-2.5 px-4 rounded-xl border border-brick/40 text-brick bg-brick/10 font-bold hover:bg-brick/20 transition-colors cursor-pointer text-xs sm:text-sm text-center disabled:opacity-50"
               >
                 Đặt lại toàn bộ (Reset)
               </button>
@@ -166,14 +204,14 @@ export default function AdminDemoPage() {
               <button
                 onClick={handleOverdueScan}
                 disabled={loading}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-ink text-paper font-bold hover:bg-ink/90 transition-colors cursor-pointer text-xs sm:text-sm text-center shadow-xs"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-ink text-paper font-bold hover:bg-ink/90 transition-colors cursor-pointer text-xs sm:text-sm text-center shadow-xs disabled:opacity-50"
               >
                 Quét nợ quá hạn
               </button>
               <button
                 onClick={handleFlushOnchain}
                 disabled={loading}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-paper border border-line text-ink font-bold hover:bg-surface transition-colors cursor-pointer text-xs sm:text-sm text-center shadow-xs"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-paper border border-line text-ink font-bold hover:bg-surface transition-colors cursor-pointer text-xs sm:text-sm text-center shadow-xs disabled:opacity-50"
               >
                 Đẩy giao dịch On-chain
               </button>
@@ -193,7 +231,7 @@ export default function AdminDemoPage() {
             <div className="grid grid-cols-3 gap-2 text-xs font-semibold pt-1">
               <button
                 onClick={() => handlePaymentModeChange("both")}
-                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                className={`p-2 rounded-xl border text-center transition-colors cursor-pointer ${
                   paymentMode === "both"
                     ? "bg-primary text-paper border-primary font-bold shadow-xs"
                     : "bg-paper text-ink border-line hover:bg-surface"
@@ -203,7 +241,7 @@ export default function AdminDemoPage() {
               </button>
               <button
                 onClick={() => handlePaymentModeChange("simulated")}
-                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                className={`p-2 rounded-xl border text-center transition-colors cursor-pointer ${
                   paymentMode === "simulated"
                     ? "bg-primary text-paper border-primary font-bold shadow-xs"
                     : "bg-paper text-ink border-line hover:bg-surface"
@@ -213,7 +251,7 @@ export default function AdminDemoPage() {
               </button>
               <button
                 onClick={() => handlePaymentModeChange("payos")}
-                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                className={`p-2 rounded-xl border text-center transition-colors cursor-pointer ${
                   paymentMode === "payos"
                     ? "bg-primary text-paper border-primary font-bold shadow-xs"
                     : "bg-paper text-ink border-line hover:bg-surface"
@@ -254,7 +292,8 @@ export default function AdminDemoPage() {
                     {rec.status === "PENDING" ? (
                       <button
                         onClick={() => handleApproveRecovery(rec.id)}
-                        className="px-3 py-1 rounded-lg bg-primary text-paper font-bold hover:bg-primary-strong cursor-pointer text-xs"
+                        disabled={loading}
+                        className="px-3 py-1 rounded-lg bg-primary text-paper font-bold hover:bg-primary-strong cursor-pointer text-xs disabled:opacity-50"
                       >
                         Duyệt ngay
                       </button>
