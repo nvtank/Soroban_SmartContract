@@ -115,11 +115,31 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
           onSuccess();
           onClose();
         }, 1000);
+      } else if (res.status === "PENDING") {
+        setStatusMessage("Đang chờ xác nhận từ hệ thống ngân hàng.");
+      } else if (res.status === "UNDERPAID") {
+        setStatusMessage("Kết quả đối soát: Nộp thiếu tiền so với yêu cầu.");
+      } else if (res.status === "OVERPAID") {
+        setStatusMessage("Kết quả đối soát: Nộp thừa tiền so với yêu cầu.");
+      } else if (res.status === "FAILED") {
+        setStatusMessage("Kết quả đối soát: Giao dịch thất bại hoặc đã bị hủy.");
+      } else if (res.status === "EXPIRED") {
+        setStatusMessage("Kết quả đối soát: Giao dịch đã hết hạn thanh toán.");
       } else {
         setStatusMessage(`Kết quả đối soát: Trạng thái hiện tại là ${res.status}.`);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Không thể đối soát lúc này. Vui lòng thử lại.");
+      const msg = err instanceof Error ? err.message : "";
+      if (
+        msg.includes("payOS") ||
+        msg.includes("PAYOS") ||
+        msg.includes("khóa API") ||
+        msg.includes("cấu hình")
+      ) {
+        setError(msg || "Cổng thanh toán payOS chưa được cấu hình khóa API.");
+      } else {
+        setError(msg || "Không thể đối soát lúc này. Vui lòng thử lại sau.");
+      }
     } finally {
       setRechecking(false);
     }
@@ -250,7 +270,7 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
             <button
               onClick={handleRecheck}
               disabled={rechecking || loading}
-              className="text-xs text-primary font-bold hover:underline cursor-pointer disabled:opacity-50"
+              className="min-h-[36px] px-3 py-1 text-xs text-primary font-bold hover:underline cursor-pointer disabled:opacity-50 inline-flex items-center justify-center"
             >
               {rechecking ? "Đang đối soát…" : "Kiểm tra lại"}
             </button>
@@ -278,32 +298,32 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
             <MockBadge label="SIMULATION" />
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             <button
               onClick={() => handleSimulate("CONFIRMED")}
               disabled={loading || rechecking}
-              className="p-2.5 rounded-xl bg-primary text-paper font-semibold hover:bg-primary-strong transition-colors cursor-pointer text-center disabled:opacity-50"
+              className="min-h-[44px] p-2.5 rounded-xl bg-primary text-paper font-semibold hover:bg-primary-strong transition-colors cursor-pointer text-center disabled:opacity-50 flex items-center justify-center"
             >
               Giả lập: Đã nhận đủ tiền
             </button>
             <button
               onClick={() => handleSimulate("UNDERPAID")}
               disabled={loading || rechecking}
-              className="p-2.5 rounded-xl bg-amber/20 text-amber-ink border border-amber/40 font-semibold hover:bg-amber/30 transition-colors cursor-pointer text-center disabled:opacity-50"
+              className="min-h-[44px] p-2.5 rounded-xl bg-amber/20 text-amber-ink border border-amber/40 font-semibold hover:bg-amber/30 transition-colors cursor-pointer text-center disabled:opacity-50 flex items-center justify-center"
             >
               Giả lập: Nộp thiếu tiền
             </button>
             <button
               onClick={() => handleSimulate("OVERPAID")}
               disabled={loading || rechecking}
-              className="p-2.5 rounded-xl bg-surface border border-line text-ink font-semibold hover:bg-line/20 transition-colors cursor-pointer text-center disabled:opacity-50"
+              className="min-h-[44px] p-2.5 rounded-xl bg-surface border border-line text-ink font-semibold hover:bg-line/20 transition-colors cursor-pointer text-center disabled:opacity-50 flex items-center justify-center"
             >
               Giả lập: Nộp thừa tiền
             </button>
             <button
               onClick={() => handleSimulate("FAILED")}
               disabled={loading || rechecking}
-              className="p-2.5 rounded-xl bg-brick/15 text-brick border border-brick/40 font-semibold hover:bg-brick/25 transition-colors cursor-pointer text-center disabled:opacity-50"
+              className="min-h-[44px] p-2.5 rounded-xl bg-brick/15 text-brick border border-brick/40 font-semibold hover:bg-brick/25 transition-colors cursor-pointer text-center disabled:opacity-50 flex items-center justify-center"
             >
               Giả lập: Thất bại / Hủy
             </button>
@@ -313,7 +333,7 @@ export function PaymentModal({ payment, roomLabel, onSuccess, onClose }: Payment
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="w-full py-2.5 rounded-xl border border-line text-ink font-medium hover:bg-surface transition-colors cursor-pointer text-sm"
+          className="w-full min-h-[44px] py-2.5 rounded-xl border border-line text-ink font-medium hover:bg-surface transition-colors cursor-pointer text-sm flex items-center justify-center"
         >
           Đóng cửa sổ
         </button>

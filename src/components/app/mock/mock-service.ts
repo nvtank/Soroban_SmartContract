@@ -717,6 +717,16 @@ class MockService {
     this.paymentMode = mode;
   }
 
+  public recheckPayment(paymentId: string): PaymentDto {
+    this.init();
+    const p = this.payments.find((item) => item.id === paymentId);
+    if (!p) throw new Error("Không tìm thấy thông tin thanh toán");
+    if (p.provider === "PAYOS") {
+      throw new Error("Cổng thanh toán payOS chưa được cấu hình khóa API.");
+    }
+    return p;
+  }
+
   public submitRecovery(phone: string): PendingRecovery {
     this.init();
     const rec: PendingRecovery = {
@@ -742,6 +752,61 @@ class MockService {
       r.status = "APPROVED";
       this.persist();
     }
+  }
+
+  public verifyRecoveryOtp(
+    requestId: string,
+    code: string,
+  ): { requestId: string; otpVerified: boolean; isSimulated: boolean; message: string } {
+    this.init();
+    const r = this.recoveries.find((item) => item.id === requestId);
+    if (!r) throw new Error("Không tìm thấy yêu cầu khôi phục.");
+    if (code !== "123456") throw new Error("Mã OTP không chính xác. Mã thử nghiệm là 123456.");
+    return {
+      requestId,
+      otpVerified: true,
+      isSimulated: true,
+      message: "Xác thực OTP thành công (mô phỏng).",
+    };
+  }
+
+  public ekycSimulate(
+    requestId: string,
+  ): { requestId: string; ekycVerified: boolean; isSimulated: boolean; status: string; message: string } {
+    this.init();
+    const r = this.recoveries.find((item) => item.id === requestId);
+    if (!r) throw new Error("Không tìm thấy yêu cầu khôi phục.");
+    return {
+      requestId,
+      ekycVerified: true,
+      isSimulated: true,
+      status: "PENDING",
+      message: "Hoàn tất xác thực eKYC mô phỏng.",
+    };
+  }
+
+  public getRecoveryById(requestId: string): PendingRecovery | undefined {
+    this.init();
+    return this.recoveries.find((item) => item.id === requestId);
+  }
+
+  public reissueRecovery(
+    requestId: string,
+  ): { requestId: string; status: string; isSimulated: boolean; message: string } {
+    this.init();
+    const r = this.recoveries.find((item) => item.id === requestId);
+    if (!r) throw new Error("Không tìm thấy yêu cầu khôi phục.");
+    if (r.status !== "APPROVED") {
+      throw new Error(`Yêu cầu khôi phục chưa được phê duyệt (Trạng thái: ${r.status}).`);
+    }
+    r.status = "COMPLETED" as any;
+    this.persist();
+    return {
+      requestId,
+      status: "COMPLETED",
+      isSimulated: true,
+      message: "Đã hoàn tất quy trình khôi phục tài khoản (mô phỏng).",
+    };
   }
 }
 

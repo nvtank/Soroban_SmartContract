@@ -265,8 +265,21 @@ export default function AdminDemoPage() {
           {/* Box 4: Pending Account Recovery Requests */}
           <div className="p-6 rounded-panel bg-surface/50 border border-line space-y-4 shadow-xs">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-ink">4. Yêu cầu khôi phục tài khoản</h2>
-              <span className="text-xs text-ink/50">{recoveries.length} yêu cầu</span>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-ink">4. Yêu cầu khôi phục tài khoản</h2>
+                <MockBadge label="MÔ PHỎNG" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-ink/50">{recoveries.length} yêu cầu</span>
+                <button
+                  type="button"
+                  onClick={loadData}
+                  disabled={loading}
+                  className="px-2.5 py-1 rounded-lg border border-line bg-paper text-[11px] font-semibold text-ink/70 hover:text-ink hover:bg-surface cursor-pointer"
+                >
+                  ↻ Làm mới
+                </button>
+              </div>
             </div>
             <p className="text-xs text-ink/70 leading-relaxed">
               Phê duyệt các yêu cầu cấp lại quyền truy cập sau khi người dùng hoàn tất bước eKYC mô phỏng.

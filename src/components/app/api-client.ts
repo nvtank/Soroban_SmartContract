@@ -13,6 +13,7 @@ import { mockService, type PendingRecovery } from "./mock/mock-service";
 import { getPublicOnchainTxsAction } from "@/app/(app)/bang-chung/actions";
 import { getNotificationsAction, markNotificationReadAction } from "./notification-actions";
 import { getPendingRecoveriesAction, approveRecoveryAction } from "./recovery-actions";
+import { checkPayOSConfiguredAction } from "./payment-actions";
 
 export function isMockEnabled(): boolean {
   return process.env.NEXT_PUBLIC_UI_MOCK === "true";
@@ -165,7 +166,14 @@ class ApiClient {
 
   async recheckPayment(paymentId: string): Promise<PaymentDto> {
     if (isMockEnabled()) {
-      return mockService.getPaymentById(paymentId) as PaymentDto;
+      return mockService.recheckPayment(paymentId);
+    }
+    const current = await this.getPaymentById(paymentId).catch(() => null);
+    if (current && current.provider === "PAYOS") {
+      const isConfigured = await checkPayOSConfiguredAction().catch(() => true);
+      if (!isConfigured) {
+        throw new Error("Cổng thanh toán payOS chưa được cấu hình khóa API.");
+      }
     }
     return await this.request<PaymentDto>(`/api/payments/${paymentId}/recheck`, {
       method: "POST",
@@ -388,11 +396,55 @@ class ApiClient {
     };
   }
 
+  async verifyRecoveryOtp(
+    requestId: string,
+    code: string,
+  ): Promise<{ requestId: string; otpVerified: boolean; isSimulated: boolean; message: string }> {
+    if (isMockEnabled()) {
+      return mockService.verifyRecoveryOtp(requestId, code);
+    }
+    return await this.request<{ requestId: string; otpVerified: boolean; isSimulated: boolean; message: string }>(
+      "/api/recovery/verify-otp",
+      {
+        method: "POST",
+        body: JSON.stringify({ requestId, code }),
+      },
+    );
+  }
+
+  async ekycSimulate(
+    requestId: string,
+    idCardNumber?: string,
+  ): Promise<{ requestId: string; ekycVerified: boolean; isSimulated: boolean; status: string; message: string }> {
+    if (isMockEnabled()) {
+      return mockService.ekycSimulate(requestId);
+    }
+    return await this.request<{ requestId: string; ekycVerified: boolean; isSimulated: boolean; status: string; message: string }>(
+      "/api/recovery/ekyc",
+      {
+        method: "POST",
+        body: JSON.stringify({ requestId, idCardNumber, biometricMatchSimulated: true }),
+      },
+    );
+  }
+
+  async getRecoveryById(requestId: string): Promise<PendingRecovery | null> {
+    if (isMockEnabled()) {
+      return mockService.getRecoveryById(requestId) || null;
+    }
+    const list = await this.getPendingRecoveries();
+    return list.find((item) => item.id === requestId) || null;
+  }
+
   async getPendingRecoveries(): Promise<PendingRecovery[]> {
     if (isMockEnabled()) {
       return mockService.getPendingRecoveries();
     }
-    return await getPendingRecoveriesAction();
+    try {
+      return await this.request<PendingRecovery[]>("/api/recovery");
+    } catch {
+      return await getPendingRecoveriesAction();
+    }
   }
 
   async approveRecovery(id: string): Promise<void> {
@@ -400,7 +452,28 @@ class ApiClient {
       mockService.approveRecovery(id);
       return;
     }
-    await approveRecoveryAction(id);
+    try {
+      await this.request(`/api/recovery/${id}/approve`, {
+        method: "POST",
+      });
+    } catch {
+      await approveRecoveryAction(id);
+    }
+  }
+
+  async reissueRecovery(
+    requestId: string,
+  ): Promise<{ requestId: string; status: string; isSimulated: boolean; message: string }> {
+    if (isMockEnabled()) {
+      return mockService.reissueRecovery(requestId);
+    }
+    return await this.request<{ requestId: string; status: string; isSimulated: boolean; message: string }>(
+      "/api/recovery/reissue",
+      {
+        method: "POST",
+        body: JSON.stringify({ requestId }),
+      },
+    );
   }
 }
 
