@@ -49,7 +49,7 @@ export async function createPasskeyRegistrationOptions(
     },
   });
 
-  // Save challenge to db
+  // Save challenge to db with 5 min expiration
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
   await db.from("auth_challenges").insert({
     user_id: userId,
@@ -68,13 +68,31 @@ export async function verifyPasskeyRegistration(
 ): Promise<VerifiedRegistrationResponse> {
   const { rpID, origin } = getWebAuthnConfig();
 
-  // Get challenge from DB
-  const { data: challengeRow } = await db
+  // Extract client challenge from clientDataJSON to prevent replay and cross-session mismatch
+  let clientChallenge: string | undefined;
+  if (response?.response?.clientDataJSON) {
+    try {
+      const parsed = JSON.parse(
+        Buffer.from(response.response.clientDataJSON, "base64url").toString("utf8"),
+      );
+      clientChallenge = parsed.challenge;
+    } catch {
+      // Ignored
+    }
+  }
+
+  let query = db
     .from("auth_challenges")
-    .select("id, challenge")
+    .select("id, challenge, expires_at")
     .eq("user_id", userId)
     .eq("type", "PASSKEY_REGISTRATION")
-    .gt("expires_at", new Date().toISOString())
+    .gt("expires_at", new Date().toISOString());
+
+  if (clientChallenge) {
+    query = query.eq("challenge", clientChallenge);
+  }
+
+  const { data: challengeRow } = await query
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -82,6 +100,9 @@ export async function verifyPasskeyRegistration(
   if (!challengeRow) {
     throw new ApiError("VALIDATION_ERROR", undefined, "Thử thách Passkey đã hết hạn hoặc không hợp lệ.");
   }
+
+  // Atomically delete/consume challenge to prevent replay
+  await db.from("auth_challenges").delete().eq("id", challengeRow.id);
 
   const verification = await verifyRegistrationResponse({
     response,
@@ -93,9 +114,6 @@ export async function verifyPasskeyRegistration(
   if (!verification.verified || !verification.registrationInfo) {
     throw new ApiError("VALIDATION_ERROR", undefined, "Không thể xác thực thông tin đăng ký Passkey.");
   }
-
-  // Delete challenge
-  await db.from("auth_challenges").delete().eq("id", challengeRow.id);
 
   const { credential } = verification.registrationInfo;
   const credentialID = credential.id;
@@ -174,12 +192,30 @@ export async function verifyPasskeyAuth(
     throw new ApiError("NOT_FOUND", undefined, "Không tìm thấy Passkey đã đăng ký.");
   }
 
-  // Get challenge from DB
-  const { data: challengeRow } = await db
+  // Extract client challenge from clientDataJSON
+  let clientChallenge: string | undefined;
+  if (response?.response?.clientDataJSON) {
+    try {
+      const parsed = JSON.parse(
+        Buffer.from(response.response.clientDataJSON, "base64url").toString("utf8"),
+      );
+      clientChallenge = parsed.challenge;
+    } catch {
+      // Ignored
+    }
+  }
+
+  let query = db
     .from("auth_challenges")
-    .select("id, challenge")
+    .select("id, challenge, expires_at")
     .eq("type", "PASSKEY_AUTH")
-    .gt("expires_at", new Date().toISOString())
+    .gt("expires_at", new Date().toISOString());
+
+  if (clientChallenge) {
+    query = query.eq("challenge", clientChallenge);
+  }
+
+  const { data: challengeRow } = await query
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -187,6 +223,9 @@ export async function verifyPasskeyAuth(
   if (!challengeRow) {
     throw new ApiError("VALIDATION_ERROR", undefined, "Thử thách Passkey đã hết hạn hoặc không hợp lệ.");
   }
+
+  // Atomically delete/consume challenge to prevent replay
+  await db.from("auth_challenges").delete().eq("id", challengeRow.id);
 
   const publicKeyBuffer = Buffer.from(cred.public_key, "base64url");
 
@@ -206,13 +245,22 @@ export async function verifyPasskeyAuth(
     throw new ApiError("UNAUTHENTICATED", undefined, "Xác thực Passkey thất bại.");
   }
 
-  // Delete challenge
-  await db.from("auth_challenges").delete().eq("id", challengeRow.id);
+  // Counter check: if credential counter > 0, new counter MUST be strictly greater
+  const currentCounter = Number(cred.counter);
+  const newCounter = verification.authenticationInfo.newCounter;
+
+  if (currentCounter > 0 && newCounter <= currentCounter) {
+    throw new ApiError(
+      "UNAUTHENTICATED",
+      undefined,
+      "Phát hiện bất thường về counter của Passkey (nguy cơ bị sao chép hoặc replay).",
+    );
+  }
 
   // Update counter
   await db
     .from("passkey_credentials")
-    .update({ counter: verification.authenticationInfo.newCounter })
+    .update({ counter: newCounter })
     .eq("id", cred.id);
 
   return { verified: true, userId: cred.user_id };
