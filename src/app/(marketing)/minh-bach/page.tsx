@@ -244,7 +244,7 @@ export default function TransparencyPage() {
                 <p className="mt-1 text-xs font-medium text-ink/80">{fact.label}</p>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line/60 pt-3 text-xs text-ink/60">
-                  <span className="font-semibold">Nguồn: {fact.source ?? "Tài liệu sơ bộ brief"}</span>
+                  <span className="font-semibold">Nguồn: {fact.source || "Chưa có nguồn"}</span>
                   {!fact.verified && (
                     <span className="inline-flex items-center gap-1 rounded-md bg-amber/20 px-2 py-0.5 text-[11px] font-bold text-amber-ink">
                       <Info className="h-3 w-3" />

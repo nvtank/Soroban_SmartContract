@@ -114,7 +114,7 @@ export function CtaSection() {
           </div>
 
           <Link
-            href="/dang-nhap?demo=landlord"
+            href="/dang-nhap?demo=landlord&next=/app/hop-dong/ct-002"
             className="flex items-center gap-1 font-bold text-primary-strong hover:underline"
             data-cursor-hover="true"
           >
