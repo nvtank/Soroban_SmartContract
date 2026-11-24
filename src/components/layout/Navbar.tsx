@@ -20,14 +20,19 @@ function NavbarInner() {
   const pathname = usePathname();
   const isHome = pathname === "/";
 
-  const navRef = useRef<HTMLElement>(null);
+  const navAnimRef = useRef<HTMLDivElement>(null);
   const hoverPillRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuOpenRef = useRef(false);
 
   const [activeSectionGroup, setActiveSectionGroup] = useState<"story" | "how" | null>(null);
   const activeGroup = isHome ? activeSectionGroup : null;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    mobileMenuOpenRef.current = mobileMenuOpen;
+  }, [mobileMenuOpen]);
 
   // Close mobile menu on Escape key or outside click
   useEffect(() => {
@@ -60,46 +65,47 @@ function NavbarInner() {
     };
   }, [mobileMenuOpen]);
 
-  // Entrance animation & Smart scroll hide/show with GSAP
+  // Entrance animation & Smart scroll hide/show with GSAP (runs once on mount)
   useEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
+    const navAnim = navAnimRef.current;
+    if (!navAnim) return;
 
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (!prefersReducedMotion) {
-      // Entrance animation
-      gsap.fromTo(
-        nav,
-        { y: -16, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.35, ease: "power2.out" }
-      );
-    }
-
     if (prefersReducedMotion) return;
 
-    // ScrollTrigger to hide when scrolling down, reveal when scrolling up
+    gsap.fromTo(
+      navAnim,
+      { y: -16, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.35, ease: "power2.out" }
+    );
+
+    let isHidden = false;
+
     const st = ScrollTrigger.create({
       start: 0,
       end: "max",
       onUpdate: (self) => {
-        // Do not hide if mobile menu is open
-        if (mobileMenuOpen) return;
+        if (mobileMenuOpenRef.current || navAnim.contains(document.activeElement)) {
+          if (isHidden) {
+            isHidden = false;
+            gsap.to(navAnim, {
+              y: 0,
+              opacity: 1,
+              duration: 0.2,
+              ease: "power2.out",
+              overwrite: "auto",
+            });
+          }
+          return;
+        }
 
-        const isDown = self.direction === 1 && self.scroll() > 120;
-        if (isDown) {
-          gsap.to(nav, {
-            y: -70,
-            opacity: 0,
-            duration: 0.2,
-            ease: "power2.out",
-            overwrite: "auto",
-          });
-        } else {
-          gsap.to(nav, {
-            y: 0,
-            opacity: 1,
-            duration: 0.25,
+        const shouldHide = self.direction === 1 && self.scroll() > 120;
+        if (shouldHide !== isHidden) {
+          isHidden = shouldHide;
+          gsap.to(navAnim, {
+            y: shouldHide ? -70 : 0,
+            opacity: shouldHide ? 0 : 1,
+            duration: shouldHide ? 0.2 : 0.25,
             ease: "power2.out",
             overwrite: "auto",
           });
@@ -108,7 +114,7 @@ function NavbarInner() {
     });
 
     return () => st.kill();
-  }, [mobileMenuOpen]);
+  }, []);
 
   // Active chapter tracking on homepage
   useEffect(() => {
@@ -177,165 +183,170 @@ function NavbarInner() {
 
   return (
     <>
-      <header
-        ref={navRef}
-        className="fixed left-1/2 -translate-x-1/2 z-50 w-auto max-w-[calc(100vw-24px)]"
+      <div
+        className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-3"
         style={{
           top: "calc(var(--demo-banner-h, 1.75rem) + 0.625rem)",
         }}
       >
-        <div className="flex items-center gap-2 sm:gap-3 rounded-full border border-line bg-paper/90 px-3.5 py-1.5 shadow-soft backdrop-blur-md">
-          {/* Logo chữ RentFlow */}
-          <Link
-            href="/"
-            className="font-sans text-sm sm:text-base font-extrabold tracking-tight text-ink hover:text-primary transition-colors px-1"
-            aria-label="RentFlow - Về trang chủ"
-          >
-            <span>Rent</span>
-            <span className="text-primary font-black">Flow</span>
-          </Link>
-
-          {/* Desktop Links (3 liên kết) */}
-          <nav
-            onMouseLeave={handleNavMouseLeave}
-            className="relative hidden sm:flex items-center gap-0.5"
-            aria-label="Điều hướng chính"
-          >
-            {/* Sliding hover pill */}
-            <div
-              ref={hoverPillRef}
-              className="pointer-events-none absolute inset-y-0.5 rounded-full bg-surface opacity-0"
-              aria-hidden="true"
-            />
-
-            {/* 1. Câu chuyện */}
+        <div ref={navAnimRef} className="pointer-events-auto max-w-full">
+          <header className="flex w-auto max-w-full items-center gap-2 sm:gap-3 rounded-full border border-line bg-paper/90 px-3.5 py-1.5 shadow-soft backdrop-blur-md">
+            {/* Logo chữ RentFlow */}
             <Link
-              href={isHome ? "#van-de" : "/#van-de"}
-              onMouseEnter={handleLinkMouseEnter}
-              className={`relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                activeGroup === "story"
-                  ? "text-primary font-bold"
-                  : "text-ink/75 hover:text-ink"
-              }`}
+              href="/"
+              className="font-sans text-sm sm:text-base font-extrabold tracking-tight text-ink hover:text-primary transition-colors px-1"
+              aria-label="RentFlow - Về trang chủ"
             >
-              {activeGroup === "story" && (
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-              )}
-              <span>Câu chuyện</span>
+              <span>Rent</span>
+              <span className="text-primary font-black">Flow</span>
             </Link>
 
-            {/* 2. Cách hoạt động */}
-            <Link
-              href={isHome ? "#hanh-trinh" : "/#hanh-trinh"}
-              onMouseEnter={handleLinkMouseEnter}
-              className={`relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                activeGroup === "how"
-                  ? "text-primary font-bold"
-                  : "text-ink/75 hover:text-ink"
-              }`}
+            {/* Desktop Links (3 liên kết) */}
+            <nav
+              onMouseLeave={handleNavMouseLeave}
+              className="relative hidden sm:flex items-center gap-0.5"
+              aria-label="Điều hướng chính"
             >
-              {activeGroup === "how" && (
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-              )}
-              <span>Cách hoạt động</span>
+              {/* Sliding hover pill */}
+              <div
+                ref={hoverPillRef}
+                className="pointer-events-none absolute inset-y-0.5 left-0 rounded-full bg-surface opacity-0"
+                aria-hidden="true"
+              />
+
+              {/* 1. Câu chuyện */}
+              <Link
+                href={isHome ? "#van-de" : "/#van-de"}
+                onMouseEnter={handleLinkMouseEnter}
+                className={`relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  activeGroup === "story"
+                    ? "text-primary font-bold"
+                    : "text-ink/75 hover:text-ink"
+                }`}
+              >
+                {activeGroup === "story" && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                )}
+                <span>Câu chuyện</span>
+              </Link>
+
+              {/* 2. Cách hoạt động */}
+              <Link
+                href={isHome ? "#hanh-trinh" : "/#hanh-trinh"}
+                onMouseEnter={handleLinkMouseEnter}
+                className={`relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  activeGroup === "how"
+                    ? "text-primary font-bold"
+                    : "text-ink/75 hover:text-ink"
+                }`}
+              >
+                {activeGroup === "how" && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                )}
+                <span>Cách hoạt động</span>
+              </Link>
+
+              {/* 3. Minh bạch */}
+              <Link
+                href="/minh-bach"
+                onMouseEnter={handleLinkMouseEnter}
+                className={`relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  isTransparency
+                    ? "text-primary font-bold"
+                    : "text-ink/75 hover:text-ink"
+                }`}
+              >
+                {isTransparency && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                )}
+                <span>Minh bạch</span>
+              </Link>
+            </nav>
+
+            {/* Nút Dùng thử (Desktop) */}
+            <Link
+              href="/dang-nhap"
+              className="hidden sm:inline-flex items-center rounded-full bg-primary px-3.5 py-1 text-xs font-bold text-paper shadow-xs transition-colors hover:bg-primary-strong focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              Dùng thử
             </Link>
 
-            {/* 3. Minh bạch */}
-            <Link
-              href="/minh-bach"
-              onMouseEnter={handleLinkMouseEnter}
-              className={`relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                isTransparency
-                  ? "text-primary font-bold"
-                  : "text-ink/75 hover:text-ink"
-              }`}
+            {/* Nút Menu (Mobile) */}
+            <button
+              ref={menuButtonRef}
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-ink sm:hidden hover:bg-surface focus-visible:outline-2 focus-visible:outline-primary"
+              aria-label={mobileMenuOpen ? "Đóng menu điều hướng" : "Mở menu điều hướng"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav-panel"
             >
-              {isTransparency && (
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-              )}
-              <span>Minh bạch</span>
-            </Link>
-          </nav>
-
-          {/* Nút Dùng thử (Desktop) */}
-          <Link
-            href="/dang-nhap"
-            className="hidden sm:inline-flex items-center rounded-full bg-primary px-3.5 py-1 text-xs font-bold text-paper shadow-xs transition-colors hover:bg-primary-strong focus-visible:outline-2 focus-visible:outline-primary"
-          >
-            Dùng thử
-          </Link>
-
-          {/* Nút Menu (Mobile) */}
-          <button
-            ref={menuButtonRef}
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-ink sm:hidden hover:bg-surface focus-visible:outline-2 focus-visible:outline-primary"
-            aria-label={mobileMenuOpen ? "Đóng menu điều hướng" : "Mở menu điều hướng"}
-            aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-nav-panel"
-          >
-            {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
+              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
+          </header>
         </div>
-      </header>
+      </div>
 
       {/* Bảng menu di động nhỏ dạng popover nổi (Mobile 390px) */}
       {mobileMenuOpen && (
         <div
-          ref={mobileMenuRef}
-          id="mobile-nav-panel"
-          role="dialog"
-          aria-label="Menu điều hướng di động"
-          className="fixed left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-32px)] max-w-xs rounded-2xl border border-line bg-paper/95 p-3.5 shadow-elevated backdrop-blur-md sm:hidden animate-in fade-in zoom-in-95 duration-150"
+          className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4 sm:hidden"
           style={{
             top: "calc(var(--demo-banner-h, 1.75rem) + 3.25rem)",
           }}
         >
-          <nav className="flex flex-col gap-1" aria-label="Điều hướng di động">
-            <Link
-              href={isHome ? "#van-de" : "/#van-de"}
-              onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                activeGroup === "story" ? "bg-primary/10 text-primary font-bold" : "text-ink hover:bg-surface"
-              }`}
-            >
-              <span>Câu chuyện</span>
-              {activeGroup === "story" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-            </Link>
-
-            <Link
-              href={isHome ? "#hanh-trinh" : "/#hanh-trinh"}
-              onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                activeGroup === "how" ? "bg-primary/10 text-primary font-bold" : "text-ink hover:bg-surface"
-              }`}
-            >
-              <span>Cách hoạt động</span>
-              {activeGroup === "how" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-            </Link>
-
-            <Link
-              href="/minh-bach"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                isTransparency ? "bg-primary/10 text-primary font-bold" : "text-ink hover:bg-surface"
-              }`}
-            >
-              <span>Minh bạch</span>
-              {isTransparency && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-            </Link>
-
-            <div className="pt-2 mt-1 border-t border-line/60">
+          <div
+            ref={mobileMenuRef}
+            id="mobile-nav-panel"
+            role="dialog"
+            aria-label="Menu điều hướng di động"
+            className="pointer-events-auto w-full max-w-xs rounded-2xl border border-line bg-paper/95 p-3.5 shadow-soft backdrop-blur-md"
+          >
+            <nav className="flex flex-col gap-1" aria-label="Điều hướng di động">
               <Link
-                href="/dang-nhap"
+                href={isHome ? "#van-de" : "/#van-de"}
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center rounded-xl bg-primary py-2 text-sm font-bold text-paper shadow-xs hover:bg-primary-strong transition-colors"
+                className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                  activeGroup === "story" ? "bg-primary/10 text-primary font-bold" : "text-ink hover:bg-surface"
+                }`}
               >
-                Dùng thử
+                <span>Câu chuyện</span>
+                {activeGroup === "story" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
               </Link>
-            </div>
-          </nav>
+
+              <Link
+                href={isHome ? "#hanh-trinh" : "/#hanh-trinh"}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                  activeGroup === "how" ? "bg-primary/10 text-primary font-bold" : "text-ink hover:bg-surface"
+                }`}
+              >
+                <span>Cách hoạt động</span>
+                {activeGroup === "how" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+              </Link>
+
+              <Link
+                href="/minh-bach"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                  isTransparency ? "bg-primary/10 text-primary font-bold" : "text-ink hover:bg-surface"
+                }`}
+              >
+                <span>Minh bạch</span>
+                {isTransparency && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+              </Link>
+
+              <div className="pt-2 mt-1 border-t border-line/60">
+                <Link
+                  href="/dang-nhap"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-center rounded-xl bg-primary py-2 text-sm font-bold text-paper shadow-xs hover:bg-primary-strong transition-colors"
+                >
+                  Dùng thử
+                </Link>
+              </div>
+            </nav>
+          </div>
         </div>
       )}
     </>
