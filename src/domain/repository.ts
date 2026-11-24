@@ -1,5 +1,6 @@
 import type {
   AuditLogEntity,
+  ChargeEntity,
   ContractEntity,
   DeductionEntity,
   DepositEntity,
@@ -50,6 +51,13 @@ export interface DomainRepository {
       updates: Partial<RentPeriodEntity>,
     ): Promise<RentPeriodEntity>;
     findOverdueCandidates(asOfDate: string, contractId?: string): Promise<RentPeriodEntity[]>;
+    findDueSoonCandidates?(asOfDate: string, contractId?: string): Promise<RentPeriodEntity[]>;
+  };
+  charges: {
+    listByContractId(contractId: string): Promise<ChargeEntity[]>;
+    findById(id: string): Promise<ChargeEntity | null>;
+    create(charge: ChargeEntity): Promise<ChargeEntity>;
+    update(id: string, updates: Partial<ChargeEntity>): Promise<ChargeEntity>;
   };
   deductions: {
     listByContractId(contractId: string): Promise<DeductionEntity[]>;
@@ -94,6 +102,7 @@ export class FakeDomainRepository implements DomainRepository {
   readonly deductionsStore = new Map<string, DeductionEntity>();
   readonly disputesStore = new Map<string, DisputeEntity>();
   readonly paymentsStore = new Map<string, PaymentEntity>();
+  readonly chargesStore = new Map<string, ChargeEntity>();
   readonly notificationsStore: NotificationEntity[] = [];
   readonly auditLogsStore: AuditLogEntity[] = [];
   readonly profilesStore = new Map<string, ProfileEntity>();
@@ -175,6 +184,22 @@ export class FakeDomainRepository implements DomainRepository {
             (p.status === "AWAITING_PAYMENT" || p.status === "PARTIALLY_PAID" || p.status === "OVERDUE") &&
             p.due_date < asOfDate
           ) {
+            result.push({ ...p });
+          }
+        }
+      }
+      return result;
+    },
+    findDueSoonCandidates: async (asOfDate: string, contractId?: string) => {
+      const [y, m, d] = asOfDate.split("-").map(Number);
+      const maxDate = new Date(Date.UTC(y, m - 1, d + 3)).toISOString().slice(0, 10);
+      const result: RentPeriodEntity[] = [];
+      for (const [cId, periods] of this.rentPeriodsStore.entries()) {
+        if (contractId && cId !== contractId) continue;
+        const contract = this.contractsStore.get(cId);
+        if (contract?.status !== "ACTIVE") continue;
+        for (const p of periods) {
+          if (p.status === "AWAITING_PAYMENT" && p.due_date >= asOfDate && p.due_date <= maxDate) {
             result.push({ ...p });
           }
         }
@@ -290,6 +315,30 @@ export class FakeDomainRepository implements DomainRepository {
     create: async (profile: ProfileEntity) => {
       this.profilesStore.set(profile.id, { ...profile });
       return { ...profile };
+    },
+  };
+
+  readonly charges = {
+    listByContractId: async (contractId: string) => {
+      return Array.from(this.chargesStore.values())
+        .filter((c) => c.contract_id === contractId)
+        .map((c) => ({ ...c }))
+        .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    },
+    findById: async (id: string) => {
+      const item = this.chargesStore.get(id);
+      return item ? { ...item } : null;
+    },
+    create: async (charge: ChargeEntity) => {
+      this.chargesStore.set(charge.id, { ...charge });
+      return { ...charge };
+    },
+    update: async (id: string, updates: Partial<ChargeEntity>) => {
+      const existing = this.chargesStore.get(id);
+      if (!existing) throw new Error(`Charge not found: ${id}`);
+      const updated = { ...existing, ...updates };
+      this.chargesStore.set(id, updated);
+      return { ...updated };
     },
   };
 }

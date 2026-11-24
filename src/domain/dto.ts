@@ -77,6 +77,20 @@ export type DisputeDto = {
   tenantAgreedAmount: MoneyString | null;
 };
 
+export type ChargeKind = "ELECTRICITY" | "WATER" | "SERVICE" | "OTHER";
+export type ChargeStatus = "UNPAID" | "PAID";
+
+export type ChargeDto = {
+  id: string;
+  periodNo: number | null;
+  kind: "ELECTRICITY" | "WATER" | "SERVICE" | "OTHER";
+  amount: string;
+  note: string | null;
+  status: "UNPAID" | "PAID";
+  createdAt: string;
+  paidAt: string | null;
+};
+
 export type ContractDetailDto = ContractSummaryDto & {
   lateFeeBpsPerDay: number;
   termsText: string;
@@ -85,6 +99,7 @@ export type ContractDetailDto = ContractSummaryDto & {
   rentPeriods: RentPeriodDto[];
   deductions: DeductionDto[];
   dispute: DisputeDto | null;
+  charges: ChargeDto[];
 };
 
 export type PaymentDto = {

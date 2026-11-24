@@ -189,6 +189,7 @@ export const INITIAL_CONTRACTS: ContractDetailDto[] = [
     ],
     deductions: [],
     dispute: null,
+    charges: [],
   },
 
   // 2. Hợp đồng đang hiệu lực (ACTIVE), cọc RECORDED, có kỳ quá hạn OVERDUE
@@ -250,6 +251,7 @@ export const INITIAL_CONTRACTS: ContractDetailDto[] = [
     ],
     deductions: [],
     dispute: null,
+    charges: [],
   },
 
   // 3. Hợp đồng đang có tranh chấp (PENDING_DISPUTE), khấu trừ bị từ chối
@@ -315,6 +317,7 @@ export const INITIAL_CONTRACTS: ContractDetailDto[] = [
       landlordAgreedAmount: "2500000",
       tenantAgreedAmount: "3500000",
     },
+    charges: [],
   },
 ];
 

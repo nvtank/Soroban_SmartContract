@@ -90,6 +90,19 @@ export type DisputeEntity = {
   updated_at?: string;
 };
 
+export type ChargeEntity = {
+  id: string;
+  contract_id: string;
+  period_no: number | null;
+  kind: "ELECTRICITY" | "WATER" | "SERVICE" | "OTHER";
+  amount: bigint;
+  note: string | null;
+  status: "UNPAID" | "PAID";
+  created_by: string;
+  created_at: string;
+  paid_at: string | null;
+};
+
 export type PaymentEntity = {
   id: string;
   contract_id: string;

@@ -7,6 +7,7 @@ import { hashContract, newSalt } from "../hashing";
 import type { DomainRepository, EnqueueOnchainFn, RequireStepUpFn } from "../repository";
 import {
   computeJourneyStep,
+  type ChargeEntity,
   type ContractEntity,
   type DeductionEntity,
   type DepositEntity,
@@ -188,6 +189,7 @@ export async function createContract(
     rentPeriods,
     [],
     null,
+    [],
     user.id,
     await repo.profiles.findById(user.id),
     resolvedTenantId ? await repo.profiles.findById(resolvedTenantId) : null,
@@ -283,11 +285,12 @@ export async function confirmContract(
     }
   }
 
-  const [deposit, periods, deductions, dispute, landlordProfile] = await Promise.all([
+  const [deposit, periods, deductions, dispute, charges, landlordProfile] = await Promise.all([
     repo.deposits.findByContractId(contractId),
     repo.rentPeriods.listByContractId(contractId),
     repo.deductions.listByContractId(contractId),
     repo.disputes.findByContractId(contractId),
+    repo.charges.listByContractId(contractId),
     repo.profiles.findById(contract.landlord_id),
   ]);
 
@@ -297,6 +300,7 @@ export async function confirmContract(
     periods,
     deductions,
     dispute,
+    charges,
     user.id,
     landlordProfile,
     userProfile,
@@ -324,11 +328,12 @@ export async function getContractDetail(
     throw new ApiError("FORBIDDEN");
   }
 
-  const [deposit, periods, deductions, dispute, landlordProfile, tenantProfile] = await Promise.all([
+  const [deposit, periods, deductions, dispute, charges, landlordProfile, tenantProfile] = await Promise.all([
     repo.deposits.findByContractId(contractId),
     repo.rentPeriods.listByContractId(contractId),
     repo.deductions.listByContractId(contractId),
     repo.disputes.findByContractId(contractId),
+    repo.charges.listByContractId(contractId),
     repo.profiles.findById(contract.landlord_id),
     contract.tenant_id ? repo.profiles.findById(contract.tenant_id) : null,
   ]);
@@ -339,6 +344,7 @@ export async function getContractDetail(
     periods,
     deductions,
     dispute,
+    charges,
     user.id,
     landlordProfile,
     tenantProfile,
@@ -450,6 +456,7 @@ function assembleContractDetail(
   periods: RentPeriodEntity[],
   deductions: DeductionEntity[],
   dispute: DisputeEntity | null,
+  charges: ChargeEntity[] = [],
   currentUserId: string,
   landlordProfile: ProfileEntity | null,
   tenantProfile: ProfileEntity | null,
@@ -509,5 +516,15 @@ function assembleContractDetail(
           tenantAgreedAmount: dispute.tenant_agreed_amount?.toString() ?? null,
         }
       : null,
+    charges: (charges ?? []).map((c) => ({
+      id: c.id,
+      periodNo: c.period_no,
+      kind: c.kind,
+      amount: c.amount.toString(),
+      note: c.note,
+      status: c.status,
+      createdAt: c.created_at,
+      paidAt: c.paid_at,
+    })),
   };
 }

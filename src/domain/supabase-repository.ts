@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DomainRepository } from "./repository";
 import type {
   AuditLogEntity,
+  ChargeEntity,
   ContractEntity,
   DeductionEntity,
   DepositEntity,
@@ -83,6 +84,19 @@ type DisputeRow = {
   landlord_agreed_amount: string | number | null;
   tenant_agreed_amount: string | number | null;
   created_at: string;
+};
+
+type ChargeRow = {
+  id: string;
+  contract_id: string;
+  period_no: number | null;
+  kind: "ELECTRICITY" | "WATER" | "SERVICE" | "OTHER";
+  amount: string | number;
+  note: string | null;
+  status: "UNPAID" | "PAID";
+  created_by: string;
+  created_at: string;
+  paid_at: string | null;
 };
 
 type PaymentRow = {
@@ -308,6 +322,23 @@ export function createSupabaseDomainRepository(
           .eq("rental_contracts.status", "ACTIVE")
           .lt("due_date", asOfDate)
           .in("status", ["AWAITING_PAYMENT", "PARTIALLY_PAID", "OVERDUE"]);
+        if (contractId) {
+          query = query.eq("contract_id", contractId);
+        }
+        const { data, error } = await query;
+        if (error || !data) return [];
+        return (data as RentPeriodRow[]).map(mapRentPeriodRow);
+      },
+      findDueSoonCandidates: async (asOfDate: string, contractId?: string): Promise<RentPeriodEntity[]> => {
+        const [y, m, d] = asOfDate.split("-").map(Number);
+        const maxDate = new Date(Date.UTC(y, m - 1, d + 3)).toISOString().slice(0, 10);
+        let query = supabase
+          .from("rent_periods")
+          .select("*, rental_contracts!inner(status)")
+          .eq("rental_contracts.status", "ACTIVE")
+          .gte("due_date", asOfDate)
+          .lte("due_date", maxDate)
+          .eq("status", "AWAITING_PAYMENT");
         if (contractId) {
           query = query.eq("contract_id", contractId);
         }
@@ -569,6 +600,59 @@ export function createSupabaseDomainRepository(
         };
       },
     },
+
+    charges: {
+      listByContractId: async (contractId: string): Promise<ChargeEntity[]> => {
+        const { data, error } = await supabase
+          .from("contract_charges")
+          .select("*")
+          .eq("contract_id", contractId)
+          .order("created_at", { ascending: true });
+        if (error || !data) return [];
+        return (data as ChargeRow[]).map(mapChargeRow);
+      },
+      findById: async (id: string): Promise<ChargeEntity | null> => {
+        const { data, error } = await supabase
+          .from("contract_charges")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+        if (error || !data) return null;
+        return mapChargeRow(data as ChargeRow);
+      },
+      create: async (charge: ChargeEntity): Promise<ChargeEntity> => {
+        const row = {
+          id: charge.id,
+          contract_id: charge.contract_id,
+          period_no: charge.period_no,
+          kind: charge.kind,
+          amount: charge.amount.toString(),
+          note: charge.note,
+          status: charge.status,
+          created_by: charge.created_by,
+          created_at: charge.created_at,
+          paid_at: charge.paid_at,
+        };
+        const { data, error } = await supabase.from("contract_charges").insert(row).select().single();
+        if (error) throw error;
+        return mapChargeRow(data as ChargeRow);
+      },
+      update: async (id: string, updates: Partial<ChargeEntity>): Promise<ChargeEntity> => {
+        const row: Record<string, unknown> = {};
+        if (updates.status !== undefined) row.status = updates.status;
+        if (updates.paid_at !== undefined) row.paid_at = updates.paid_at;
+        if (updates.note !== undefined) row.note = updates.note;
+
+        const { data, error } = await supabase
+          .from("contract_charges")
+          .update(row)
+          .eq("id", id)
+          .select()
+          .single();
+        if (error) throw error;
+        return mapChargeRow(data as ChargeRow);
+      },
+    },
   };
 }
 
@@ -669,5 +753,20 @@ function mapPaymentRow(data: PaymentRow): PaymentEntity {
     is_simulated: Boolean(data.is_simulated),
     settled_at: data.settled_at,
     created_at: data.created_at,
+  };
+}
+
+function mapChargeRow(data: ChargeRow): ChargeEntity {
+  return {
+    id: data.id,
+    contract_id: data.contract_id,
+    period_no: data.period_no != null ? Number(data.period_no) : null,
+    kind: data.kind,
+    amount: BigInt(data.amount),
+    note: data.note,
+    status: data.status,
+    created_by: data.created_by,
+    created_at: data.created_at,
+    paid_at: data.paid_at,
   };
 }
