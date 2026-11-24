@@ -260,14 +260,14 @@ function NavbarInner() {
       style={{ top: "calc(var(--demo-banner-h, 1.75rem) + 0.625rem)" }}
     >
       <div ref={islandRef} className="pointer-events-auto relative max-w-full">
-        <header className="flex items-center gap-1 rounded-full bg-ink/95 p-1.5 text-paper shadow-[0_20px_44px_-20px_rgba(10,18,40,0.75)] ring-1 ring-white/10">
+        <header className="flex items-center gap-1 rounded-full bg-white p-1.5 text-black shadow-[0_14px_36px_-18px_rgba(0,0,0,0.28)] ring-1 ring-black/10">
           <Link
             href="/"
             data-island-item
             className="flex items-center gap-2 rounded-full py-0.5 pl-1 pr-2.5"
             aria-label="RentFlow - Về trang chủ"
           >
-            <KeyMark ref={ringRef} className="h-8 w-8 text-paper" />
+            <KeyMark ref={ringRef} className="h-8 w-8 text-black" />
             <span className="text-[15px] font-extrabold tracking-tight">
               Rent<span className="text-primary">Flow</span>
             </span>
@@ -279,7 +279,7 @@ function NavbarInner() {
             className="hidden w-0 overflow-hidden whitespace-nowrap opacity-0 sm:block"
             aria-live="polite"
           >
-            <span className="flex w-max items-center gap-2 border-l border-white/15 py-1 pl-3 pr-3 text-[13px] font-semibold text-paper/80">
+            <span className="flex w-max items-center gap-2 border-l border-black/10 py-1 pl-3 pr-3 text-[13px] font-semibold text-black/70">
               <span className="font-mono text-[11px] text-primary">0{chapter + 1}</span>
               <span className="inline-flex shrink-0 overflow-hidden">
                 <span ref={chapterTextRef} key={chapter} className="block">
@@ -297,7 +297,7 @@ function NavbarInner() {
           >
             <span
               ref={hoverRef}
-              className="pointer-events-none absolute inset-y-0 left-0 w-0 rounded-full bg-white/10 opacity-0"
+              className="pointer-events-none absolute inset-y-0 left-0 w-0 rounded-full bg-black/[0.06] opacity-0"
               aria-hidden="true"
             />
             {LINKS.map((l) => (
@@ -307,7 +307,7 @@ function NavbarInner() {
                 data-island-item
                 onMouseEnter={(e) => moveHover(e.currentTarget)}
                 className={`relative z-10 flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-colors ${
-                  isActive(l) ? "text-paper" : "text-paper/65 hover:text-paper"
+                  isActive(l) ? "text-black" : "text-black/80 hover:text-black"
                 }`}
               >
                 <span
@@ -332,13 +332,13 @@ function NavbarInner() {
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
-            className="ml-1 flex h-9 w-9 flex-col items-center justify-center gap-[5px] rounded-full bg-white/10 sm:hidden"
+            className="ml-1 flex h-9 w-9 flex-col items-center justify-center gap-[5px] rounded-full bg-black/[0.06] sm:hidden"
             aria-label={menuOpen ? "Đóng menu điều hướng" : "Mở menu điều hướng"}
             aria-expanded={menuOpen}
             aria-controls="island-menu"
           >
-            <span ref={barTopRef} className="block h-[2px] w-4 rounded-full bg-paper" />
-            <span ref={barBottomRef} className="block h-[2px] w-4 rounded-full bg-paper" />
+            <span ref={barTopRef} className="block h-[2px] w-4 rounded-full bg-black" />
+            <span ref={barBottomRef} className="block h-[2px] w-4 rounded-full bg-black" />
           </button>
         </header>
 
@@ -348,7 +348,7 @@ function NavbarInner() {
             <div
               ref={panelRef}
               id="island-menu"
-              className="rounded-[1.75rem] bg-ink p-3 text-paper shadow-[0_24px_60px_-24px_rgba(10,18,40,0.8)] ring-1 ring-white/10"
+              className="rounded-[1.75rem] bg-white p-3 text-black shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] ring-1 ring-black/10"
             >
               <nav className="flex flex-col" aria-label="Điều hướng di động">
                 {LINKS.map((l) => (
@@ -357,7 +357,7 @@ function NavbarInner() {
                     href={hrefOf(l)}
                     onClick={() => setMenuOpen(false)}
                     data-menu-item
-                    className="flex items-center justify-between rounded-2xl px-4 py-3.5 text-2xl font-extrabold tracking-tight hover:bg-white/5"
+                    className="flex items-center justify-between rounded-2xl px-4 py-3.5 text-2xl font-extrabold tracking-tight hover:bg-black/5"
                   >
                     {l.label}
                     {isActive(l) && <span className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />}
@@ -367,7 +367,7 @@ function NavbarInner() {
                   href="/dang-nhap"
                   onClick={() => setMenuOpen(false)}
                   data-menu-item
-                  className="mt-2 rounded-2xl bg-primary px-4 py-3.5 text-center text-base font-bold"
+                  className="mt-2 rounded-2xl bg-primary px-4 py-3.5 text-center text-base font-bold text-white"
                 >
                   Dùng thử
                 </Link>

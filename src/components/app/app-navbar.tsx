@@ -201,7 +201,7 @@ export function AppNavbar() {
     >
       <div
         ref={barRef}
-        className="mx-auto flex max-w-6xl items-center justify-between gap-2 rounded-full bg-ink/95 p-1.5 pl-2 text-paper shadow-[0_20px_44px_-20px_rgba(10,18,40,0.7)] ring-1 ring-white/10"
+        className="mx-auto flex max-w-6xl items-center justify-between gap-2 rounded-full bg-white p-1.5 pl-2 text-black shadow-[0_14px_36px_-18px_rgba(0,0,0,0.28)] ring-1 ring-black/10"
       >
         {/* Trái: logo và vai trò */}
         <div className="flex min-w-0 items-center gap-2">
@@ -210,14 +210,14 @@ export function AppNavbar() {
             className="flex shrink-0 items-center gap-2 rounded-full py-0.5 pr-1"
             aria-label="RentFlow - Bảng điều khiển"
           >
-            <KeyMark ref={ringRef} className="h-8 w-8 text-paper" />
+            <KeyMark ref={ringRef} className="h-8 w-8 text-black" />
             <span className="text-[15px] font-extrabold tracking-tight">
               Rent<span className="text-primary">Flow</span>
             </span>
           </Link>
           <span
             className={`hidden shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex ${
-              role === "LANDLORD" ? "bg-white/10 text-paper/85" : "bg-primary/20 text-[#7fe0bd]"
+              role === "LANDLORD" ? "bg-black/[0.06] text-black/80" : "bg-primary/10 text-primary-strong"
             }`}
           >
             {roleLabel}
@@ -230,7 +230,7 @@ export function AppNavbar() {
             type="button"
             data-tour="nav-tour"
             onClick={handleTourStart}
-            className="rounded-full px-3 py-2 text-[13px] font-semibold text-paper/75 transition-colors hover:bg-white/10 hover:text-paper"
+            className="rounded-full px-3 py-2 text-[13px] font-semibold text-black/80 transition-colors hover:bg-black/[0.06] hover:text-black"
           >
             <RollText>Hướng dẫn</RollText>
           </button>
@@ -239,7 +239,7 @@ export function AppNavbar() {
             <button
               type="button"
               onClick={() => togglePanel("notifs")}
-              className="relative flex h-9 w-9 items-center justify-center rounded-full text-paper/80 transition-colors hover:bg-white/10 hover:text-paper"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full text-black/70 transition-colors hover:bg-black/[0.06] hover:text-black"
               aria-label="Thông báo"
               aria-expanded={panel === "notifs"}
             >
@@ -249,7 +249,7 @@ export function AppNavbar() {
               {unreadCount > 0 && (
                 <span
                   ref={badgeRef}
-                  className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brick px-1 text-[10px] font-bold text-paper ring-2 ring-ink"
+                  className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brick px-1 text-[10px] font-bold text-paper ring-2 ring-white"
                 >
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
@@ -308,7 +308,7 @@ export function AppNavbar() {
             <button
               type="button"
               onClick={() => togglePanel("user")}
-              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 transition-colors hover:bg-white/10 sm:pr-3"
+              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 transition-colors hover:bg-black/[0.06] sm:pr-3"
               aria-label="Menu người dùng"
               aria-expanded={panel === "user"}
             >
