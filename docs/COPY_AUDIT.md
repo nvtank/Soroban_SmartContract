@@ -124,3 +124,14 @@ Trong Vòng 5, toàn bộ trang chủ đã được tái cấu trúc thành **La
    - Chiều cao trang trên mobile: ~5.200 px (≤ 7.000 px).
    - Tuyệt đối không dùng các thuật ngữ cấm `XLM`, `gas`, `seed phrase` trên trang chủ.
    - Duy trì banner mô phỏng (`DemoBanner`, `role="note"`) ở đỉnh mọi trang.
+
+
+## Vòng 5, lượt 2 (Manager): trang chủ tối giản
+
+Trang chủ được viết lại thành 7 chương (`src/components/landing/`), toàn bộ chữ nằm ở `marketingVi.landing`.
+
+- Đã sửa câu sai sự thật của lượt 1: "tuyệt đối không lưu dữ liệu cá nhân". Database off-chain vẫn lưu họ tên và số điện thoại; câu mới nói rõ **trên chain** chỉ có mã băm và số tiền.
+- Bỏ các chữ "tuyệt đối", "100%", "hoàn hảo"; bỏ câu "VietQR chạy trong sandbox" (thực tế là mô phỏng).
+- Bỏ hai con số PCCC chưa xác minh khỏi trang chủ.
+- Chương 6 liệt kê 4 mục chạy thật (Soroban trên Testnet, mã băm có muối, Fee-Bump, Passkey mới thử trên thiết bị ảo) và 4 mục mô phỏng (ngân hàng, VietQR và payOS, giải ngân VND, OTP), kèm liên kết tới `/minh-bach`.
+- Số đo trên trang (Manager đo bằng Playwright): 381 chữ, 5 SVG, 6 liên kết trong `<main>`. Lượt 1 là 1.750 chữ, 107 SVG, 44 liên kết.

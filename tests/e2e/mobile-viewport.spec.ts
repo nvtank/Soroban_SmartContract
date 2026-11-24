@@ -41,7 +41,7 @@ test.describe("E2E: Giao diện di động 390x844 (không tràn ngang, thao tá
     await expect(page.locator("body")).toBeVisible();
     await assertNoHorizontalOverflow(page);
 
-    const tryBtn = page.getByRole("link", { name: /Dùng thử demo/i }).first();
+    const tryBtn = page.getByRole("main").getByRole("link", { name: /^Dùng thử/i }).first();
     await expect(tryBtn).toBeVisible();
     await tryBtn.click();
     await expect(page).toHaveURL(/\/dang-nhap/);

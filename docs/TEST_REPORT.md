@@ -96,3 +96,15 @@ Các lỗi này lọt qua test đơn vị và chỉ lộ ra khi chạy thật:
 | `/minh-bach` | 60,0 | 16,7 | 0 | 0 |
 
 Kết luận trung thực: ở phép đo đúng, trang chủ **đã gần 60 FPS** ngay cả khi CPU chậm 4 lần; các tối ưu bổ sung giảm số lần layout nhưng chưa cho thấy cải thiện FPS rõ rệt (dao động giữa các lần chạy lớn hơn mức cải thiện). Phản ánh "web lướt rất lag" ban đầu chưa được tái hiện bằng số đo; cảm nhận thực tế phụ thuộc máy, cần thử trên máy trình diễn thật.
+
+### Vòng 5: trang chủ mới
+
+Cùng công cụ đo (Chrome, CPU chậm 4 lần, bản build production, cuộn hết trang có 3 đoạn ghim cuộn), chạy 3 lần liên tiếp:
+
+| Lần | FPS | p95 (ms) | Khung giật > 33 ms | Khung giật > 50 ms | Long task |
+|---|---|---|---|---|---|
+| 1 | 57,3 | 16,8 | 10 | 0 | 1 |
+| 2 | 56,8 | 33,3 | 3 | 0 | 0 |
+| 3 | 59,0 | 16,8 | 1 | 0 | 0 |
+
+Kết luận trung thực: trung bình gần 60 FPS, nhưng số khung giật **dao động lớn giữa các lần** (1 đến 10) trong khi lượng vẽ lại gần như không đổi, nên phần lớn dao động đến từ tải của máy đo. **Chưa khẳng định đạt** mục tiêu ≤ 3 khung giật. Đã bỏ hiệu ứng bo góc (gây vẽ lại cả khối lớn); blur chỉ còn trên chữ tiêu đề.

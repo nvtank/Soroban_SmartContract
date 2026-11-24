@@ -1,41 +1,26 @@
-import { HeroSection } from "@/components/marketing/HeroSection";
-import { ProblemSection } from "@/components/marketing/ProblemSection";
-import { SolutionSection } from "@/components/marketing/SolutionSection";
-import { HowItWorksSection } from "@/components/marketing/HowItWorksSection";
-import { BlockchainSection } from "@/components/marketing/BlockchainSection";
-import { TruthSection } from "@/components/marketing/TruthSection";
-import { CtaSection } from "@/components/marketing/CtaSection";
-import { KeyMotifConnector } from "@/components/motion/KeyMotifConnector";
+import { Hero } from "@/components/landing/Hero";
+import { Problem } from "@/components/landing/Problem";
+import { Solution } from "@/components/landing/Solution";
+import { Journey } from "@/components/landing/Journey";
+import { Proof } from "@/components/landing/Proof";
+import { Truth } from "@/components/landing/Truth";
+import { Cta } from "@/components/landing/Cta";
 
+/**
+ * Trang chủ kể chuyện 7 chương. Chiếc chìa khóa nối các chương:
+ * hero xoay chìa rồi rơi xuống, chương 3 hai chìa cùng mở két, chương 5 hóa thành con dấu,
+ * chương 7 mỗi vai cầm một chìa.
+ */
 export default function MarketingPage() {
   return (
-    <main id="marketing-container" className="relative flex flex-col w-full overflow-x-hidden">
-      {/* Chương 01: Mở đầu (#mo-dau) — Điểm tựa niềm tin */}
-      <HeroSection />
-      <KeyMotifConnector chapter={1} />
-
-      {/* Chương 02: Vấn đề (#van-de) — Ba nỗi đau thực tế */}
-      <ProblemSection />
-      <KeyMotifConnector chapter={2} />
-
-      {/* Chương 03: Giải pháp (#giai-phap) — Két cọc 2 chìa khóa */}
-      <SolutionSection />
-      <KeyMotifConnector chapter={3} />
-
-      {/* Chương 04: Hành trình (#hanh-trinh) — 5 bước minh bạch */}
-      <HowItWorksSection />
-      <KeyMotifConnector chapter={4} />
-
-      {/* Chương 05: Bằng chứng (#on-chain) — Dấu vết trên Stellar Testnet */}
-      <BlockchainSection />
-      <KeyMotifConnector chapter={5} />
-
-      {/* Chương 06: Sự thật (#su-that) — Ranh giới Thật vs Mô phỏng */}
-      <TruthSection />
-      <KeyMotifConnector chapter={6} />
-
-      {/* Chương 07: Dùng thử (#dung-thu) — Lời mời trải nghiệm */}
-      <CtaSection />
+    <main id="marketing-container" className="relative w-full overflow-x-clip">
+      <Hero />
+      <Problem />
+      <Solution />
+      <Journey />
+      <Proof />
+      <Truth />
+      <Cta />
     </main>
   );
 }
