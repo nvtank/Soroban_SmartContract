@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEMO_USERS } from "@/lib/supabase/demo-accounts";
 import { createSessionToken } from "@/lib/supabase/demo-session";
 import { seedDemoUsers, wipeDemoData } from "@/lib/supabase/seed";
+import { createStepUpSession, type StepUpAction } from "@/lib/crypto/step-up";
 
 /**
  * Chuẩn bị kịch bản trình diễn bằng CHÍNH các API nghiệp vụ thật (không chèn thẳng vào database),
@@ -11,8 +12,6 @@ import { seedDemoUsers, wipeDemoData } from "@/lib/supabase/seed";
 
 type Actor = { id: string; role: "LANDLORD" | "TENANT" | "ADMIN_DEMO" };
 type Json = Record<string, unknown>;
-
-const STEP_UP = { "x-step-up-token": "demo-step-up" };
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -37,6 +36,14 @@ export async function prepareDemoScenario(
   const landlord = cookieFor(DEMO_USERS.LANDLORD);
   const tenant1 = cookieFor(DEMO_USERS.TENANT_1);
   const tenant2 = cookieFor(DEMO_USERS.TENANT_2);
+
+  async function stepUpHeader(userId: string, action: StepUpAction): Promise<Record<string, string>> {
+    if (process.env.ALLOW_DEMO_STEP_UP_BYPASS === "true") {
+      return { "x-step-up-token": "demo-step-up" };
+    }
+    const { stepUpToken } = await createStepUpSession(admin, userId, action);
+    return { "x-step-up-token": stepUpToken };
+  }
 
   async function call<T = Json>(
     cookie: string,
@@ -107,9 +114,11 @@ export async function prepareDemoScenario(
     "6000000",
     DEMO_USERS.TENANT_1.phone,
   );
-  await call(tenant1, "POST", `/api/contracts/${b.id}/confirm`, {}, STEP_UP);
+  await call(tenant1, "POST", `/api/contracts/${b.id}/confirm`, {}, await stepUpHeader(DEMO_USERS.TENANT_1.id, "SIGN_CONTRACT"));
   await payDeposit(tenant1, b.id);
-  await call(landlord, "POST", "/api/jobs/overdue-scan", { asOfDate: isoDate(today) });
+  const cronSecret = process.env.CRON_SECRET;
+  const cronHeaders: Record<string, string> = cronSecret ? { authorization: `Bearer ${cronSecret}` } : {};
+  await call(landlord, "POST", "/api/jobs/overdue-scan", { asOfDate: isoDate(today) }, cronHeaders);
   result.contracts.push({
     label: "Phòng 402 - Căn hộ Moonlight",
     id: b.id,
@@ -123,7 +132,7 @@ export async function prepareDemoScenario(
     "5000000",
     DEMO_USERS.TENANT_2.phone,
   );
-  await call(tenant2, "POST", `/api/contracts/${c.id}/confirm`, {}, STEP_UP);
+  await call(tenant2, "POST", `/api/contracts/${c.id}/confirm`, {}, await stepUpHeader(DEMO_USERS.TENANT_2.id, "SIGN_CONTRACT"));
   await payDeposit(tenant2, c.id);
   await call(landlord, "POST", `/api/contracts/${c.id}/deduction/propose`, {
     amount: "800000",
@@ -135,7 +144,7 @@ export async function prepareDemoScenario(
     "POST",
     `/api/deductions/${detail.deductions[0].id}/respond`,
     { accept: false },
-    STEP_UP,
+    await stepUpHeader(DEMO_USERS.TENANT_2.id, "RESPOND_DEDUCTION"),
   );
   result.contracts.push({
     label: "Phòng 102 - Nhà phố Green",

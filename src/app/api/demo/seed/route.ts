@@ -1,11 +1,10 @@
-import { withApi, ok, ApiError } from "@/lib/api/http";
+import { withApi, ok } from "@/lib/api/http";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { seedDemoData } from "@/lib/supabase/seed";
+import { assertDemoRouteAccess } from "@/lib/demo/auth";
 
-export const POST = withApi(async () => {
-  if (process.env.DEMO_MODE !== "true") {
-    throw new ApiError("NOT_FOUND");
-  }
+export const POST = withApi(async (request: Request) => {
+  await assertDemoRouteAccess(request);
 
   const admin = createAdminSupabase();
   const result = await seedDemoData(admin);

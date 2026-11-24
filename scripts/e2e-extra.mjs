@@ -4,9 +4,16 @@ import { readFileSync } from "node:fs";
 
 const BASE = process.env.BASE || "http://127.0.0.1:3112";
 const STEP = { "x-step-up-token": "demo-step-up" };
-const cronSecret = readFileSync(new URL("../.env.local", import.meta.url), "utf8")
-  .match(/^CRON_SECRET=(.+)$/m)?.[1]
-  ?.trim();
+let cronSecret = process.env.CRON_SECRET;
+if (!cronSecret) {
+  try {
+    cronSecret = readFileSync(new URL("../.env.local", import.meta.url), "utf8")
+      .match(/^CRON_SECRET=(.+)$/m)?.[1]
+      ?.trim();
+  } catch {
+    // bỏ qua nếu không tìm thấy file
+  }
+}
 
 async function login(phone) {
   const res = await fetch(`${BASE}/api/auth/otp/verify`, {

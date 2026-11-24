@@ -39,8 +39,12 @@ export async function requireStepUp(
   // 1. Check header
   let tokenToVerify = request.headers.get("x-step-up-token");
 
-  // In DEMO_MODE, support demo bypass token
-  if (process.env.DEMO_MODE === "true" && tokenToVerify === "demo-step-up") {
+  // Lối tắt demo-step-up chỉ được nhận khi biến môi trường ALLOW_DEMO_STEP_UP_BYPASS=true (mặc định tắt)
+  const allowBypass =
+    process.env.DEMO_MODE === "true" &&
+    process.env.ALLOW_DEMO_STEP_UP_BYPASS === "true";
+
+  if (allowBypass && tokenToVerify === "demo-step-up") {
     return;
   }
 
@@ -57,7 +61,7 @@ export async function requireStepUp(
     }
   }
 
-  if (process.env.DEMO_MODE === "true" && tokenToVerify === "demo-step-up") {
+  if (allowBypass && tokenToVerify === "demo-step-up") {
     return;
   }
 

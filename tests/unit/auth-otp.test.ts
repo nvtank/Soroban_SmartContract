@@ -19,7 +19,7 @@ describe("OTP SĐT Simulation & Rate Limiting Rules", () => {
   });
 
   it("allows fixed OTP 123456 for demo phone numbers", () => {
-    const demoPhones = ["0900000001", "0900000002", "0900000003"];
+    const demoPhones = ["0900000001", "0900000002", "0900000003", "0900000004"];
     const fixedDemoOtp = "123456";
 
     for (const phone of demoPhones) {
