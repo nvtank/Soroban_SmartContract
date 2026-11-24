@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as otpRequest } from "@/app/api/auth/otp/request/route";
 import { POST as otpVerify } from "@/app/api/auth/otp/verify/route";
 import { createAdminSupabase } from "@/lib/supabase/admin";
@@ -18,6 +18,9 @@ const post = (path: string, body: unknown) =>
 
 describe("admin demo OTP is a private secret, not the public demo code", () => {
   const saved = { demo: process.env.DEMO_MODE, otp: process.env.DEMO_ADMIN_OTP };
+  beforeEach(async () => {
+    await createAdminSupabase().from("rate_limits").delete().like("key", "otp:%");
+  });
   afterEach(() => {
     process.env.DEMO_MODE = saved.demo;
     if (saved.otp === undefined) delete process.env.DEMO_ADMIN_OTP;

@@ -69,26 +69,26 @@ export type DeductionDto = {
   createdAt: IsoDateTime;
 };
 
-export type DisputeDto = {
-  status: DisputeStatus;
-  openedBy: string | null;
-  note: string | null;
-  landlordAgreedAmount: MoneyString | null;
-  tenantAgreedAmount: MoneyString | null;
-};
-
 export type ChargeKind = "ELECTRICITY" | "WATER" | "SERVICE" | "OTHER";
 export type ChargeStatus = "UNPAID" | "PAID";
 
 export type ChargeDto = {
   id: string;
   periodNo: number | null;
-  kind: "ELECTRICITY" | "WATER" | "SERVICE" | "OTHER";
-  amount: string;
+  kind: ChargeKind;
+  amount: MoneyString;
   note: string | null;
-  status: "UNPAID" | "PAID";
-  createdAt: string;
-  paidAt: string | null;
+  status: ChargeStatus;
+  createdAt: IsoDateTime;
+  paidAt: IsoDateTime | null;
+};
+
+export type DisputeDto = {
+  status: DisputeStatus;
+  openedBy: string | null;
+  note: string | null;
+  landlordAgreedAmount: MoneyString | null;
+  tenantAgreedAmount: MoneyString | null;
 };
 
 export type ContractDetailDto = ContractSummaryDto & {

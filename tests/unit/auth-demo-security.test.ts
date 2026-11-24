@@ -48,7 +48,9 @@ describe("Demo Routes & Security Isolation (Agent B - Vòng 4)", () => {
   const SESSION_SECRET = "test-session-secret-at-least-32-chars-long!";
   let originalEnv: NodeJS.ProcessEnv;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Giới hạn tần suất xác thực OTP lưu trong DB 5 phút; dọn để chạy lại liên tiếp không bị 429
+    await createAdminSupabase().from("rate_limits").delete().like("key", "otp:ver:%");
     originalEnv = { ...process.env };
     process.env.DEMO_MODE = "true";
     process.env.CRON_SECRET = CRON_SECRET;

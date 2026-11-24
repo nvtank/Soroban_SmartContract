@@ -43,6 +43,8 @@ const SECRET_PATTERNS = [
       /package-lock\.json$/,
       /pnpm-lock\.yaml$/,
       /constants\.ts$/,
+      // Chuỗi giả cố ý ghi trong test (CRON_SECRET/SESSION_SECRET dạng 'test-...'), không phải bí mật thật.
+      /tests\/unit\/auth-demo-security\.test\.ts$/,
     ],
   },
 ];

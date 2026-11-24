@@ -193,11 +193,11 @@ export default function DashboardPage() {
             </h2>
 
             {/* Filters and search */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex rounded-xl bg-surface p-1 border border-line text-xs font-semibold">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center rounded-xl bg-surface p-1 border border-line text-xs font-semibold overflow-x-auto max-w-full whitespace-nowrap">
                 <button
                   onClick={() => setFilter("ALL")}
-                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer min-h-[32px] ${
                     filter === "ALL" ? "bg-paper text-ink shadow-xs" : "text-ink/60 hover:text-ink"
                   }`}
                 >
@@ -205,7 +205,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   onClick={() => setFilter("ACTIVE")}
-                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer min-h-[32px] ${
                     filter === "ACTIVE"
                       ? "bg-paper text-primary font-bold shadow-xs"
                       : "text-ink/60 hover:text-ink"
@@ -215,7 +215,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   onClick={() => setFilter("PENDING")}
-                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer min-h-[32px] ${
                     filter === "PENDING"
                       ? "bg-paper text-amber-ink font-bold shadow-xs"
                       : "text-ink/60 hover:text-ink"
@@ -225,7 +225,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   onClick={() => setFilter("DISPUTE")}
-                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer min-h-[32px] ${
                     filter === "DISPUTE"
                       ? "bg-paper text-brick font-bold shadow-xs"
                       : "text-ink/60 hover:text-ink"
@@ -240,7 +240,7 @@ export default function DashboardPage() {
                 placeholder="Tìm kiếm phòng..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-line bg-paper text-xs text-ink focus:outline-primary w-40 sm:w-48"
+                className="px-3 py-2 rounded-xl border border-line bg-paper text-xs text-ink focus:outline-primary w-full sm:w-48"
               />
             </div>
           </div>

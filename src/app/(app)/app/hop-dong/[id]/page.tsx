@@ -12,7 +12,7 @@ import { OnchainDrawer } from "@/components/app/onchain-drawer";
 import { OnchainStamp } from "@/components/app/onchain-stamp";
 import { formatDate, formatDateTime } from "@/components/app/date-format";
 import { JourneyStepper, StatusBadge, MoneyAmount, OnchainProofChip, MockBadge } from "@/components/shared";
-import type { ContractDetailDto, PaymentDto, OnchainTxDto } from "@/domain/dto";
+import type { ContractDetailDto, PaymentDto, OnchainTxDto, ChargeDto, ChargeKind } from "@/domain/dto";
 
 type TabKey = "tong-quan" | "tien-coc" | "tien-thue" | "hoan-coc" | "bang-chung";
 
@@ -46,6 +46,17 @@ function ContractDetailContent({ id }: { id: string }) {
   const [refundAmountInput, setRefundAmountInput] = useState("");
   const [disputeNoteInput, setDisputeNoteInput] = useState("Hai bên không thống nhất chi phí sửa chữa");
   const [agreedAmountInput, setAgreedAmountInput] = useState("");
+
+  // Charges state
+  const [chargeKind, setChargeKind] = useState<"ELECTRICITY" | "WATER" | "SERVICE" | "OTHER">("ELECTRICITY");
+  const [chargeAmount, setChargeAmount] = useState("");
+  const [chargeNote, setChargeNote] = useState("");
+  const [chargePeriod, setChargePeriod] = useState<string>("");
+  const [addingCharge, setAddingCharge] = useState(false);
+  const [chargeFormError, setChargeFormError] = useState<string | null>(null);
+  const [chargeFormSuccess, setChargeFormSuccess] = useState<string | null>(null);
+  const [confirmingCharge, setConfirmingCharge] = useState<ChargeDto | null>(null);
+  const [markingChargePaid, setMarkingChargePaid] = useState(false);
 
   const pollCountRef = useRef(0);
   const MAX_POLLS = 15;
@@ -217,6 +228,56 @@ function ContractDetailContent({ id }: { id: string }) {
     }
   };
 
+  const handleAddCharge = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChargeFormError(null);
+    setChargeFormSuccess(null);
+
+    const cleanAmount = chargeAmount.trim();
+    if (!cleanAmount) {
+      setChargeFormError("Vui lòng nhập số tiền.");
+      return;
+    }
+    if (!/^\d+$/.test(cleanAmount) || BigInt(cleanAmount) <= BigInt(0)) {
+      setChargeFormError("Số tiền phải là chuỗi chữ số nguyên dương lớn hơn 0.");
+      return;
+    }
+
+    setAddingCharge(true);
+    try {
+      await apiClient.createCharge(id, {
+        kind: chargeKind,
+        amount: cleanAmount,
+        note: chargeNote.trim() || undefined,
+        periodNo: chargePeriod ? Number(chargePeriod) : undefined,
+      });
+      setChargeFormSuccess("Đã thêm khoản nợ phát sinh thành công.");
+      setChargeAmount("");
+      setChargeNote("");
+      setChargePeriod("");
+      await loadContract();
+    } catch (err: unknown) {
+      setChargeFormError(err instanceof Error ? err.message : "Thêm khoản nợ phát sinh thất bại");
+    } finally {
+      setAddingCharge(false);
+    }
+  };
+
+  const handleConfirmMarkChargePaid = async () => {
+    if (!confirmingCharge) return;
+    setMarkingChargePaid(true);
+    setActionError(null);
+    try {
+      await apiClient.markChargePaid(id, confirmingCharge.id);
+      setConfirmingCharge(null);
+      await loadContract();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Cập nhật trạng thái khoản phát sinh thất bại");
+    } finally {
+      setMarkingChargePaid(false);
+    }
+  };
+
   const handleProposeDeduction = async (e: React.FormEvent) => {
     e.preventDefault();
     setActionError(null);
@@ -319,7 +380,7 @@ function ContractDetailContent({ id }: { id: string }) {
     <div className="min-h-screen bg-paper flex flex-col">
       <AppNavbar />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 min-w-0">
         {/* Breadcrumb & Quick actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-xs sm:text-sm text-ink/60">
@@ -396,7 +457,7 @@ function ContractDetailContent({ id }: { id: string }) {
         {/* 5 Tab Navigation with data-lenis-prevent */}
         <nav
           aria-label="Tabs hợp đồng"
-          className="flex border-b border-line gap-2 sm:gap-6 overflow-x-auto text-xs sm:text-sm font-semibold select-none"
+          className="flex border-b border-line gap-2 sm:gap-6 overflow-x-auto text-xs sm:text-sm font-semibold select-none w-full max-w-full min-w-0"
           data-lenis-prevent
         >
           <button
@@ -453,7 +514,7 @@ function ContractDetailContent({ id }: { id: string }) {
 
         {/* TAB 1: TỔNG QUAN */}
         {activeTab === "tong-quan" && (
-          <section className="bg-surface/40 rounded-card border border-line p-6 sm:p-8 space-y-6">
+          <section className="bg-surface/40 rounded-card border border-line p-4 sm:p-6 lg:p-8 space-y-6 w-full max-w-full min-w-0">
             <h2 className="text-lg sm:text-xl font-bold text-ink">Thông tin hợp đồng</h2>
 
             {/* Confirmation Banner if PENDING_CONFIRMATION */}
@@ -512,7 +573,7 @@ function ContractDetailContent({ id }: { id: string }) {
 
         {/* TAB 2: TIỀN CỌC */}
         {activeTab === "tien-coc" && (
-          <section className="bg-surface/40 rounded-card border border-line p-6 sm:p-8 space-y-6">
+          <section className="bg-surface/40 rounded-card border border-line p-4 sm:p-6 lg:p-8 space-y-6 w-full max-w-full min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-lg sm:text-xl font-bold text-ink">Bảo chứng tiền cọc</h2>
               <StatusBadge kind="deposit" status={contract.depositStatus} />
@@ -581,108 +642,424 @@ function ContractDetailContent({ id }: { id: string }) {
         )}
 
         {/* TAB 3: TIỀN THUÊ & CÔNG NỢ */}
-        {activeTab === "tien-thue" && (
-          <section className="bg-surface/40 rounded-card border border-line p-6 sm:p-8 space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg sm:text-xl font-bold text-ink">Lịch thu tiền thuê & Công nợ</h2>
-              <span className="text-xs text-ink/60">{contract.rentPeriods.length} kỳ thuê</span>
-            </div>
+        {activeTab === "tien-thue" && (() => {
+          const unpaidRentTotal = (contract.rentPeriods || []).reduce((acc, p) => {
+            if (p.status !== "PAID") {
+              const due = BigInt(p.amountDue || "0");
+              const paid = BigInt(p.amountPaid || "0");
+              const rem = due > paid ? due - paid : BigInt(0);
+              return acc + rem;
+            }
+            return acc;
+          }, BigInt(0));
 
-            <div className="overflow-x-auto" data-lenis-prevent>
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead>
-                  <tr className="border-b border-line text-ink/50 font-semibold">
-                    <th className="py-2.5 px-3">Kỳ</th>
-                    <th className="py-2.5 px-3">Hạn thanh toán</th>
-                    <th className="py-2.5 px-3">Phải nộp</th>
-                    <th className="py-2.5 px-3">Đã nộp</th>
-                    <th className="py-2.5 px-3">Quá hạn</th>
-                    <th className="py-2.5 px-3">Phí trễ</th>
-                    <th className="py-2.5 px-3">Trạng thái</th>
-                    <th className="py-2.5 px-3 text-right">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line/60">
-                  {contract.rentPeriods.map((period) => (
-                    <tr key={period.periodNo} className="hover:bg-paper/50 transition-colors">
-                      <td className="py-3 px-3 font-bold text-ink">Kỳ {period.periodNo}</td>
-                      <td className="py-3 px-3 text-ink/80">{formatDate(period.dueDate)}</td>
-                      <td className="py-3 px-3">
-                        <MoneyAmount value={period.amountDue} size="sm" />
-                      </td>
-                      <td className="py-3 px-3">
-                        <MoneyAmount value={period.amountPaid} size="sm" />
-                      </td>
-                      <td className="py-3 px-3">
-                        {period.lateDays > 0 ? (
-                          <span className="text-brick font-bold">{period.lateDays} ngày</span>
-                        ) : (
-                          <span className="text-ink/40">0</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3">
-                        {period.lateFee !== "0" ? (
-                          <span className="text-brick font-semibold">
-                            <MoneyAmount value={period.lateFee} size="sm" />
-                          </span>
-                        ) : (
-                          <span className="text-ink/40">0 ₫</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3">
-                        <StatusBadge kind="rent" status={period.status} />
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        {isLandlord &&
-                          contract.status === "ACTIVE" &&
-                          period.status === "OVERDUE" &&
-                          (extendPeriod === period.periodNo ? (
-                            <span className="inline-flex flex-wrap items-center justify-end gap-2">
-                              <input
-                                type="date"
-                                value={extendDate}
-                                min={tomorrowIso()}
-                                onChange={(e) => setExtendDate(e.target.value)}
-                                aria-label="Hạn thanh toán mới"
-                                className="rounded-lg border border-line bg-paper px-2 py-1 text-sm"
-                              />
+          const lateFeeTotal = (contract.rentPeriods || []).reduce((acc, p) => {
+            return acc + BigInt(p.lateFee || "0");
+          }, BigInt(0));
+
+          const chargesList: ChargeDto[] = contract.charges || [];
+          const unpaidChargesTotal = chargesList.reduce((acc, c) => {
+            if (c.status === "UNPAID") {
+              return acc + BigInt(c.amount || "0");
+            }
+            return acc;
+          }, BigInt(0));
+
+          const grandTotalDebt = unpaidRentTotal + lateFeeTotal + unpaidChargesTotal;
+
+          const kindLabels: Record<string, string> = {
+            ELECTRICITY: "Tiền điện",
+            WATER: "Tiền nước",
+            SERVICE: "Phí dịch vụ",
+            OTHER: "Khoản khác",
+          };
+
+          return (
+            <section className="bg-surface/40 rounded-card border border-line p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 w-full max-w-full min-w-0">
+              {/* 1. DÒNG TỔNG CÔNG NỢ */}
+              <div className="p-4 sm:p-6 rounded-panel bg-paper border border-line shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-3">
+                  <div className="space-y-0.5">
+                    <h3 className="font-extrabold text-base sm:text-lg text-ink">
+                      Tổng hợp công nợ hợp đồng
+                    </h3>
+                    <p className="text-xs text-ink/60">
+                      Bao gồm tiền thuê chưa nộp, tiền phạt quá hạn và các khoản phát sinh (điện, nước, dịch vụ).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 bg-surface/80 px-3 py-1.5 rounded-xl border border-line self-start sm:self-auto">
+                    <span className="text-xs font-bold text-ink/70">Tổng công nợ:</span>
+                    <MoneyAmount value={grandTotalDebt.toString()} size="md" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs sm:text-sm">
+                  <div className="p-3.5 rounded-xl bg-surface border border-line space-y-1">
+                    <span className="text-ink/60 block text-xs">Tiền thuê chưa trả:</span>
+                    <MoneyAmount value={unpaidRentTotal.toString()} size="sm" />
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-surface border border-line space-y-1">
+                    <span className="text-ink/60 block text-xs">Phí phạt chậm trả:</span>
+                    <div className={lateFeeTotal > BigInt(0) ? "text-brick font-bold" : ""}>
+                      <MoneyAmount value={lateFeeTotal.toString()} size="sm" />
+                    </div>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-surface border border-line space-y-1">
+                    <span className="text-ink/60 block text-xs">Khoản phát sinh chưa trả:</span>
+                    <MoneyAmount value={unpaidChargesTotal.toString()} size="sm" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. BẢNG TIỀN THUÊ THEO KỲ */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base sm:text-lg font-bold text-ink">Lịch thu tiền thuê theo kỳ</h3>
+                  <span className="text-xs text-ink/60">{contract.rentPeriods.length} kỳ thuê</span>
+                </div>
+
+                <div className="overflow-x-auto w-full max-w-full min-w-0" data-lenis-prevent>
+                  <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[600px]">
+                    <thead>
+                      <tr className="border-b border-line text-ink/50 font-semibold">
+                        <th className="py-2.5 px-3">Kỳ</th>
+                        <th className="py-2.5 px-3">Hạn thanh toán</th>
+                        <th className="py-2.5 px-3">Phải nộp</th>
+                        <th className="py-2.5 px-3">Đã nộp</th>
+                        <th className="py-2.5 px-3">Quá hạn</th>
+                        <th className="py-2.5 px-3">Phí trễ</th>
+                        <th className="py-2.5 px-3">Trạng thái</th>
+                        <th className="py-2.5 px-3 text-right">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line/60">
+                      {contract.rentPeriods.map((period) => (
+                        <tr key={period.periodNo} className="hover:bg-paper/50 transition-colors">
+                          <td className="py-3 px-3 font-bold text-ink">Kỳ {period.periodNo}</td>
+                          <td className="py-3 px-3 text-ink/80">{formatDate(period.dueDate)}</td>
+                          <td className="py-3 px-3">
+                            <MoneyAmount value={period.amountDue} size="sm" />
+                          </td>
+                          <td className="py-3 px-3">
+                            <MoneyAmount value={period.amountPaid} size="sm" />
+                          </td>
+                          <td className="py-3 px-3">
+                            {period.lateDays > 0 ? (
+                              <span className="text-brick font-bold">{period.lateDays} ngày</span>
+                            ) : (
+                              <span className="text-ink/40">0</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            {period.lateFee !== "0" ? (
+                              <span className="text-brick font-semibold">
+                                <MoneyAmount value={period.lateFee} size="sm" />
+                              </span>
+                            ) : (
+                              <span className="text-ink/40">0 ₫</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            <StatusBadge kind="rent" status={period.status} />
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            {isLandlord &&
+                              contract.status === "ACTIVE" &&
+                              period.status === "OVERDUE" &&
+                              (extendPeriod === period.periodNo ? (
+                                <span className="inline-flex flex-wrap items-center justify-end gap-2">
+                                  <input
+                                    type="date"
+                                    value={extendDate}
+                                    min={tomorrowIso()}
+                                    onChange={(e) => setExtendDate(e.target.value)}
+                                    aria-label="Hạn thanh toán mới"
+                                    className="rounded-lg border border-line bg-paper px-2 py-1 text-xs sm:text-sm"
+                                  />
+                                  <button
+                                    onClick={() => handleExtendDue(period.periodNo)}
+                                    className="px-3 py-1.5 rounded-lg bg-primary text-paper font-bold hover:bg-primary-strong transition-colors text-xs"
+                                  >
+                                    Xác nhận
+                                  </button>
+                                  <button
+                                    onClick={() => setExtendPeriod(null)}
+                                    className="px-3 py-1.5 rounded-lg border border-line text-ink/70 hover:bg-surface text-xs"
+                                  >
+                                    Hủy
+                                  </button>
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => setExtendPeriod(period.periodNo)}
+                                  className="px-3 py-1.5 rounded-lg border border-primary text-primary-strong font-bold hover:bg-primary/10 transition-colors text-xs"
+                                >
+                                  Gia hạn thanh toán
+                                </button>
+                              ))}
+                            {period.status !== "PAID" && isTenant && (
                               <button
-                                onClick={() => handleExtendDue(period.periodNo)}
-                                className="px-3 py-1 rounded-lg bg-primary text-paper font-bold hover:bg-primary-strong transition-colors"
+                                onClick={() => handlePayRent(period.periodNo)}
+                                className="px-3.5 py-1.5 rounded-lg bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-xs"
                               >
-                                Xác nhận
+                                Nộp tiền
                               </button>
-                              <button
-                                onClick={() => setExtendPeriod(null)}
-                                className="px-3 py-1 rounded-lg border border-line text-ink/70 hover:bg-surface"
-                              >
-                                Hủy
-                              </button>
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => setExtendPeriod(period.periodNo)}
-                              className="px-3 py-1 rounded-lg border border-primary text-primary-strong font-bold hover:bg-primary/10 transition-colors"
-                            >
-                              Gia hạn thanh toán
-                            </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 3. PHẦN KHOẢN PHÁT SINH (ĐIỆN, NƯỚC, DỊCH VỤ) */}
+              <div className="space-y-4 pt-6 border-t border-line">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="space-y-0.5">
+                    <h3 className="text-base sm:text-lg font-bold text-ink">
+                      Khoản phát sinh (Điện, nước, dịch vụ)
+                    </h3>
+                    <p className="text-xs text-ink/60">
+                      Các chi phí thực tế phát sinh trong quá trình thuê nhà.
+                    </p>
+                  </div>
+                  <span className="text-xs text-ink/60 self-start sm:self-auto">
+                    {chargesList.length} khoản phát sinh
+                  </span>
+                </div>
+
+                {/* Bảng các khoản phát sinh */}
+                <div className="overflow-x-auto w-full max-w-full min-w-0" data-lenis-prevent>
+                  <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[600px]">
+                    <thead>
+                      <tr className="border-b border-line text-ink/50 font-semibold">
+                        <th className="py-2.5 px-3">Loại khoản</th>
+                        <th className="py-2.5 px-3">Kỳ liên quan</th>
+                        <th className="py-2.5 px-3">Ghi chú</th>
+                        <th className="py-2.5 px-3">Số tiền</th>
+                        <th className="py-2.5 px-3">Trạng thái</th>
+                        <th className="py-2.5 px-3 text-right">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line/60">
+                      {chargesList.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-xs text-ink/50">
+                            Chưa có khoản nợ phát sinh nào.
+                          </td>
+                        </tr>
+                      ) : (
+                        chargesList.map((charge) => (
+                          <tr key={charge.id} className="hover:bg-paper/50 transition-colors">
+                            <td className="py-3 px-3 font-bold text-ink">
+                              {kindLabels[charge.kind] || charge.kind}
+                            </td>
+                            <td className="py-3 px-3 text-ink/70">
+                              {charge.periodNo ? `Kỳ ${charge.periodNo}` : "Ngoài kỳ"}
+                            </td>
+                            <td className="py-3 px-3 text-ink/80 max-w-xs truncate">
+                              {charge.note || "—"}
+                            </td>
+                            <td className="py-3 px-3 font-semibold">
+                              <MoneyAmount value={charge.amount} size="sm" />
+                            </td>
+                            <td className="py-3 px-3">
+                              {charge.status === "PAID" ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary/15 text-primary border border-primary/30">
+                                  ✓ Đã thanh toán
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber/20 text-amber-ink border border-amber/40">
+                                  ⏳ Chưa thanh toán
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              {isLandlord && contract.status === "ACTIVE" && charge.status === "UNPAID" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmingCharge(charge)}
+                                  className="px-3 py-1.5 rounded-lg border border-primary text-primary-strong font-bold hover:bg-primary/10 transition-colors text-xs whitespace-nowrap cursor-pointer"
+                                >
+                                  Đã nhận ngoài hệ thống
+                                </button>
+                              ) : isTenant && charge.status === "UNPAID" ? (
+                                <span className="text-[11px] text-ink/50 italic">Cần thanh toán trực tiếp</span>
+                              ) : (
+                                <span className="text-[11px] text-ink/40">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Form thêm khoản nợ phát sinh cho chủ nhà khi hợp đồng đang hiệu lực */}
+                {isLandlord && contract.status === "ACTIVE" && (
+                  <div className="p-4 sm:p-6 rounded-panel bg-paper border border-line space-y-4 mt-4">
+                    <h4 className="font-bold text-sm sm:text-base text-ink">
+                      Thêm khoản nợ phát sinh mới
+                    </h4>
+
+                    {chargeFormError && (
+                      <div role="alert" className="p-3 rounded-xl bg-brick/10 border border-brick/30 text-brick text-xs font-semibold">
+                        ⚠️ {chargeFormError}
+                      </div>
+                    )}
+                    {chargeFormSuccess && (
+                      <div role="status" className="p-3 rounded-xl bg-primary/10 border border-primary/30 text-primary text-xs font-semibold">
+                        ✓ {chargeFormSuccess}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleAddCharge} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-ink/80 block">
+                          Loại khoản phí:
+                        </label>
+                        <select
+                          value={chargeKind}
+                          onChange={(e) => setChargeKind(e.target.value as ChargeKind)}
+                          className="w-full px-3 py-2.5 rounded-xl border border-line bg-surface text-ink text-xs sm:text-sm focus:outline-primary cursor-pointer"
+                        >
+                          <option value="ELECTRICITY">Tiền điện</option>
+                          <option value="WATER">Tiền nước</option>
+                          <option value="SERVICE">Phí dịch vụ</option>
+                          <option value="OTHER">Khoản khác</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-ink/80 block">
+                          Số tiền (₫):
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={chargeAmount}
+                          onChange={(e) => setChargeAmount(e.target.value)}
+                          placeholder="Ví dụ: 350000"
+                          className="w-full px-3 py-2.5 rounded-xl border border-line bg-surface text-ink text-xs sm:text-sm font-mono focus:outline-primary"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-ink/80 block">
+                          Kỳ liên quan (tùy chọn):
+                        </label>
+                        <select
+                          value={chargePeriod}
+                          onChange={(e) => setChargePeriod(e.target.value)}
+                          className="w-full px-3 py-2.5 rounded-xl border border-line bg-surface text-ink text-xs sm:text-sm focus:outline-primary cursor-pointer"
+                        >
+                          <option value="">Không gắn kỳ cụ thể</option>
+                          {contract.rentPeriods.map((p) => (
+                            <option key={p.periodNo} value={p.periodNo}>
+                              Kỳ {p.periodNo} ({formatDate(p.dueDate)})
+                            </option>
                           ))}
-                        {period.status !== "PAID" && isTenant && (
-                          <button
-                            onClick={() => handlePayRent(period.periodNo)}
-                            className="px-3 py-1 rounded-lg bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-xs"
-                          >
-                            Nộp tiền
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-ink/80 block">
+                          Ghi chú diễn giải:
+                        </label>
+                        <input
+                          type="text"
+                          value={chargeNote}
+                          onChange={(e) => setChargeNote(e.target.value)}
+                          placeholder="Ví dụ: Số điện 150 kWh..."
+                          className="w-full px-3 py-2.5 rounded-xl border border-line bg-surface text-ink text-xs sm:text-sm focus:outline-primary"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2 lg:col-span-4 flex justify-end pt-2">
+                        <button
+                          type="submit"
+                          disabled={addingCharge}
+                          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors cursor-pointer text-xs sm:text-sm disabled:opacity-50 shadow-xs"
+                        >
+                          {addingCharge ? "Đang thêm…" : "Thêm khoản phát sinh"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal xác nhận đã nhận tiền ngoài hệ thống */}
+              {confirmingCharge && (
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="confirm-charge-title"
+                >
+                  <div className="w-full max-w-md bg-paper rounded-panel border border-line p-6 shadow-soft space-y-5">
+                    <div className="flex items-center justify-between border-b border-line pb-3">
+                      <h3 id="confirm-charge-title" className="font-bold text-base text-ink">
+                        Xác nhận nhận tiền ngoài hệ thống
+                      </h3>
+                      <button
+                        onClick={() => setConfirmingCharge(null)}
+                        className="text-ink/40 hover:text-ink text-lg leading-none cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Warning banner: KHÔNG PHẢI XÁC NHẬN CỦA NGÂN HÀNG */}
+                    <div className="p-3.5 rounded-xl bg-amber/15 border-2 border-amber/40 text-xs text-amber-ink space-y-1">
+                      <div className="font-extrabold flex items-center gap-1.5">
+                        <span>⚠️</span> Lưu ý quan trọng
+                      </div>
+                      <p className="leading-relaxed">
+                        Đây là chủ nhà tự xác nhận, <strong>không phải xác nhận của ngân hàng</strong>. Khoản tiền này được thanh toán trực tiếp qua tiền mặt hoặc chuyển khoản ngoài hệ thống RentFlow.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-surface border border-line text-xs space-y-1.5 text-ink/80">
+                      <div>
+                        Loại khoản: <strong>{kindLabels[confirmingCharge.kind] || confirmingCharge.kind}</strong>
+                      </div>
+                      <div>
+                        Số tiền: <MoneyAmount value={confirmingCharge.amount} size="sm" />
+                      </div>
+                      {confirmingCharge.note && (
+                        <div>
+                          Ghi chú: <em>{confirmingCharge.note}</em>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingCharge(null)}
+                        className="px-4 py-2 rounded-xl border border-line text-ink/70 hover:bg-surface text-xs font-semibold cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConfirmMarkChargePaid}
+                        disabled={markingChargePaid}
+                        className="px-4 py-2 rounded-xl bg-primary text-paper font-bold hover:bg-primary-strong transition-colors text-xs cursor-pointer disabled:opacity-50 shadow-xs"
+                      >
+                        {markingChargePaid ? "Đang xác nhận…" : "Xác nhận đã nhận"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+          );
+        })()}
 
         {/* TAB 4: HOÀN CỌC & TRANH CHẤP */}
         {activeTab === "hoan-coc" && (
@@ -745,17 +1122,17 @@ function ContractDetailContent({ id }: { id: string }) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                 <input
                   type="number"
                   value={refundAmountInput}
                   onChange={(e) => setRefundAmountInput(e.target.value)}
                   placeholder="Số tiền hoàn trả (₫)"
-                  className="px-3.5 py-2 rounded-xl border border-line bg-surface text-xs sm:text-sm font-mono w-48 focus:outline-primary"
+                  className="px-3.5 py-2.5 rounded-xl border border-line bg-surface text-xs sm:text-sm font-mono w-full sm:w-48 focus:outline-primary"
                 />
                 <button
                   onClick={handleApproveRefund}
-                  className="px-4 py-2 rounded-xl bg-primary text-paper text-xs sm:text-sm font-bold hover:bg-primary-strong transition-colors cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-primary text-paper text-xs sm:text-sm font-bold hover:bg-primary-strong transition-colors cursor-pointer text-center"
                 >
                   Xác nhận hoàn cọc
                 </button>
@@ -851,17 +1228,17 @@ function ContractDetailContent({ id }: { id: string }) {
               </h3>
 
               {!isDisputed ? (
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <input
                     type="text"
                     value={disputeNoteInput}
                     onChange={(e) => setDisputeNoteInput(e.target.value)}
                     placeholder="Lý do mở tranh chấp..."
-                    className="flex-1 px-3.5 py-2 rounded-xl border border-line bg-surface text-xs sm:text-sm"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-line bg-surface text-xs sm:text-sm"
                   />
                   <button
                     onClick={handleOpenDispute}
-                    className="px-4 py-2 rounded-xl bg-brick/15 text-brick border border-brick/40 text-xs sm:text-sm font-bold hover:bg-brick/25 cursor-pointer whitespace-nowrap"
+                    className="px-4 py-2.5 rounded-xl bg-brick/15 text-brick border border-brick/40 text-xs sm:text-sm font-bold hover:bg-brick/25 cursor-pointer whitespace-nowrap text-center"
                   >
                     Mở tranh chấp & Khóa cọc
                   </button>
@@ -892,17 +1269,17 @@ function ContractDetailContent({ id }: { id: string }) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                     <input
                       type="number"
                       value={agreedAmountInput}
                       onChange={(e) => setAgreedAmountInput(e.target.value)}
                       placeholder="Số tiền thỏa thuận (₫)"
-                      className="px-3.5 py-2 rounded-xl border border-line bg-surface text-xs sm:text-sm font-mono w-48"
+                      className="px-3.5 py-2.5 rounded-xl border border-line bg-surface text-xs sm:text-sm font-mono w-full sm:w-48"
                     />
                     <button
                       onClick={handleResolveDispute}
-                      className="px-4 py-2 rounded-xl bg-primary text-paper text-xs sm:text-sm font-bold hover:bg-primary-strong cursor-pointer whitespace-nowrap"
+                      className="px-4 py-2.5 rounded-xl bg-primary text-paper text-xs sm:text-sm font-bold hover:bg-primary-strong cursor-pointer whitespace-nowrap text-center"
                     >
                       Xác nhận số tiền đồng thuận
                     </button>
@@ -919,7 +1296,7 @@ function ContractDetailContent({ id }: { id: string }) {
 
         {/* TAB 5: BẰNG CHỨNG ON-CHAIN */}
         {activeTab === "bang-chung" && (
-          <section className="bg-surface/40 rounded-card border border-line p-6 sm:p-8 space-y-6">
+          <section className="bg-surface/40 rounded-card border border-line p-4 sm:p-6 lg:p-8 space-y-6 w-full max-w-full min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg sm:text-xl font-bold text-ink">
@@ -961,7 +1338,7 @@ function ContractDetailContent({ id }: { id: string }) {
                 Các giao dịch Soroban đã ghi nhận ({onchainTxs.length}):
               </span>
 
-              <div className="overflow-x-auto" data-lenis-prevent>
+              <div className="overflow-x-auto w-full max-w-full min-w-0" data-lenis-prevent>
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-line text-ink/50 font-semibold">
