@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { Keypair, authorizeEntry, Transaction, FeeBumpTransaction } from "@stellar/stellar-sdk";
+import { Address, Keypair, authorizeEntry, Transaction, FeeBumpTransaction, xdr } from "@stellar/stellar-sdk";
 import type { OnchainTxDto } from "@/domain/dto";
 import { ApiError } from "@/lib/api/http";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -19,6 +19,20 @@ const defaultWithCustodyKeypair: CustodySignerCallback = async (db, userId, fn) 
   return withCustodyKeypair(db as SupabaseClient, userId, fn);
 };
 
+/** Địa chỉ tài khoản mà auth entry yêu cầu chữ ký (null nếu entry dùng tài khoản nguồn của giao dịch). */
+function authEntryAddress(entry: xdr.SorobanAuthorizationEntry): string | null {
+  // SDK 17: credentials là union. Mạng trả về nhánh "sorobanCredentialsAddressV2" (trường addressV2);
+  // nhánh cũ "sorobanCredentialsAddress" dùng trường address. Tài khoản nguồn thì không có trường nào.
+  const credentials = entry.credentials as unknown as {
+    type: string;
+    address?: { address: xdr.ScAddress };
+    addressV2?: { address: xdr.ScAddress };
+  };
+  const inner = credentials.addressV2 ?? credentials.address;
+  if (!credentials.type.startsWith("sorobanCredentialsAddress") || !inner) return null;
+  return Address.fromScAddress(inner.address).toString();
+}
+
 let backgroundFlushScheduled = false;
 
 /**
@@ -34,7 +48,14 @@ async function scheduleBackgroundFlush(): Promise<void> {
       backgroundFlushScheduled = false;
       try {
         const { createAdminSupabase } = await import("@/lib/supabase/admin");
-        await flushOnchain(createAdminSupabase(), { limit: 5, pollTimeoutMs: 8000 });
+        const admin = createAdminSupabase();
+        // Mỗi vòng chỉ xử lý giao dịch đầu hàng của từng hợp đồng (giữ đúng thứ tự), nên lặp lại
+        // đến khi không còn tiến triển. Có giới hạn số vòng để không chạy vô hạn.
+        for (let round = 0; round < 12; round++) {
+          const { confirmed, failed } = await flushOnchain(admin, { limit: 5, pollTimeoutMs: 8000 });
+          if (confirmed === 0 && failed === 0) break;
+          if (failed > 0) break; // giao dịch lỗi chặn các giao dịch sau, chờ thử lại thủ công
+        }
       } catch {
         // Route /api/jobs/flush-onchain hoặc nút thử lại sẽ xử lý tiếp
       }
@@ -49,10 +70,7 @@ const DEFAULT_POLL_TIMEOUT_MS = 6000;
 type GenericDb = {
   /** Repository bọc client Supabase (xem DomainRepository của lớp domain). */
   db?: GenericDb;
-  rpc?: (
-    name: string,
-    params?: unknown,
-  ) => Promise<{ data: OnchainTxRecord[] | null; error: unknown }>;
+  rpc?: (name: string, params?: unknown) => Promise<{ data: OnchainTxRecord[] | null; error: unknown }>;
   from?: (table: string) => {
     insert: (record: unknown) => Promise<{ error: unknown }>;
     select: (columns: string) => {
@@ -372,7 +390,8 @@ export async function flushOnchain(
       if (!client.getContractId() || !platformKeypair) {
         await updateRecord(head.id, {
           status: "FAILED",
-          error: "Hệ thống blockchain chưa được cấu hình (thiếu STELLAR_CONTRACT_ID hoặc STELLAR_PLATFORM_SECRET). Vui lòng thử lại sau.",
+          error:
+            "Hệ thống blockchain chưa được cấu hình (thiếu STELLAR_CONTRACT_ID hoặc STELLAR_PLATFORM_SECRET). Vui lòng thử lại sau.",
           tx_hash: null,
           locked_at: null,
           locked_by: null,
@@ -444,46 +463,46 @@ export async function flushOnchain(
             sourcePublicKey: platformKeypair.publicKey(),
           });
 
-          // Ký Auth Entries
-          if (authEntries.length > 0) {
-            if (head.signer.kind === "USER") {
-              const userId = head.signer.userId;
-              {
-                const signWithCustody = deps?.withCustodyKeypair ?? defaultWithCustodyKeypair;
-                await signWithCustody(db, userId, async (custodyKeypair) => {
-                  for (let i = 0; i < authEntries.length; i++) {
-                    authEntries[i] = await authorizeEntry(
-                      authEntries[i],
-                      custodyKeypair,
-                      1000,
-                      client.getNetworkPassphrase(),
-                    );
-                  }
-                });
-              }
-            } else if (head.signer.kind === "ORACLE") {
-              const oracleSigner = oracleKeypair || platformKeypair;
+          // Ký Auth Entries: chỉ ký entry đúng địa chỉ của người ký, thời hạn tính từ ledger hiện tại,
+          // rồi dựng lại giao dịch vì Operation.auth là bất biến sau khi build.
+          let txToSign: Transaction = transaction;
+          if (authEntries.length > 0 && head.signer.kind !== "PLATFORM") {
+            const latest = client.getLatestLedgerSequence ? await client.getLatestLedgerSequence() : 900;
+            const validUntilLedger = latest + 100;
+            const signEntriesWith = async (keypair: Keypair) => {
               for (let i = 0; i < authEntries.length; i++) {
+                if (authEntryAddress(authEntries[i]) !== keypair.publicKey()) continue;
                 authEntries[i] = await authorizeEntry(
                   authEntries[i],
-                  oracleSigner,
-                  1000,
+                  keypair,
+                  validUntilLedger,
                   client.getNetworkPassphrase(),
                 );
               }
+            };
+
+            if (head.signer.kind === "USER") {
+              const signWithCustody = deps?.withCustodyKeypair ?? defaultWithCustodyKeypair;
+              await signWithCustody(db, head.signer.userId, signEntriesWith);
+            } else if (head.signer.kind === "ORACLE") {
+              await signEntriesWith(oracleKeypair || platformKeypair);
+            }
+
+            if (client.applyAuthEntries) {
+              txToSign = client.applyAuthEntries(transaction, authEntries);
             }
           }
 
           // Ký phong bì giao dịch bằng khóa PLATFORM
-          transaction.sign(platformKeypair);
+          txToSign.sign(platformKeypair);
 
           // Kiểm tra xem có bật Fee-Bump (CAP-0015, P1) hay không
-          let txToSubmit: Transaction | FeeBumpTransaction = transaction;
+          let txToSubmit: Transaction | FeeBumpTransaction = txToSign;
           if (isFeeBumpEnabled()) {
             try {
-              txToSubmit = buildFeeBumpTx(transaction, platformKeypair, client.getNetworkPassphrase());
+              txToSubmit = buildFeeBumpTx(txToSign, platformKeypair, client.getNetworkPassphrase());
             } catch {
-              txToSubmit = transaction;
+              txToSubmit = txToSign;
             }
           }
 

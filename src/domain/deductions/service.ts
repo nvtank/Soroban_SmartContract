@@ -282,19 +282,15 @@ export async function respondDeduction(
       created_at: now,
     });
 
-    // Enqueue onchain: respond_deduction(id, tenant, false) và open_dispute(id, party)
+    // Enqueue onchain: respond_deduction(id, tenant, false). Contract tự chuyển sang
+    // PENDING_DISPUTE và mở tranh chấp khi bị từ chối, nên KHÔNG gọi thêm open_dispute
+    // (gọi thêm sẽ bị contract từ chối vì sai trạng thái).
     if (deps?.enqueueOnchain) {
       try {
         await deps.enqueueOnchain(repo, {
           contractId: contract.id,
           action: "respond_deduction",
           args: [contract.id, false],
-          signer: { kind: "USER", userId: user.id },
-        });
-        await deps.enqueueOnchain(repo, {
-          contractId: contract.id,
-          action: "open_dispute",
-          args: [contract.id],
           signer: { kind: "USER", userId: user.id },
         });
       } catch (err) {

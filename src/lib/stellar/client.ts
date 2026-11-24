@@ -4,6 +4,7 @@ import {
   Transaction,
   FeeBumpTransaction,
   TransactionBuilder,
+  Operation,
   Networks,
   xdr,
 } from "@stellar/stellar-sdk";
@@ -57,22 +58,43 @@ export class SorobanRpcClient implements StellarRpcClient {
 
     const preparedTx = await this.server.prepareTransaction(baseTx);
 
-    // Lấy danh sách auth entries cần ký từ thao tác
-    const operation = preparedTx.operations[0];
-    let authEntries: xdr.SorobanAuthorizationEntry[] = [];
-    if (operation && "body" in operation && operation.body) {
-      const opBody = operation.body as unknown as {
-        invokeHostFunctionOp?: { auth?: xdr.SorobanAuthorizationEntry[] };
-      };
-      if (opBody.invokeHostFunctionOp?.auth) {
-        authEntries = opBody.invokeHostFunctionOp.auth;
-      }
-    }
+    // Auth entries do bước simulate ghi lại nằm ngay trên operation (Operation.auth)
+    const operation = preparedTx.operations[0] as { auth?: xdr.SorobanAuthorizationEntry[] } | undefined;
+    const authEntries: xdr.SorobanAuthorizationEntry[] = operation?.auth ? [...operation.auth] : [];
 
     return {
       transaction: preparedTx,
       authEntries,
     };
+  }
+
+  async getLatestLedgerSequence(): Promise<number> {
+    const latest = await this.server.getLatestLedger();
+    return latest.sequence;
+  }
+
+  applyAuthEntries(tx: Transaction, signed: xdr.SorobanAuthorizationEntry[]): Transaction {
+    const operation = tx.operations[0] as { func: xdr.HostFunction } | undefined;
+    if (!operation) throw new Error("Giao dịch không có operation để gắn chữ ký.");
+
+    // cloneFrom không giữ dữ liệu tài nguyên Soroban (footprint, phí tài nguyên) nên phải gắn lại,
+    // nếu không mạng sẽ từ chối giao dịch với mã "malformed".
+    const envelope = tx.toEnvelope() as unknown as {
+      v1?: { tx?: { ext?: { sorobanData?: xdr.SorobanTransactionData } } };
+    };
+    const sorobanData = envelope.v1?.tx?.ext?.sorobanData;
+    if (!sorobanData) throw new Error("Giao dịch thiếu dữ liệu tài nguyên Soroban sau khi simulate.");
+
+    // tx.fee gồm phí cơ sở và phí tài nguyên; setSorobanData cộng phí tài nguyên một lần nữa nên phải trừ trước.
+    const baseFee = (
+      BigInt(tx.fee) - BigInt(String((sorobanData as unknown as { resourceFee: unknown }).resourceFee))
+    ).toString();
+
+    return TransactionBuilder.cloneFrom(tx, { fee: baseFee, networkPassphrase: this.networkPassphrase })
+      .clearOperations()
+      .addOperation(Operation.invokeHostFunction({ func: operation.func, auth: signed }))
+      .setSorobanData(sorobanData)
+      .build();
   }
 
   async submitTransaction(tx: Transaction | FeeBumpTransaction): Promise<SubmitResult> {
@@ -159,7 +181,8 @@ export class SorobanRpcClient implements StellarRpcClient {
  * Khởi tạo Soroban RPC client từ biến môi trường hoặc config truyền vào.
  */
 export function getStellarClient(config?: Partial<StellarRpcConfig>): StellarRpcClient {
-  const contractId = config?.contractId || process.env.STELLAR_CONTRACT_ID || "";
+  // Cấu hình truyền vào (kể cả chuỗi rỗng) luôn thắng biến môi trường
+  const contractId = config?.contractId ?? process.env.STELLAR_CONTRACT_ID ?? "";
 
   return new SorobanRpcClient({
     rpcUrl: config?.rpcUrl || process.env.STELLAR_RPC_URL || DEFAULT_RPC_URL,

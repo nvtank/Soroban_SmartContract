@@ -63,6 +63,10 @@ export interface StellarRpcClient {
     transaction: Transaction;
     authEntries: xdr.SorobanAuthorizationEntry[];
   }>;
+  /** Ledger hiện tại, dùng để đặt thời hạn cho chữ ký auth entry. */
+  getLatestLedgerSequence?(): Promise<number>;
+  /** Dựng lại giao dịch với các auth entry đã ký (Operation.auth là bất biến sau khi build). */
+  applyAuthEntries?(tx: Transaction, signed: xdr.SorobanAuthorizationEntry[]): Transaction;
   submitTransaction(tx: Transaction | FeeBumpTransaction): Promise<SubmitResult>;
   getTransaction(txHash: string): Promise<TxStatusResult>;
   pollTransaction(txHash: string, timeoutMs?: number, intervalMs?: number): Promise<TxStatusResult>;

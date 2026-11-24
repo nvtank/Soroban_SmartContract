@@ -369,7 +369,9 @@ describe("5-step end-to-end contract journey integration (Real Database)", () =>
     expect(actionNames).toContain("record_rent_paid");
     expect(actionNames).toContain("propose_deduction");
     expect(actionNames).toContain("respond_deduction");
-    expect(actionNames).toContain("open_dispute");
+    // Người thuê từ chối khấu trừ: contract tự mở tranh chấp trong respond_deduction(false),
+    // nên không được gọi thêm open_dispute (contract sẽ từ chối vì sai trạng thái).
+    expect(actionNames).not.toContain("open_dispute");
     expect(actionNames).toContain("resolve_dispute");
 
     // Đảm bảo TUYỆT ĐỐI không có PII trong mọi tham số on-chain
