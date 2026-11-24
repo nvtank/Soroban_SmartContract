@@ -8,7 +8,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useSession } from "./session-context";
 import { apiClient } from "./api-client";
 import type { NotificationDto } from "@/domain/dto";
-import { KeyMark, popIn, popOut, REDUCED, RollText } from "@/components/layout/island/island-motion";
+import { popIn, popOut, REDUCED, RollText } from "@/components/layout/island/island-motion";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -41,7 +41,6 @@ export function AppNavbar() {
   const [panel, setPanel] = useState<Panel>(null);
 
   const barRef = useRef<HTMLDivElement>(null);
-  const ringRef = useRef<SVGCircleElement>(null);
   const bellRef = useRef<HTMLSpanElement>(null);
   const badgeRef = useRef<HTMLSpanElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -87,18 +86,8 @@ export function AppNavbar() {
         });
       },
     });
-    const ring = ringRef.current;
-    const progress = ring
-      ? gsap.fromTo(
-          ring,
-          { strokeDashoffset: 1 },
-          { strokeDashoffset: 0, ease: "none", scrollTrigger: { start: 0, end: "max", scrub: 0.4 } },
-        )
-      : null;
     return () => {
       hide.kill();
-      progress?.scrollTrigger?.kill();
-      progress?.kill();
     };
   }, [pathname]);
 
@@ -207,10 +196,9 @@ export function AppNavbar() {
         <div className="flex min-w-0 items-center gap-2">
           <Link
             href="/app"
-            className="flex shrink-0 items-center gap-2 rounded-full py-0.5 pr-1"
+            className="flex shrink-0 items-center rounded-full py-1.5 pl-2.5 pr-1"
             aria-label="RentFlow - Bảng điều khiển"
           >
-            <KeyMark ref={ringRef} className="h-8 w-8 text-black" />
             <span className="text-[15px] font-extrabold tracking-tight">
               Rent<span className="text-primary">Flow</span>
             </span>

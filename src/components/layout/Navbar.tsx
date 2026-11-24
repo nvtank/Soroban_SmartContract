@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { KeyMark, REDUCED, RollText, useMagnetic } from "./island/island-motion";
+import { REDUCED, RollText, useMagnetic } from "./island/island-motion";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -36,7 +36,6 @@ function NavbarInner() {
   const chapterBoxRef = useRef<HTMLDivElement>(null);
   const chapterTextRef = useRef<HTMLSpanElement>(null);
   const hoverRef = useRef<HTMLSpanElement>(null);
-  const ringRef = useRef<SVGCircleElement>(null);
   const ctaRef = useRef<HTMLAnchorElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const barTopRef = useRef<HTMLSpanElement>(null);
@@ -67,25 +66,6 @@ function NavbarInner() {
     }, island);
     return () => ctx.revert();
   }, []);
-
-  // Vòng tiến độ đọc quanh logo
-  useEffect(() => {
-    const ring = ringRef.current;
-    if (!ring) return;
-    const tween = gsap.fromTo(
-      ring,
-      { strokeDashoffset: 1 },
-      {
-        strokeDashoffset: 0,
-        ease: "none",
-        scrollTrigger: { start: 0, end: "max", scrub: 0.4, invalidateOnRefresh: true },
-      },
-    );
-    return () => {
-      tween.scrollTrigger?.kill();
-      tween.kill();
-    };
-  }, [pathname]);
 
   // Thu gọn khi cuộn xuống: ẩn liên kết, hiện tên chương hiện tại. Cuộn lên hoặc rê chuột thì nở ra.
   useEffect(() => {
@@ -264,10 +244,9 @@ function NavbarInner() {
           <Link
             href="/"
             data-island-item
-            className="flex items-center gap-2 rounded-full py-0.5 pl-1 pr-2.5"
+            className="flex items-center rounded-full py-1.5 pl-3 pr-2.5"
             aria-label="RentFlow - Về trang chủ"
           >
-            <KeyMark ref={ringRef} className="h-8 w-8 text-black" />
             <span className="text-[15px] font-extrabold tracking-tight">
               Rent<span className="text-primary">Flow</span>
             </span>

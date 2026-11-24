@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { gsap } from "gsap";
 
 export const REDUCED = "(prefers-reduced-motion: reduce)";
@@ -46,38 +46,6 @@ export function RollText({ children, className = "" }: { children: ReactNode; cl
     </span>
   );
 }
-
-/** Logo chìa khóa trong vòng tròn; vòng ngoài là thanh tiến độ đọc trang. */
-export const KeyMark = forwardRef<SVGCircleElement, { className?: string }>(function KeyMark(
-  { className = "" },
-  ref,
-) {
-  return (
-    <svg viewBox="0 0 40 40" className={className} fill="none" aria-hidden="true">
-      <circle cx="20" cy="20" r="18" stroke="currentColor" strokeOpacity="0.18" strokeWidth="2" />
-      <circle
-        ref={ref}
-        cx="20"
-        cy="20"
-        r="18"
-        className="stroke-primary"
-        strokeWidth="2"
-        strokeLinecap="round"
-        pathLength={1}
-        strokeDasharray="1"
-        strokeDashoffset="1"
-        transform="rotate(-90 20 20)"
-      />
-      <circle cx="14.5" cy="20" r="4.5" stroke="currentColor" strokeWidth="2.2" />
-      <path
-        d="M19 20h9.5M25.5 20v3.2M28.5 20v4.2"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-});
 
 /** Nút bị hút nhẹ theo con trỏ. */
 export function useMagnetic(ref: RefObject<HTMLElement | null>, strength = 0.3) {
