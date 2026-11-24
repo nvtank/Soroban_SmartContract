@@ -131,6 +131,21 @@ describe("Stellar ABI Argument Encoding", () => {
     expect(scVals2).toHaveLength(3);
   });
 
+  it("mã hóa thành công __constructor và init", () => {
+    const scValsConstructor = encodeContractArgs("__constructor", {
+      admin: dummyAddrLandlord,
+      oracle: dummyAddrTenant,
+    });
+    expect(scValsConstructor).toHaveLength(2);
+
+    const scValsInit = encodeContractArgs("init", {
+      admin: dummyAddrLandlord,
+      oracle: dummyAddrTenant,
+    });
+    expect(scValsInit).toHaveLength(2);
+    expect(scValsConstructor[0].toXDR("hex")).toBe(scValsInit[0].toXDR("hex"));
+  });
+
   it("mã hóa thành công view functions: get_contract và get_rent_period", () => {
     expect(encodeContractArgs("get_contract", { id: dummyUUID })).toHaveLength(1);
     expect(encodeContractArgs("get_rent_period", { id: dummyUUID, period: 2 })).toHaveLength(2);

@@ -2,6 +2,7 @@ import { Address, nativeToScVal, xdr } from "@stellar/stellar-sdk";
 import { ApiError } from "@/lib/api/http";
 
 export const SOROBAN_ACTIONS = [
+  "__constructor",
   "init",
   "create_contract",
   "tenant_confirm",
@@ -89,6 +90,7 @@ function boolToScVal(b: boolean | string | number): xdr.ScVal {
  */
 export function getRequiredSignerKind(action: string): "USER" | "ORACLE" | "PLATFORM" {
   switch (action) {
+    case "__constructor":
     case "init":
       return "PLATFORM";
     case "record_deposit_paid":
@@ -112,8 +114,9 @@ export function encodeContractArgs(
   const args: any = Array.isArray(rawArgs) ? rawArgs : { ...rawArgs };
 
   switch (action) {
+    case "__constructor":
     case "init": {
-      // init(admin: Address, oracle: Address)
+      // __constructor(admin: Address, oracle: Address)
       const admin = Array.isArray(args) ? args[0] : args.admin;
       const oracle = Array.isArray(args) ? args[1] : args.oracle;
       return [addressToScVal(admin, "admin"), addressToScVal(oracle, "oracle")];
