@@ -3,32 +3,21 @@ import { marketingVi } from "@/i18n/sections/marketing";
 import { FACTS } from "@/content/facts";
 import { vi } from "@/i18n/vi";
 import { MockBadge } from "@/components/shared/MockBadge";
-import {
-  ShieldCheck,
-  Lock,
-  Database,
-  Blocks,
-  FileCheck,
-  Info,
-  ArrowLeft,
-  Cpu,
-} from "lucide-react";
 
 export default function TransparencyPage() {
   const trans = marketingVi.transparency;
   const sections = trans.sections;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-24 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-5xl px-4 pt-28 pb-20 sm:px-6 lg:px-8">
       {/* Breadcrumb & Nút quay lại */}
-      <div className="flex items-center gap-3 text-xs font-semibold text-ink/60">
+      <div className="flex items-center gap-2 text-xs font-semibold text-ink/60">
         <Link
           href="/"
-          className="flex items-center gap-1 hover:text-primary transition-colors"
+          className="hover:text-primary transition-colors"
           data-cursor-hover="true"
         >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span>Trang chủ</span>
+          ← Trang chủ
         </Link>
         <span>/</span>
         <span className="text-ink">{marketingVi.nav.transparency}</span>
@@ -36,9 +25,8 @@ export default function TransparencyPage() {
 
       {/* Header trang Minh bạch */}
       <div className="mt-8">
-        <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1 text-xs font-bold text-primary-strong w-fit max-w-full">
-          <ShieldCheck className="h-4 w-4 shrink-0" />
-          <span>Tiêu chuẩn Đạo đức Blockchain & AI</span>
+        <div className="rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1 text-xs font-bold text-primary-strong w-fit max-w-full">
+          Tiêu chuẩn Đạo đức Blockchain & AI
         </div>
         <h1 className="mt-4 text-[length:var(--text-section)] font-extrabold leading-tight text-ink">
           {trans.pageTitle}
@@ -49,10 +37,10 @@ export default function TransparencyPage() {
       </div>
 
       {/* Nội dung các phần */}
-      <div className="mt-16 flex flex-col gap-16">
+      <div className="mt-14 flex flex-col gap-12 sm:gap-16">
         {/* Phần 1: Dữ liệu thu thập & Mục đích */}
         <section className="rounded-3xl border border-line bg-paper p-6 sm:p-10 shadow-soft">
-          <h2 className="text-2xl font-bold text-ink">
+          <h2 className="text-xl sm:text-2xl font-bold text-ink">
             {sections.dataCollection.title}
           </h2>
           <p className="mt-3 text-sm sm:text-base leading-relaxed text-ink/80">
@@ -83,58 +71,55 @@ export default function TransparencyPage() {
 
         {/* Phần 2: Bảng phân định On-Chain và Off-Chain */}
         <section className="rounded-3xl border border-line bg-paper p-6 sm:p-10 shadow-soft">
-          <h2 className="text-2xl font-bold text-ink">
+          <h2 className="text-xl sm:text-2xl font-bold text-ink">
             {sections.onOffChainTable.title}
           </h2>
           <p className="mt-3 text-sm sm:text-base leading-relaxed text-ink/80">
             {sections.onOffChainTable.description}
           </p>
 
-          <div className="mt-6 overflow-x-auto rounded-2xl border border-line">
-            <table className="w-full text-left border-collapse text-xs sm:text-sm">
-              <thead>
-                <tr className="border-b border-line bg-surface/80 font-bold text-ink">
-                  <th className="p-4 w-1/4">Loại thông tin</th>
-                  <th className="p-4 w-3/8 text-ink/80">
-                    <div className="flex items-center gap-1.5">
-                      <Database className="h-4 w-4" />
+          <div className="mt-6">
+            <div className="sm:hidden text-[11px] text-ink/50 mb-1.5 flex items-center gap-1 font-medium">
+              <span>↔ Cuộn ngang để xem đầy đủ bảng</span>
+            </div>
+            <div className="overflow-x-auto w-full max-w-full min-w-0 rounded-2xl border border-line" data-lenis-prevent>
+              <table className="w-full min-w-[540px] text-left border-collapse text-xs sm:text-sm">
+                <thead>
+                  <tr className="border-b border-line bg-surface/80 font-bold text-ink">
+                    <th className="p-4 w-1/4">Loại thông tin</th>
+                    <th className="p-4 w-3/8 text-ink/80">
                       <span>{sections.onOffChainTable.offchainHeader}</span>
-                    </div>
-                  </th>
-                  <th className="p-4 w-3/8 text-primary-strong bg-primary/5">
-                    <div className="flex items-center gap-1.5">
-                      <Blocks className="h-4 w-4" />
+                    </th>
+                    <th className="p-4 w-3/8 text-primary-strong bg-primary/5">
                       <span>{sections.onOffChainTable.onchainHeader}</span>
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line/60">
-                {sections.onOffChainTable.items.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-surface/20">
-                    <td className="p-4 font-bold text-ink">{row.category}</td>
-                    <td className="p-4 text-ink/75">{row.offchain}</td>
-                    <td className="p-4 font-semibold text-primary-strong bg-primary/5">
-                      {row.onchain}
-                    </td>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-line/60">
+                  {sections.onOffChainTable.items.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-surface/20">
+                      <td className="p-4 font-bold text-ink">{row.category}</td>
+                      <td className="p-4 text-ink/75">{row.offchain}</td>
+                      <td className="p-4 font-semibold text-primary-strong bg-primary/5">
+                        {row.onchain}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
         {/* Phần 3: Quyền riêng tư & Bảo mật */}
         <section className="rounded-3xl border border-line bg-paper p-6 sm:p-10 shadow-soft">
-          <h2 className="text-2xl font-bold text-ink">
+          <h2 className="text-xl sm:text-2xl font-bold text-ink">
             {sections.privacySecurity.title}
           </h2>
           <ul className="mt-4 flex flex-col gap-3 text-sm sm:text-base text-ink/80">
             {sections.privacySecurity.points.map((point, idx) => (
-              <li key={idx} className="flex items-start gap-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary-strong mt-0.5">
-                  <Lock className="h-3.5 w-3.5" />
-                </span>
+              <li key={idx} className="flex items-start gap-2.5">
+                <span className="font-bold text-primary select-none mt-0.5">•</span>
                 <span className="leading-relaxed">{point}</span>
               </li>
             ))}
@@ -143,15 +128,13 @@ export default function TransparencyPage() {
 
         {/* Phần 4: Bảo vệ tài sản & Tiền cọc */}
         <section className="rounded-3xl border border-line bg-paper p-6 sm:p-10 shadow-soft">
-          <h2 className="text-2xl font-bold text-ink">
+          <h2 className="text-xl sm:text-2xl font-bold text-ink">
             {sections.assetProtection.title}
           </h2>
           <ul className="mt-4 flex flex-col gap-3 text-sm sm:text-base text-ink/80">
             {sections.assetProtection.points.map((point, idx) => (
-              <li key={idx} className="flex items-start gap-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary-strong mt-0.5">
-                  <FileCheck className="h-3.5 w-3.5" />
-                </span>
+              <li key={idx} className="flex items-start gap-2.5">
+                <span className="font-bold text-primary select-none mt-0.5">•</span>
                 <span className="leading-relaxed">{point}</span>
               </li>
             ))}
@@ -160,11 +143,10 @@ export default function TransparencyPage() {
 
         {/* Phần 5: Đạo đức AI (Khẳng định bản demo không dùng AI quyết định) */}
         <section className="rounded-3xl border-2 border-primary/30 bg-primary/5 p-6 sm:p-10 shadow-soft">
-          <div className="flex items-center gap-2 text-xs font-bold text-primary-strong uppercase tracking-wider">
-            <Cpu className="h-4 w-4" />
-            <span>Tuyên bố Đạo đức Trí tuệ Nhân tạo</span>
+          <div className="text-xs font-bold text-primary-strong uppercase tracking-wider">
+            Tuyên bố Đạo đức Trí tuệ Nhân tạo
           </div>
-          <h2 className="mt-2 text-2xl font-extrabold text-primary-strong">
+          <h2 className="mt-2 text-xl sm:text-2xl font-extrabold text-primary-strong">
             {sections.aiEthics.title}
           </h2>
           <div className="mt-4 rounded-2xl border border-primary/20 bg-paper p-5 text-sm sm:text-base font-semibold leading-relaxed text-ink">
@@ -180,7 +162,7 @@ export default function TransparencyPage() {
           <div className="flex items-center gap-2">
             <MockBadge label="TRUNG THỰC VỀ BẢN DEMO" />
           </div>
-          <h2 className="mt-2 text-2xl font-bold text-amber-ink">
+          <h2 className="mt-2 text-xl sm:text-2xl font-bold text-amber-ink">
             {sections.simulationList.title}
           </h2>
           <p className="mt-2 text-sm text-amber-ink/90">
@@ -207,7 +189,7 @@ export default function TransparencyPage() {
 
         {/* Phần 7: Lộ trình hoàn thiện pháp lý và kỹ thuật */}
         <section className="rounded-3xl border border-line bg-paper p-6 sm:p-10 shadow-soft">
-          <h2 className="text-2xl font-bold text-ink">{sections.roadmap.title}</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-ink">{sections.roadmap.title}</h2>
           <ul className="mt-4 flex flex-col gap-3 text-sm sm:text-base text-ink/80">
             {sections.roadmap.items.map((item, idx) => (
               <li key={idx} className="flex items-start gap-3">
@@ -222,7 +204,7 @@ export default function TransparencyPage() {
 
         {/* Phần 8: Nguồn số liệu từ FACTS có kèm nhãn Chưa xác minh nguồn */}
         <section className="rounded-3xl border border-line bg-surface/50 p-6 sm:p-10">
-          <h2 className="text-2xl font-bold text-ink">
+          <h2 className="text-xl sm:text-2xl font-bold text-ink">
             {sections.factsVerification.title}
           </h2>
           <p className="mt-2 text-sm text-ink/70">
@@ -246,9 +228,8 @@ export default function TransparencyPage() {
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line/60 pt-3 text-xs text-ink/60">
                   <span className="font-semibold">Nguồn: {fact.source || "Chưa có nguồn"}</span>
                   {!fact.verified && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-amber/20 px-2 py-0.5 text-[11px] font-bold text-amber-ink">
-                      <Info className="h-3 w-3" />
-                      <span>{vi.common.unverifiedSource}</span>
+                    <span className="rounded-md bg-amber/20 px-2 py-0.5 text-[11px] font-bold text-amber-ink">
+                      {vi.common.unverifiedSource}
                     </span>
                   )}
                 </div>

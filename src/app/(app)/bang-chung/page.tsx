@@ -83,8 +83,8 @@ export default function PublicProofPage() {
 
         {/* Non-PII Banner */}
         <section className="p-4 sm:p-5 rounded-panel bg-primary/10 border border-primary/20 space-y-2 shadow-xs">
-          <div className="font-bold text-primary text-sm sm:text-base flex items-center gap-2">
-            <span>🛡️</span> Nguyên tắc Đạo đức & Bảo vệ Quyền riêng tư (Zero-PII On-chain)
+          <div className="font-bold text-primary text-sm sm:text-base">
+            Nguyên tắc Đạo đức & Bảo vệ Quyền riêng tư (Zero-PII On-chain)
           </div>
           <p className="text-xs sm:text-sm text-ink/80 leading-relaxed">
             Hệ thống RentFlow tuân thủ nghiêm ngặt quy định bảo mật: <strong>Tuyệt đối không đưa thông tin định danh cá nhân</strong> (Họ tên, Số điện thoại, CCCD, địa chỉ, hình ảnh bàn giao, nội dung văn bản hợp đồng) lên sổ cái blockchain. Dữ liệu on-chain chỉ gồm mã định danh nội bộ (UUID), mã băm mật mã SHA-256 có salt và các trạng thái chuyển đổi.
@@ -169,8 +169,12 @@ export default function PublicProofPage() {
               description="Không có bản ghi blockchain nào khớp với bộ lọc hoặc từ khóa tra cứu."
             />
           ) : (
-            <div className="overflow-x-auto" data-lenis-prevent>
-              <table className="w-full text-left text-xs sm:text-sm">
+            <div>
+              <div className="sm:hidden text-[11px] text-ink/50 mb-1.5 flex items-center gap-1 font-medium">
+                <span>↔ Cuộn ngang để xem đầy đủ giao dịch</span>
+              </div>
+              <div className="overflow-x-auto w-full max-w-full min-w-0" data-lenis-prevent>
+                <table className="w-full min-w-[650px] text-left text-xs sm:text-sm">
                 <thead>
                   <tr className="border-b border-line text-ink/50 font-semibold">
                     <th className="py-3 px-3">Hành động pháp lý</th>
@@ -222,6 +226,7 @@ export default function PublicProofPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </section>
