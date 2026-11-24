@@ -235,6 +235,20 @@ export async function confirmContract(
 
   const now = new Date().toISOString();
 
+  // Đảm bảo tạo kỳ thuê khi hợp đồng hiệu lực nếu chưa có
+  const existingPeriods = await repo.rentPeriods.listByContractId(contractId);
+  if (existingPeriods.length === 0) {
+    const generated = generateRentPeriods(
+      contractId,
+      updatedContract.start_date,
+      updatedContract.end_date,
+      updatedContract.due_day,
+      updatedContract.rent_amount,
+      now,
+    );
+    await repo.rentPeriods.createMany(generated);
+  }
+
   await repo.auditLogs.create({
     id: randomUUID(),
     actor_id: user.id,
@@ -376,8 +390,9 @@ export async function listContracts(
 
 /**
  * Sinh danh sách các kỳ thuê theo start_date, end_date và due_day.
+ * Xử lý tháng thiếu ngày (due_day = 31) an toàn theo múi giờ và ngày thực tế của từng tháng.
  */
-function generateRentPeriods(
+export function generateRentPeriods(
   contractId: string,
   startDateStr: string,
   endDateStr: string,
@@ -386,21 +401,19 @@ function generateRentPeriods(
   nowIso: string,
 ): RentPeriodEntity[] {
   const periods: RentPeriodEntity[] = [];
-  const start = new Date(startDateStr);
-  const end = new Date(endDateStr);
+  const [startYear, startMonth] = startDateStr.split("-").map(Number);
+  const [endYear, endMonth] = endDateStr.split("-").map(Number);
 
-  let currentYear = start.getFullYear();
-  let currentMonth = start.getMonth(); // 0-indexed
+  let y = startYear;
+  let m = startMonth; // 1-indexed
   let periodNo = 1;
 
-  while (true) {
-    const monthDueDate = new Date(currentYear, currentMonth, dueDay);
-    // Nếu ngày đến hạn đã vượt quá ngày kết thúc hợp đồng, dừng
-    if (monthDueDate > end && periodNo > 1) break;
-
-    const yyyy = currentYear.toString();
-    const mm = String(currentMonth + 1).padStart(2, "0");
-    const dd = String(Math.min(dueDay, daysInMonth(currentYear, currentMonth + 1))).padStart(2, "0");
+  while (y < endYear || (y === endYear && m <= endMonth)) {
+    const maxDay = daysInMonth(y, m);
+    const actualDueDay = Math.min(dueDay, maxDay);
+    const yyyy = y.toString();
+    const mm = String(m).padStart(2, "0");
+    const dd = String(actualDueDay).padStart(2, "0");
     const dueDate = `${yyyy}-${mm}-${dd}`;
 
     periods.push({
@@ -417,20 +430,18 @@ function generateRentPeriods(
     });
 
     periodNo++;
-    currentMonth++;
-    if (currentMonth > 11) {
-      currentMonth = 0;
-      currentYear++;
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
     }
-
-    if (new Date(currentYear, currentMonth, 1) > end) break;
   }
 
   return periods;
 }
 
 function daysInMonth(year: number, month1Indexed: number): number {
-  return new Date(year, month1Indexed, 0).getDate();
+  return new Date(Date.UTC(year, month1Indexed, 0)).getUTCDate();
 }
 
 function assembleContractDetail(

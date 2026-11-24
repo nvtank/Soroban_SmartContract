@@ -18,16 +18,29 @@ export type OverdueScanResult = {
 };
 
 /**
+ * Lấy ngày hiện tại theo múi giờ Asia/Ho_Chi_Minh định dạng YYYY-MM-DD.
+ */
+export function getVietnamToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/**
  * Quét các kỳ thuê quá hạn và tính phí trễ.
  * Công thức phí trễ theo CONTRACTS.md mục 3: late_fee = rent * bps * days / 10000 (làm tròn xuống).
+ * Idempotent trong ngày: nếu kỳ thuê đã được quét cho cùng số ngày trễ (cùng ngày), không cộng phí và không gửi lại thông báo/onchain.
  */
 export async function scanOverdue(
   repo: DomainRepository,
-  options?: { asOfDate?: string },
+  options?: { asOfDate?: string; contractId?: string },
   deps?: OverdueScanDeps,
 ): Promise<OverdueScanResult> {
-  const asOf = options?.asOfDate ?? new Date().toISOString().slice(0, 10);
-  const candidates = await repo.rentPeriods.findOverdueCandidates(asOf);
+  const asOf = options?.asOfDate ?? getVietnamToday();
+  const candidates = await repo.rentPeriods.findOverdueCandidates(asOf, options?.contractId);
 
   let overdueCount = 0;
   const updatedPeriods: OverdueScanResult["updatedPeriods"] = [];
@@ -37,11 +50,20 @@ export async function scanOverdue(
     const contract = await repo.contracts.findById(period.contract_id);
     if (!contract || contract.status !== "ACTIVE") continue;
 
-    // Tính số ngày trễ: chênh lệch giữa ngày quét và ngày đến hạn
-    const dueDateTs = new Date(period.due_date).getTime();
-    const asOfTs = new Date(asOf).getTime();
-    const diffMs = asOfTs - dueDateTs;
-    const daysLate = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    // Tính số ngày trễ chuẩn xác theo UTC date
+    const [asOfYear, asOfMonth, asOfDay] = asOf.split("-").map(Number);
+    const [dueYear, dueMonth, dueDay] = period.due_date.split("-").map(Number);
+    const asOfUtc = Date.UTC(asOfYear, asOfMonth - 1, asOfDay);
+    const dueUtc = Date.UTC(dueYear, dueMonth - 1, dueDay);
+    const diffMs = asOfUtc - dueUtc;
+    const daysLate = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (daysLate <= 0) continue;
+
+    // Idempotent: nếu kỳ thuê đã là OVERDUE và đã ghi nhận đúng số ngày trễ này trong ngày, bỏ qua
+    if (period.status === "OVERDUE" && period.late_days === daysLate) {
+      continue;
+    }
 
     // late_fee = rent * bps * days / 10000
     const rentAmount = contract.rent_amount;
@@ -68,11 +90,12 @@ export async function scanOverdue(
 
     await repo.auditLogs.create({
       id: randomUUID(),
-      actor_id: "system:cron",
+      actor_id: null,
       action: "RENT_MARKED_OVERDUE",
       entity: "rent_periods",
       entity_id: `${period.contract_id}:${period.period_no}`,
       meta: {
+        systemActor: "system:cron",
         contractId: period.contract_id,
         periodNo: period.period_no,
         daysLate,

@@ -19,6 +19,168 @@ export async function settlePayment(
   paymentId: string,
   deps?: SettlementDeps,
 ): Promise<void> {
+  const supabaseClient: SupabaseClient | null =
+    "from" in db && typeof (db as SupabaseClient).rpc === "function"
+      ? (db as SupabaseClient)
+      : "db" in db && typeof (db as Record<string, unknown>).db === "object" && typeof ((db as Record<string, unknown>).db as SupabaseClient)?.rpc === "function"
+        ? ((db as Record<string, unknown>).db as SupabaseClient)
+        : null;
+
+  if (supabaseClient) {
+    const { data, error } = await supabaseClient.rpc("settle_payment_atomic", {
+      p_payment_id: paymentId,
+    });
+
+    if (error) {
+      console.error("[settlement] Atomic settle RPC error:", error);
+      throw error;
+    }
+    if (!data || data.error) {
+      if (data?.error === "PAYMENT_NOT_FOUND") {
+        console.warn(`[settlement] Payment not found: ${paymentId}`);
+        return;
+      }
+      throw new Error(`Settlement RPC failed: ${data?.error}`);
+    }
+
+    if (data.action_taken === "ALREADY_SETTLED") {
+      return; // Idempotent: already settled!
+    }
+
+    const payment = data.payment;
+    const now = new Date().toISOString();
+    const repo = createSupabaseDomainRepository(supabaseClient);
+    const contract = await repo.contracts.findById(payment.contract_id);
+    if (!contract) return;
+
+    const paymentRefHash = hashPaymentRef(
+      payment.provider,
+      BigInt(payment.order_code),
+      payment.payment_ref_salt,
+    );
+
+    if (data.action_taken === "DEPOSIT_RECORDED") {
+      await repo.auditLogs.create({
+        id: randomUUID(),
+        actor_id: null,
+        action: "DEPOSIT_RECORDED",
+        entity: "deposits",
+        entity_id: payment.contract_id,
+        meta: {
+          systemActor: "system:settlement",
+          paymentId,
+          amount: payment.business_amount.toString(),
+          paymentRefHash,
+        },
+        created_at: now,
+      });
+
+      for (const uid of [contract.landlord_id, contract.tenant_id].filter(Boolean) as string[]) {
+        await repo.notifications.create({
+          id: randomUUID(),
+          user_id: uid,
+          type: "DEPOSIT_RECORDED",
+          title: "Tiền cọc đã được ghi nhận",
+          body: `Tiền cọc phòng ${contract.room_label} (${payment.business_amount.toString()} ₫) đã được nạp thành công và bảo chứng.`,
+          read_at: null,
+          created_at: now,
+        });
+      }
+
+      if (deps?.enqueueOnchain) {
+        try {
+          await deps.enqueueOnchain(repo, {
+            contractId: payment.contract_id,
+            action: "record_deposit_paid",
+            args: [payment.contract_id, paymentRefHash, payment.business_amount.toString()],
+            signer: { kind: "ORACLE" },
+          });
+        } catch (err) {
+          console.error("[settlement] Failed to enqueue record_deposit_paid onchain:", err);
+        }
+      }
+      return;
+    }
+
+    if (data.action_taken === "RENT_UPDATED") {
+      const periodNo = Number(payment.period_no);
+      const rentPeriod = data.rent_period;
+      const targetStatus = rentPeriod.status;
+
+      await repo.auditLogs.create({
+        id: randomUUID(),
+        actor_id: null,
+        action: targetStatus === "PAID" ? "RENT_PAID" : "RENT_PARTIALLY_PAID",
+        entity: "rent_periods",
+        entity_id: `${payment.contract_id}:${periodNo}`,
+        meta: {
+          systemActor: "system:settlement",
+          paymentId,
+          periodNo,
+          amountPaid: rentPeriod.amount_paid.toString(),
+          status: targetStatus,
+          paymentRefHash,
+        },
+        created_at: now,
+      });
+
+      if (contract.tenant_id) {
+        await repo.notifications.create({
+          id: randomUUID(),
+          user_id: contract.tenant_id,
+          type: "RENT_PAID",
+          title: `Thanh toán kỳ thuê số ${periodNo}`,
+          body:
+            targetStatus === "PAID"
+              ? `Đã thanh toán đủ kỳ thuê số ${periodNo}.`
+              : `Đã ghi nhận thanh toán một phần (${rentPeriod.amount_paid.toString()} ₫) cho kỳ thuê số ${periodNo}.`,
+          read_at: null,
+          created_at: now,
+        });
+      }
+
+      if (deps?.enqueueOnchain) {
+        try {
+          await deps.enqueueOnchain(repo, {
+            contractId: payment.contract_id,
+            action: "record_rent_paid",
+            args: [
+              payment.contract_id,
+              periodNo,
+              payment.business_amount.toString(),
+              paymentRefHash,
+            ],
+            signer: { kind: "ORACLE" },
+          });
+        } catch (err) {
+          console.error("[settlement] Failed to enqueue record_rent_paid onchain:", err);
+        }
+      }
+      return;
+    }
+
+    if (data.action_taken === "RENT_PARTIALLY_PAID") {
+      const periodNo = Number(payment.period_no);
+      await repo.auditLogs.create({
+        id: randomUUID(),
+        actor_id: null,
+        action: "RENT_UNDERPAID",
+        entity: "rent_periods",
+        entity_id: `${payment.contract_id}:${periodNo}`,
+        meta: {
+          systemActor: "system:settlement",
+          paymentId,
+          paidAmount: payment.paid_amount.toString(),
+        },
+        created_at: now,
+      });
+      return;
+    }
+
+    return;
+  }
+
+  // Fallback cho In-Memory / Fake repository (phục vụ unit test không có Supabase RPC)
   const repo: DomainRepository =
     "contracts" in db && typeof (db as DomainRepository).contracts?.findById === "function"
       ? (db as DomainRepository)
@@ -61,11 +223,12 @@ export async function settlePayment(
 
         await repo.auditLogs.create({
           id: randomUUID(),
-          actor_id: "system:settlement",
+          actor_id: null,
           action: "DEPOSIT_RECORDED",
           entity: "deposits",
           entity_id: payment.contract_id,
           meta: {
+            systemActor: "system:settlement",
             paymentId,
             amount: payment.business_amount.toString(),
             paymentRefHash,
@@ -116,11 +279,12 @@ export async function settlePayment(
 
         await repo.auditLogs.create({
           id: randomUUID(),
-          actor_id: "system:settlement",
+          actor_id: null,
           action: targetStatus === "PAID" ? "RENT_PAID" : "RENT_PARTIALLY_PAID",
           entity: "rent_periods",
           entity_id: `${payment.contract_id}:${payment.period_no}`,
           meta: {
+            systemActor: "system:settlement",
             paymentId,
             periodNo: payment.period_no,
             amountPaid: newPaid.toString(),
@@ -181,11 +345,11 @@ export async function settlePayment(
 
         await repo.auditLogs.create({
           id: randomUUID(),
-          actor_id: "system:settlement",
+          actor_id: null,
           action: "RENT_UNDERPAID",
           entity: "rent_periods",
           entity_id: `${payment.contract_id}:${payment.period_no}`,
-          meta: { paymentId, paidAmount: payment.paid_amount.toString() },
+          meta: { systemActor: "system:settlement", paymentId, paidAmount: payment.paid_amount.toString() },
           created_at: now,
         });
       }
