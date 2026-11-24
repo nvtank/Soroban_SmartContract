@@ -1,42 +1,56 @@
+import "@/../tests/setup";
+import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { confirmContract, createContract, getContractDetail } from "@/domain/contracts/service";
 import { settlePayment } from "@/domain/contracts/settlement";
+import { approveRefund, requestRefund } from "@/domain/deposits/service";
 import { proposeDeduction, respondDeduction } from "@/domain/deductions/service";
 import { resolveDispute } from "@/domain/disputes/service";
 import { scanOverdue } from "@/domain/jobs/overdue-scan";
 import type { SessionUser } from "@/domain/dto";
-import { FakeDomainRepository, type OnchainSigner } from "@/domain/repository";
+import type { OnchainSigner } from "@/domain/repository";
+import { createSupabaseDomainRepository } from "@/domain/supabase-repository";
+import { createTestAdminClient } from "./helpers";
 
-describe("5-step end-to-end contract journey integration", () => {
+describe("5-step end-to-end contract journey integration (Real Database)", () => {
+  const admin = createTestAdminClient();
+  const repo = createSupabaseDomainRepository(admin);
+
+  const landlordId = randomUUID();
+  const tenantId = randomUUID();
+  const landlordPhone = `091${Date.now().toString().slice(-7)}`;
+  const tenantPhone = `098${Date.now().toString().slice(-7)}`;
+
   const landlord: SessionUser = {
-    id: "landlord-e2e",
+    id: landlordId,
     role: "LANDLORD",
     fullName: "Chủ nhà Lê Văn C",
-    phone: "0912345678",
+    phone: landlordPhone,
   };
 
   const tenant: SessionUser = {
-    id: "tenant-e2e",
+    id: tenantId,
     role: "TENANT",
     fullName: "Người thuê Phạm Thị D",
-    phone: "0987654321",
+    phone: tenantPhone,
   };
 
-  it("completes full 5-step journey: create -> confirm -> deposit -> rent & overdue -> deduction & refund -> dispute branch", async () => {
-    const repo = new FakeDomainRepository();
-    await repo.profiles.create({
-      id: landlord.id,
-      phone: landlord.phone,
-      full_name: landlord.fullName,
-      role: landlord.role,
-      created_at: new Date().toISOString(),
+  it("completes full 5-step journey and handles concurrency on real DB", async () => {
+    // 0. Tạo người dùng mẫu trong DB thật qua RPC seed_demo_user
+    await admin.rpc("seed_demo_user", {
+      p_id: landlord.id,
+      p_email: `landlord_${landlord.id.slice(0, 8)}@rentflow.local`,
+      p_phone: landlord.phone,
+      p_full_name: landlord.fullName,
+      p_role: landlord.role,
     });
-    await repo.profiles.create({
-      id: tenant.id,
-      phone: tenant.phone,
-      full_name: tenant.fullName,
-      role: tenant.role,
-      created_at: new Date().toISOString(),
+
+    await admin.rpc("seed_demo_user", {
+      p_id: tenant.id,
+      p_email: `tenant_${tenant.id.slice(0, 8)}@rentflow.local`,
+      p_phone: tenant.phone,
+      p_full_name: tenant.fullName,
+      p_role: tenant.role,
     });
 
     const onchainTxs: Array<{
@@ -74,6 +88,15 @@ describe("5-step end-to-end contract journey integration", () => {
     expect(contract.journeyStep).toBe("SIGN");
     expect(contract.deposit.status).toBe("UNPAID");
 
+    // Kiểm tra trực tiếp trong PostgreSQL thật
+    const { data: dbContractBefore } = await admin
+      .from("rental_contracts")
+      .select("id, status, landlord_id")
+      .eq("id", contract.id)
+      .single();
+    expect(dbContractBefore?.status).toBe("PENDING_CONFIRMATION");
+    expect(dbContractBefore?.landlord_id).toBe(landlord.id);
+
     // Người thuê xem hợp đồng
     const detailForTenant = await getContractDetail(repo, contract.id, tenant);
     expect(detailForTenant.id).toBe(contract.id);
@@ -89,45 +112,74 @@ describe("5-step end-to-end contract journey integration", () => {
     expect(confirmed.journeyStep).toBe("DEPOSIT");
     expect(stepUpMock).toHaveBeenCalledWith(expect.anything(), tenant.id, "SIGN_CONTRACT");
 
+    // Kiểm tra PostgreSQL: trạng thái đã là ACTIVE và tenant_id đã gán
+    const { data: dbContractAfter } = await admin
+      .from("rental_contracts")
+      .select("id, status, tenant_id")
+      .eq("id", contract.id)
+      .single();
+    expect(dbContractAfter?.status).toBe("ACTIVE");
+    expect(dbContractAfter?.tenant_id).toBe(tenant.id);
+
     // ==========================================
     // BƯỚC 2: Nạp cọc qua VietQR -> Settlement ghi nhận cọc
     // ==========================================
-    const depositPaymentId = "pay-dep-1";
-    await repo.payments.create({
+    const depositPaymentId = randomUUID();
+    const orderCode1 = BigInt(Math.floor(Date.now() / 1000) * 1000 + Math.floor(Math.random() * 900) + 100);
+
+    await admin.from("payments").insert({
       id: depositPaymentId,
       contract_id: contract.id,
       kind: "DEPOSIT",
       period_no: null,
-      business_amount: 5000000n,
-      expected_amount: 5000000n,
-      paid_amount: 5000000n,
+      business_amount: 5000000,
+      expected_amount: 5000000,
+      paid_amount: 5000000,
       provider: "PAYOS",
-      order_code: 990001n,
+      order_code: orderCode1.toString(),
       payment_ref_salt: "salt-dep-1",
       status: "CONFIRMED",
       qr_data: null,
       checkout_url: null,
       is_simulated: false,
-      settled_at: null,
-      created_at: new Date().toISOString(),
     });
 
-    await settlePayment(repo, depositPaymentId, { enqueueOnchain: enqueueMock });
+    // Thử nghiệm gọi đồng thời settlePayment (Requirement 4)
+    await Promise.all([
+      settlePayment(admin, depositPaymentId, { enqueueOnchain: enqueueMock }),
+      settlePayment(admin, depositPaymentId, { enqueueOnchain: enqueueMock }),
+    ]);
 
     let updatedDetail = await getContractDetail(repo, contract.id, tenant);
     expect(updatedDetail.deposit.status).toBe("RECORDED");
     expect(updatedDetail.journeyStep).toBe("RENT");
 
+    // Kiểm tra DB thật: cọc đã ghi nhận, settled_at đã có
+    const { data: dbDeposit } = await admin
+      .from("deposits")
+      .select("status, paid_amount")
+      .eq("contract_id", contract.id)
+      .single();
+    expect(dbDeposit?.status).toBe("RECORDED");
+    expect(Number(dbDeposit?.paid_amount)).toBe(5000000);
+
+    const { data: dbPayment } = await admin
+      .from("payments")
+      .select("settled_at")
+      .eq("id", depositPaymentId)
+      .single();
+    expect(dbPayment?.settled_at).not.toBeNull();
+
     // ==========================================
     // BƯỚC 3: Kỳ thuê hàng tháng & Quét quá hạn
     // ==========================================
     // Giả lập quét quá hạn khi đã qua ngày 5 (ngày 15/03/2026)
-    const overdueResult = await scanOverdue(
+    const overdueResult1 = await scanOverdue(
       repo,
-      { asOfDate: "2026-03-15" },
+      { asOfDate: "2026-03-15", contractId: contract.id },
       { enqueueOnchain: enqueueMock },
     );
-    expect(overdueResult.overdueCount).toBe(1);
+    expect(overdueResult1.overdueCount).toBe(1);
 
     updatedDetail = await getContractDetail(repo, contract.id, tenant);
     const p1 = updatedDetail.rentPeriods[0];
@@ -136,28 +188,44 @@ describe("5-step end-to-end contract journey integration", () => {
     // Phí trễ: 5,000,000 * 50 * 10 / 10,000 = 250,000 VND
     expect(p1.lateFee).toBe("250000");
 
+    // Quét quá hạn lần 2 trong cùng ngày -> Idempotent, không cộng phí hai lần (Requirement 5)
+    const overdueResult2 = await scanOverdue(
+      repo,
+      { asOfDate: "2026-03-15", contractId: contract.id },
+      { enqueueOnchain: enqueueMock },
+    );
+    expect(overdueResult2.overdueCount).toBe(0);
+
+    const { data: dbPeriodAfterIdem } = await admin
+      .from("rent_periods")
+      .select("status, late_days, late_fee")
+      .eq("contract_id", contract.id)
+      .eq("period_no", 1)
+      .single();
+    expect(Number(dbPeriodAfterIdem?.late_fee)).toBe(250000); // Không bị nhân đôi lên 500,000
+
     // Thanh toán tiền thuê kỳ 1
-    const rentPaymentId = "pay-rent-1";
-    await repo.payments.create({
+    const rentPaymentId = randomUUID();
+    const orderCode2 = BigInt(Math.floor(Date.now() / 1000) * 1000 + Math.floor(Math.random() * 900) + 101);
+
+    await admin.from("payments").insert({
       id: rentPaymentId,
       contract_id: contract.id,
       kind: "RENT",
       period_no: 1,
-      business_amount: 5000000n,
-      expected_amount: 5000000n,
-      paid_amount: 5000000n,
+      business_amount: 5000000,
+      expected_amount: 5000000,
+      paid_amount: 5000000,
       provider: "PAYOS",
-      order_code: 990002n,
+      order_code: orderCode2.toString(),
       payment_ref_salt: "salt-rent-1",
       status: "CONFIRMED",
       qr_data: null,
       checkout_url: null,
       is_simulated: false,
-      settled_at: null,
-      created_at: new Date().toISOString(),
     });
 
-    await settlePayment(repo, rentPaymentId, { enqueueOnchain: enqueueMock });
+    await settlePayment(admin, rentPaymentId, { enqueueOnchain: enqueueMock });
     updatedDetail = await getContractDetail(repo, contract.id, tenant);
     expect(updatedDetail.rentPeriods[0].status).toBe("PAID");
 
@@ -173,7 +241,7 @@ describe("5-step end-to-end contract journey integration", () => {
     );
     expect(deduction.status).toBe("PROPOSED");
 
-    // Người thuê không đồng ý -> từ chối khấu trừ -> cọc chuyển sang PENDING_DISPUTE
+    // Người thuê từ chối khấu trừ -> cọc chuyển sang PENDING_DISPUTE
     await respondDeduction(repo, deduction.id, { accept: false }, tenant, new Request("http://localhost"), {
       requireStepUp: vi.fn().mockResolvedValue(undefined),
       enqueueOnchain: enqueueMock,
@@ -183,6 +251,14 @@ describe("5-step end-to-end contract journey integration", () => {
     expect(updatedDetail.deposit.status).toBe("PENDING_DISPUTE");
     expect(updatedDetail.journeyStep).toBe("DISPUTE");
     expect(updatedDetail.dispute?.status).toBe("IN_PROGRESS");
+
+    // Kiểm tra PostgreSQL DB
+    const { data: dbDepositDisputed } = await admin
+      .from("deposits")
+      .select("status")
+      .eq("contract_id", contract.id)
+      .single();
+    expect(dbDepositDisputed?.status).toBe("PENDING_DISPUTE");
 
     // ==========================================
     // BƯỚC 5: Nhánh Tranh chấp khi có bất đồng và Thống nhất hòa giải
@@ -213,7 +289,78 @@ describe("5-step end-to-end contract journey integration", () => {
     expect(updatedDetail.deposit.refundAmount).toBe("3800000");
     expect(updatedDetail.status).toBe("ENDED");
 
-    // Toàn bộ các thao tác đã sinh onchain actions tương ứng
+    // Kiểm tra DB: hợp đồng đã ENDED, cọc đã DEDUCTED với đúng số tiền
+    const { data: dbContractFinal } = await admin
+      .from("rental_contracts")
+      .select("status")
+      .eq("id", contract.id)
+      .single();
+    expect(dbContractFinal?.status).toBe("ENDED");
+
+    // ==========================================
+    // KIỂM TRA ĐỒNG THỜI DUYỆT HOÀN CỌC (Requirement 3: Hai bên cùng duyệt không giải ngân 2 lần)
+    // ==========================================
+    const contractConc = await createContract(
+      repo,
+      {
+        roomLabel: "Phòng 202 Concurrency",
+        rentAmount: "4000000",
+        depositAmount: "4000000",
+        startDate: "2026-04-01",
+        endDate: "2026-09-30",
+        dueDay: 1,
+        lateFeeBpsPerDay: 50,
+        termsText: "Terms",
+        tenantPhoneInvited: tenant.phone,
+      },
+      landlord,
+    );
+    await confirmContract(repo, contractConc.id, tenant);
+
+    const concDepPayId = randomUUID();
+    await admin.from("payments").insert({
+      id: concDepPayId,
+      contract_id: contractConc.id,
+      kind: "DEPOSIT",
+      business_amount: 4000000,
+      expected_amount: 4000000,
+      paid_amount: 4000000,
+      provider: "PAYOS",
+      order_code: BigInt(Math.floor(Date.now() / 1000) * 1000 + Math.floor(Math.random() * 900) + 200).toString(),
+      payment_ref_salt: "salt-conc",
+      status: "CONFIRMED",
+      is_simulated: false,
+    });
+    await settlePayment(admin, concDepPayId);
+    await requestRefund(repo, contractConc.id, tenant);
+
+    // Chủ nhà đã approve 4,000,000
+    await approveRefund(repo, contractConc.id, { refundAmount: "4000000" }, landlord);
+
+    // Người thuê gửi 2 request approveRefund đồng thời (cùng số tiền 4,000,000)
+    let releaseCount = 0;
+    const trackingEnqueue = vi.fn().mockImplementation(async (_r, p) => {
+      if (p.action === "approve_refund") releaseCount++;
+      return { id: "tx-conc" };
+    });
+
+    const [concRes1, concRes2] = await Promise.all([
+      approveRefund(repo, contractConc.id, { refundAmount: "4000000" }, tenant, undefined, {
+        enqueueOnchain: trackingEnqueue,
+      }),
+      approveRefund(repo, contractConc.id, { refundAmount: "4000000" }, tenant, undefined, {
+        enqueueOnchain: trackingEnqueue,
+      }),
+    ]);
+
+    expect(concRes1.status).toBe("REFUNDED");
+    expect(concRes2.status).toBe("REFUNDED");
+    // Chỉ giải ngân đúng 1 lần duy nhất trên onchain outbox
+    expect(releaseCount).toBe(1);
+
+    // ==========================================
+    // KIỂM TRA ON-CHAIN ACTIONS VÀ KHÔNG CHỨA PII (Requirement 8)
+    // ==========================================
     const actionNames = onchainTxs.map((t) => t.action);
     expect(actionNames).toContain("create_contract");
     expect(actionNames).toContain("tenant_confirm");
@@ -224,5 +371,16 @@ describe("5-step end-to-end contract journey integration", () => {
     expect(actionNames).toContain("respond_deduction");
     expect(actionNames).toContain("open_dispute");
     expect(actionNames).toContain("resolve_dispute");
+
+    // Đảm bảo TUYỆT ĐỐI không có PII trong mọi tham số on-chain
+    for (const tx of onchainTxs) {
+      const serialized = JSON.stringify(tx.args);
+      expect(serialized).not.toContain(landlordPhone);
+      expect(serialized).not.toContain(tenantPhone);
+      expect(serialized).not.toContain("Lê Văn C");
+      expect(serialized).not.toContain("Phạm Thị D");
+      expect(serialized).not.toContain("Ecohome");
+      expect(serialized).not.toContain("Hỏng máy giặt"); // Chỉ truyền hash lý do, không truyền văn bản trần
+    }
   });
 });
