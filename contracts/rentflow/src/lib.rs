@@ -1,5 +1,6 @@
 #![no_std]
 #![allow(deprecated)]
+#![allow(clippy::too_many_arguments)]
 
 pub mod storage;
 pub mod types;
@@ -12,10 +13,10 @@ use storage::{ContractRecord, DataKey, DeductionProposal, RentPeriodRecord};
 use types::{ContractStatus, DepositStatus, DisputeStatus, Error, RentStatus};
 
 const DAY_IN_LEDGERS: u32 = 17280;
-const INSTANCE_LIFETIME_THRESHOLD: u32 = DAY_IN_LEDGERS * 7;
-const INSTANCE_BUMP_AMOUNT: u32 = DAY_IN_LEDGERS * 30;
-const PERSISTENT_LIFETIME_THRESHOLD: u32 = DAY_IN_LEDGERS * 7;
-const PERSISTENT_BUMP_AMOUNT: u32 = DAY_IN_LEDGERS * 30;
+const INSTANCE_LIFETIME_THRESHOLD: u32 = DAY_IN_LEDGERS * 14;
+const INSTANCE_BUMP_AMOUNT: u32 = DAY_IN_LEDGERS * 60;
+const PERSISTENT_LIFETIME_THRESHOLD: u32 = DAY_IN_LEDGERS * 14;
+const PERSISTENT_BUMP_AMOUNT: u32 = DAY_IN_LEDGERS * 60;
 
 fn extend_instance_ttl(env: &Env) {
     env.storage()
@@ -351,6 +352,9 @@ impl RentFlowContract {
             .get(&contract_key)
             .ok_or(Error::ContractNotFound)?;
 
+        extend_persistent_ttl(&env, &contract_key);
+        extend_instance_ttl(&env);
+
         let bps = contract.late_fee_bps_per_day as i128;
         let days = days_late as i128;
         let fee = contract
@@ -421,10 +425,18 @@ impl RentFlowContract {
         }
         party.require_auth();
 
+        if contract.status != ContractStatus::Active {
+            return Err(Error::InvalidTransition);
+        }
+
         if contract.deposit_status != DepositStatus::Recorded
             && contract.deposit_status != DepositStatus::PendingRefund
         {
             return Err(Error::InvalidTransition);
+        }
+
+        if contract.dispute_status != DisputeStatus::None {
+            return Err(Error::DisputeActive);
         }
 
         contract.deposit_status = DepositStatus::PendingRefund;
@@ -459,6 +471,10 @@ impl RentFlowContract {
         }
         party.require_auth();
 
+        if contract.status != ContractStatus::Active {
+            return Err(Error::InvalidTransition);
+        }
+
         if refund_amount < 0 || refund_amount > contract.deposit_amount {
             return Err(Error::InvalidAmount);
         }
@@ -469,9 +485,7 @@ impl RentFlowContract {
             return Err(Error::InvalidTransition);
         }
 
-        if contract.dispute_status != DisputeStatus::None
-            && contract.dispute_status != DisputeStatus::Resolved
-        {
+        if contract.dispute_status != DisputeStatus::None {
             return Err(Error::DisputeActive);
         }
 
@@ -501,8 +515,18 @@ impl RentFlowContract {
                 return Err(Error::RefundAmountMismatch);
             }
 
-            contract.deposit_status = DepositStatus::Refunded;
+            let deducted = contract
+                .deposit_amount
+                .checked_sub(refund_amount)
+                .ok_or(Error::Overflow)?;
+
+            if refund_amount == contract.deposit_amount {
+                contract.deposit_status = DepositStatus::Refunded;
+            } else {
+                contract.deposit_status = DepositStatus::Deducted;
+            }
             contract.refund_amount = refund_amount;
+            contract.deducted_amount = deducted;
             contract.status = ContractStatus::Ended;
 
             env.storage().persistent().remove(&other_approval_key);
@@ -514,7 +538,7 @@ impl RentFlowContract {
 
             env.events().publish(
                 (Symbol::new(&env, "release_authorized"),),
-                (id.clone(), refund_amount),
+                (id.clone(), refund_amount, deducted),
             );
             env.events().publish(
                 (Symbol::new(&env, "deposit"), Symbol::new(&env, "refunded")),
@@ -553,6 +577,10 @@ impl RentFlowContract {
             return Err(Error::Unauthorized);
         }
         landlord.require_auth();
+
+        if contract.status != ContractStatus::Active {
+            return Err(Error::InvalidTransition);
+        }
 
         if amount <= 0 {
             return Err(Error::InvalidAmount);
@@ -611,6 +639,10 @@ impl RentFlowContract {
             return Err(Error::Unauthorized);
         }
         tenant.require_auth();
+
+        if contract.status != ContractStatus::Active {
+            return Err(Error::InvalidTransition);
+        }
 
         if contract.deposit_status != DepositStatus::PendingRefund {
             return Err(Error::InvalidTransition);
@@ -690,6 +722,10 @@ impl RentFlowContract {
         }
         party.require_auth();
 
+        if contract.status != ContractStatus::Active {
+            return Err(Error::InvalidTransition);
+        }
+
         if contract.deposit_status != DepositStatus::Recorded
             && contract.deposit_status != DepositStatus::PendingRefund
         {
@@ -736,6 +772,10 @@ impl RentFlowContract {
             return Err(Error::Unauthorized);
         }
         party.require_auth();
+
+        if contract.status != ContractStatus::Active {
+            return Err(Error::InvalidTransition);
+        }
 
         if agreed_amount < 0 || agreed_amount > contract.deposit_amount {
             return Err(Error::InvalidAmount);
@@ -832,6 +872,7 @@ impl RentFlowContract {
             .get(&contract_key)
             .ok_or(Error::ContractNotFound)?;
         extend_persistent_ttl(&env, &contract_key);
+        extend_instance_ttl(&env);
         Ok(contract)
     }
 
@@ -846,6 +887,7 @@ impl RentFlowContract {
             .get(&period_key)
             .ok_or(Error::PeriodNotFound)?;
         extend_persistent_ttl(&env, &period_key);
+        extend_instance_ttl(&env);
         Ok(period_rec)
     }
 }
