@@ -4,7 +4,10 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
   type VerifiedRegistrationResponse,
-  type VerifiedAuthenticationResponse,
+} from "@simplewebauthn/server";
+import type {
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
 } from "@simplewebauthn/server";
 import { isoUint8Array } from "@simplewebauthn/server/helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -64,7 +67,7 @@ export async function createPasskeyRegistrationOptions(
 export async function verifyPasskeyRegistration(
   db: SupabaseClient,
   userId: string,
-  response: any,
+  response: RegistrationResponseJSON,
 ): Promise<VerifiedRegistrationResponse> {
   const { rpID, origin } = getWebAuthnConfig();
 
@@ -173,7 +176,7 @@ export async function createPasskeyAuthOptions(
 
 export async function verifyPasskeyAuth(
   db: SupabaseClient,
-  response: any,
+  response: AuthenticationResponseJSON,
 ): Promise<{ verified: boolean; userId: string }> {
   const { rpID, origin } = getWebAuthnConfig();
 

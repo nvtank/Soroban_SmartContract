@@ -203,7 +203,7 @@ if (cliArg) {
     if (check.hasPii) {
       violations.push({ input: cliArg, reason: check.reason });
     }
-  } catch (err) {
+  } catch {
     // Không phải JSON
   }
 }

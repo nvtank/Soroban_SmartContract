@@ -29,7 +29,7 @@ export const POST = withApi(async (request: Request) => {
   );
 
   const body = await parseJson(request, VerifyRegistrationSchema);
-  const verification = await verifyPasskeyRegistration(admin, user.id, body);
+  const verification = await verifyPasskeyRegistration(admin, user.id, body as unknown as Parameters<typeof verifyPasskeyRegistration>[2]);
 
   return ok({ verified: verification.verified });
 });

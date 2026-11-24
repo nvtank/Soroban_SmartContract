@@ -30,7 +30,7 @@ export const POST = withApi(async (request: Request) => {
   );
 
   const body = await parseJson(request, VerifyAuthSchema);
-  const { verified, userId } = await verifyPasskeyAuth(admin, body);
+  const { verified, userId } = await verifyPasskeyAuth(admin, body as unknown as Parameters<typeof verifyPasskeyAuth>[1]);
 
   if (!verified || !userId) {
     throw new ApiError("UNAUTHENTICATED", undefined, "Xác thực Passkey thất bại.");

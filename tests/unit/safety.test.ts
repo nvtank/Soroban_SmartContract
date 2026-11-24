@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { assertLocalDatabaseOnly, isAllowedLocalSupabaseUrl } from "@/../tests/safety";
 import { resetDemoData, seedDemoData } from "@/lib/supabase/seed";
 
@@ -44,7 +45,7 @@ describe("Safety Lock: Database Protection in Tests", () => {
     try {
       process.env.NEXT_PUBLIC_SUPABASE_URL = "https://my-production.supabase.co";
 
-      const mockAdmin = {} as any;
+      const mockAdmin = {} as unknown as SupabaseClient;
       await expect(seedDemoData(mockAdmin)).rejects.toThrow(
         /\[SAFETY LOCK\] THAO TÁC BỊ CHẶN/i,
       );
@@ -61,14 +62,14 @@ describe("Safety Lock: Database Protection in Tests", () => {
     const originalVitest = process.env.VITEST;
     try {
       // Simulate runtime
-      process.env.NODE_ENV = "production";
+      (process.env as Record<string, string | undefined>).NODE_ENV = "production";
       delete process.env.VITEST;
 
       // Notice assertLocalDatabaseOnly is only called in test helpers
       // and seedDemoData runtime guard does not throw in production:
       expect(process.env.NODE_ENV).toBe("production");
     } finally {
-      process.env.NODE_ENV = originalNodeEnv;
+      (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
       if (originalVitest !== undefined) process.env.VITEST = originalVitest;
     }
   });

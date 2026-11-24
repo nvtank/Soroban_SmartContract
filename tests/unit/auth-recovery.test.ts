@@ -57,7 +57,8 @@ describe("Account Recovery Flow (Simulated OTP, eKYC, Admin Approval, Passkey Re
       }),
     });
 
-    const res = await recoveryRequestPost(req, {} as any);
+    const dummyCtx = { params: Promise.resolve({}) } as unknown as { params: Promise<Record<string, string>> };
+    const res = await recoveryRequestPost(req, dummyCtx);
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -78,7 +79,8 @@ describe("Account Recovery Flow (Simulated OTP, eKYC, Admin Approval, Passkey Re
       }),
     });
 
-    const res = await recoveryVerifyOtpPost(req, {} as any);
+    const dummyCtx = { params: Promise.resolve({}) } as unknown as { params: Promise<Record<string, string>> };
+    const res = await recoveryVerifyOtpPost(req, dummyCtx);
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -96,7 +98,8 @@ describe("Account Recovery Flow (Simulated OTP, eKYC, Admin Approval, Passkey Re
       }),
     });
 
-    const res = await recoveryEkycPost(req, {} as any);
+    const dummyCtx = { params: Promise.resolve({}) } as unknown as { params: Promise<Record<string, string>> };
+    const res = await recoveryEkycPost(req, dummyCtx);
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -104,13 +107,15 @@ describe("Account Recovery Flow (Simulated OTP, eKYC, Admin Approval, Passkey Re
   });
 
   it("Step 4: GET /api/recovery lists pending requests for Admin Demo dashboard", async () => {
-    const res = await recoveryGet({} as Request, {} as any);
+    const dummyReq = new Request("http://localhost:3000/api/recovery");
+    const dummyCtx = { params: Promise.resolve({}) } as unknown as { params: Promise<Record<string, string>> };
+    const res = await recoveryGet(dummyReq, dummyCtx);
     const json = await res.json();
 
     expect(res.status).toBe(200);
     expect(Array.isArray(json.data)).toBe(true);
 
-    const found = json.data.find((r: any) => r.id === requestId);
+    const found = json.data.find((r: { id: string; phone: string }) => r.id === requestId);
     expect(found).toBeDefined();
     expect(found.phone).toBe(testPhone);
   });
@@ -131,7 +136,8 @@ describe("Account Recovery Flow (Simulated OTP, eKYC, Admin Approval, Passkey Re
       }),
     });
 
-    const res = await recoveryApprovePost(req, {} as any);
+    const dummyCtx = { params: Promise.resolve({}) } as unknown as { params: Promise<Record<string, string>> };
+    const res = await recoveryApprovePost(req, dummyCtx);
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -156,7 +162,8 @@ describe("Account Recovery Flow (Simulated OTP, eKYC, Admin Approval, Passkey Re
       }),
     });
 
-    const res = await recoveryReissuePost(req, {} as any);
+    const dummyCtx = { params: Promise.resolve({}) } as unknown as { params: Promise<Record<string, string>> };
+    const res = await recoveryReissuePost(req, dummyCtx);
     const json = await res.json();
 
     expect(res.status).toBe(200);

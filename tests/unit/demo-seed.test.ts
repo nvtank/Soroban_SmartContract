@@ -2,7 +2,7 @@ import "@/../tests/setup";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { POST as seedPost } from "@/app/api/demo/seed/route";
 import { POST as resetPost } from "@/app/api/demo/reset/route";
-import { seedDemoData, DEMO_USERS, DEMO_CONTRACTS } from "@/lib/supabase/seed";
+import { seedDemoData, DEMO_CONTRACTS } from "@/lib/supabase/seed";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 describe("/api/demo/seed & reset idempotent and DEMO_MODE enforcement", () => {
@@ -12,10 +12,12 @@ describe("/api/demo/seed & reset idempotent and DEMO_MODE enforcement", () => {
   it("returns 404 when DEMO_MODE is not true", async () => {
     process.env.DEMO_MODE = "false";
     try {
-      const resSeed = await seedPost({} as Request, {} as any);
+      const dummyReq = new Request("http://localhost:3000/api/demo/seed", { method: "POST" });
+      const dummyCtx = { params: Promise.resolve({}) } as unknown as { params: Promise<Record<string, string>> };
+      const resSeed = await seedPost(dummyReq, dummyCtx);
       expect(resSeed.status).toBe(404);
 
-      const resReset = await resetPost({} as Request, {} as any);
+      const resReset = await resetPost(dummyReq, dummyCtx);
       expect(resReset.status).toBe(404);
     } finally {
       process.env.DEMO_MODE = originalDemoMode;
