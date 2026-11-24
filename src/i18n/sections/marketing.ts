@@ -66,7 +66,8 @@ export const marketingVi = {
     pairs: [
       {
         painTitle: "Giam cọc / Trừ cọc vô lý",
-        painDesc: "Tiền cọc nằm hoàn toàn trong tay chủ nhà, người thuê luôn ở thế bị động khi kết thúc kỳ hạn.",
+        painDesc:
+          "Tiền cọc nằm hoàn toàn trong tay chủ nhà, người thuê luôn ở thế bị động khi kết thúc kỳ hạn.",
         solutionTitle: "Két cọc hai chìa khóa (Dual-Key Vault)",
         solutionDesc:
           "Tiền cọc được giữ ở trạng thái trung lập (mô phỏng escrow). Chỉ được giải ngân khi CẢ HAI BÊN cùng dùng Passkey xác nhận cùng số tiền.",
@@ -167,31 +168,32 @@ export const marketingVi = {
     gameSuccessMessage: "Chính xác! Dữ liệu đã được phân loại đúng nguyên tắc kiến trúc.",
     marqueeTitle: "Băng giao dịch Stellar Testnet mới nhất",
     marqueeEmpty: "Chưa có giao dịch nào được ghi nhận trên Testnet trong phiên làm việc này.",
-    marqueeNote: "Dữ liệu được lấy trực tiếp từ hàng đợi onchain_txs. Bấm vào giao dịch để mở Stellar Expert Explorer.",
+    marqueeNote:
+      "Dữ liệu được lấy trực tiếp từ hàng đợi onchain_txs. Bấm vào giao dịch để mở Stellar Expert Explorer.",
     techCards: [
       {
         name: "Stellar & Soroban",
         role: "Sổ cái trạng thái & Chống gian lận",
         status: "ĐÃ TRIỂN KHAI",
-        desc: "Smart contract Soroban quản lý máy trạng thái, kiểm tra quyền chữ ký của từng bên, đảm bảo không thể đơn phương rút cọc trái phép.",
+        desc: "Smart contract Soroban quản lý máy trạng thái và kiểm tra chữ ký của từng bên. Contract không giữ tiền VNĐ: nó chỉ cho phép phát lệnh giải ngân (mô phỏng) khi cả hai bên cùng xác nhận.",
       },
       {
-        name: "SEP-10 & Passkey",
-        role: "Xác thực danh tính không cần mật khẩu",
-        status: "ĐÃ TRIỂN KHAI",
-        desc: "Sử dụng WebAuthn/Passkey sinh trắc học thiết bị kết hợp mô hình custodial ví quản lý ở server, người dùng không cần nhớ 12 từ khóa hạt giống (seed phrase).",
+        name: "Passkey (WebAuthn)",
+        role: "Ký thao tác quan trọng không cần mật khẩu",
+        status: "ĐÃ CHẠY THỬ",
+        desc: "Đăng ký và xác thực Passkey được kiểm tra trên Chrome bằng thiết bị Passkey ảo; ký hợp đồng dùng mã bước hai một lần do máy chủ cấp. Chưa kiểm tra trên điện thoại thật. Ví do máy chủ giữ hộ (custodial), người dùng không phải nhớ 12 từ khóa.",
       },
       {
         name: "CAP-15 Fee-Bump",
         role: "Nền tảng trả phí thay người dùng",
-        status: "LỘ TRÌNH P1",
-        desc: "Tài khoản nền tảng bọc giao dịch fee-bump giúp người dùng bình thường không cần sở hữu đồng XLM vẫn thực hiện được giao dịch blockchain.",
+        status: "ĐÃ CHẠY TRÊN TESTNET",
+        desc: "Giao dịch được bọc FeeBumpTransaction, tài khoản nền tảng trả phí nên người dùng không cần sở hữu XLM. Người dùng chỉ ký phần ủy quyền của mình.",
       },
       {
-        name: "Stellar Anchor",
-        role: "Cầu nối nạp rút tiền định danh VND",
+        name: "SEP-10 & Stellar Anchor",
+        role: "Xác thực ví chuẩn Stellar và cầu nối nạp rút VND",
         status: "LỘ TRÌNH DÀI HẠN",
-        desc: "Tích hợp chuẩn SEP-24 với tổ chức tài chính được cấp phép để biến tiền cọc ký quỹ thành stablecoin neo giá VND thật trên chuỗi.",
+        desc: "Chưa triển khai trong bản demo. Hướng phát triển: SEP-10 cho xác thực ví và SEP-24 với tổ chức tài chính được cấp phép để nạp rút tiền định danh VND.",
       },
     ],
     nextBridge: "Xem bảng so sánh RentFlow với các mô hình hiện tại ↓",
@@ -202,7 +204,13 @@ export const marketingVi = {
     title: "RentFlow định vị ở đâu trên thị trường?",
     description:
       "So sánh trung thực với ngân hàng truyền thống, phần mềm quản lý trọ và các dự án Web3 thuần túy. Thông tin căn cứ theo Brief thiết kế.",
-    columns: ["Tiêu chí", "RentFlow (Đề xuất)", "Ngân hàng truyền thống", "App quản lý phòng trọ", "Dự án Web3 thuần"],
+    columns: [
+      "Tiêu chí",
+      "RentFlow (Đề xuất)",
+      "Ngân hàng truyền thống",
+      "App quản lý phòng trọ",
+      "Dự án Web3 thuần",
+    ],
     rows: [
       {
         criteria: "Bảo chứng tiền cọc",
@@ -313,7 +321,8 @@ export const marketingVi = {
           {
             field: "Mã khóa công khai Passkey (WebAuthn)",
             source: "Trình duyệt của thiết bị người dùng sinh ra khi đăng ký.",
-            purpose: "Xác thực hành vi ký hợp đồng và mở khóa két hoàn cọc, thay thế chữ ký tay truyền thống.",
+            purpose:
+              "Xác thực hành vi ký hợp đồng và mở khóa két hoàn cọc, thay thế chữ ký tay truyền thống.",
           },
         ],
       },

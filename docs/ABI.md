@@ -1,7 +1,7 @@
 # RentFlow Smart Contract ABI & Specification
 
 Tài liệu đặc tả Smart Contract Soroban của dự án **RentFlow** (Track 4/5 Stellar Ideathon).
-Bản cứng smart contract (Round 2), không deploy trực tiếp; phục vụ tích hợp với backend/frontend và kiểm thử.
+Bản đã deploy lên Stellar Testnet (xem docs/CONTRACTS.md); phục vụ tích hợp với backend/frontend và kiểm thử.
 
 ---
 

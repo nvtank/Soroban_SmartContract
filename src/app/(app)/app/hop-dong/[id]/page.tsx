@@ -11,13 +11,7 @@ import { StepUpModal } from "@/components/app/step-up-modal";
 import { OnchainDrawer } from "@/components/app/onchain-drawer";
 import { OnchainStamp } from "@/components/app/onchain-stamp";
 import { formatDate, formatDateTime } from "@/components/app/date-format";
-import {
-  JourneyStepper,
-  StatusBadge,
-  MoneyAmount,
-  OnchainProofChip,
-  MockBadge,
-} from "@/components/shared";
+import { JourneyStepper, StatusBadge, MoneyAmount, OnchainProofChip, MockBadge } from "@/components/shared";
 import type { ContractDetailDto, PaymentDto, OnchainTxDto } from "@/domain/dto";
 
 type TabKey = "tong-quan" | "tien-coc" | "tien-thue" | "hoan-coc" | "bang-chung";
@@ -40,7 +34,7 @@ function ContractDetailContent({ id }: { id: string }) {
   const [activePayment, setActivePayment] = useState<PaymentDto | null>(null);
   const [showStepUp, setShowStepUp] = useState<string | null>(null);
   const [stepUpData, setStepUpData] = useState<{
-    action: "SIGN_CONTRACT" | "APPROVE_REFUND" | "RESPOND_DEDUCTION" | "RESOLVE_DISPUTE";
+    action: "SIGN_CONTRACT" | "APPROVE_REFUND" | "RESPOND_DEDUCTION" | "RESOLVE_DISPUTE" | "EXTEND_DUE";
     title: string;
     onSuccess: (stepUpToken: string) => Promise<void>;
   } | null>(null);
@@ -110,9 +104,7 @@ function ContractDetailContent({ id }: { id: string }) {
 
       const hasPendingTx = onchainTxs.some((t) => t.status === "PENDING" || t.status === "SUBMITTED");
       const needsPoll =
-        hasPendingTx ||
-        contract?.status === "PENDING_CONFIRMATION" ||
-        contract?.depositStatus === "UNPAID";
+        hasPendingTx || contract?.status === "PENDING_CONFIRMATION" || contract?.depositStatus === "UNPAID";
 
       if (!needsPoll) return;
 
@@ -187,6 +179,32 @@ function ContractDetailContent({ id }: { id: string }) {
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "Lỗi tạo thanh toán tiền cọc");
     }
+  };
+
+  const [extendPeriod, setExtendPeriod] = useState<number | null>(null);
+  const [extendDate, setExtendDate] = useState("");
+
+  const handleExtendDue = (periodNo: number) => {
+    setActionError(null);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(extendDate)) {
+      setActionError("Vui lòng chọn hạn thanh toán mới.");
+      return;
+    }
+    setStepUpData({
+      action: "EXTEND_DUE",
+      title: "Xác nhận gia hạn thanh toán",
+      onSuccess: async (stepUpToken: string) => {
+        try {
+          await apiClient.extendDue(id, periodNo, extendDate, stepUpToken);
+          setExtendPeriod(null);
+          setExtendDate("");
+          await loadContract();
+        } catch (err: unknown) {
+          setActionError(err instanceof Error ? err.message : "Gia hạn thanh toán thất bại");
+        }
+      },
+    });
+    setShowStepUp("EXTEND_DUE");
   };
 
   const handlePayRent = async (periodNo: number) => {
@@ -322,7 +340,10 @@ function ContractDetailContent({ id }: { id: string }) {
         </div>
 
         {actionError && (
-          <div role="alert" className="p-4 rounded-xl bg-brick/10 border border-brick/30 text-brick text-xs sm:text-sm flex items-center justify-between gap-2">
+          <div
+            role="alert"
+            className="p-4 rounded-xl bg-brick/10 border border-brick/30 text-brick text-xs sm:text-sm flex items-center justify-between gap-2"
+          >
             <span>⚠️ {actionError}</span>
             <button
               onClick={() => setActionError(null)}
@@ -505,7 +526,8 @@ function ContractDetailContent({ id }: { id: string }) {
                     Tiền cọc đã được bảo chứng an toàn trong hệ thống (mô phỏng)
                   </div>
                   <p className="text-xs text-ink/70">
-                    Khoản tiền này bị khóa ở trạng thái trung lập. Chỉ được giải ngân khi có sự đồng thuận của cả Chủ nhà và Người thuê.
+                    Khoản tiền này bị khóa ở trạng thái trung lập. Chỉ được giải ngân khi có sự đồng thuận của
+                    cả Chủ nhà và Người thuê.
                   </p>
                 </div>
                 <OnchainStamp timestamp={confirmedTx.createdAt} />
@@ -520,7 +542,8 @@ function ContractDetailContent({ id }: { id: string }) {
                     <span>💳</span> Chưa nạp tiền cọc bảo chứng
                   </div>
                   <p>
-                    Số tiền cọc cần nạp là <MoneyAmount value={contract.depositAmount} size="sm" />. Quét mã VietQR để hoàn tất nạp cọc.
+                    Số tiền cọc cần nạp là <MoneyAmount value={contract.depositAmount} size="sm" />. Quét mã
+                    VietQR để hoàn tất nạp cọc.
                   </p>
                 </div>
                 {isTenant && (
@@ -610,6 +633,40 @@ function ContractDetailContent({ id }: { id: string }) {
                         <StatusBadge kind="rent" status={period.status} />
                       </td>
                       <td className="py-3 px-3 text-right">
+                        {isLandlord &&
+                          contract.status === "ACTIVE" &&
+                          period.status === "OVERDUE" &&
+                          (extendPeriod === period.periodNo ? (
+                            <span className="inline-flex flex-wrap items-center justify-end gap-2">
+                              <input
+                                type="date"
+                                value={extendDate}
+                                min={tomorrowIso()}
+                                onChange={(e) => setExtendDate(e.target.value)}
+                                aria-label="Hạn thanh toán mới"
+                                className="rounded-lg border border-line bg-paper px-2 py-1 text-sm"
+                              />
+                              <button
+                                onClick={() => handleExtendDue(period.periodNo)}
+                                className="px-3 py-1 rounded-lg bg-primary text-paper font-bold hover:bg-primary-strong transition-colors"
+                              >
+                                Xác nhận
+                              </button>
+                              <button
+                                onClick={() => setExtendPeriod(null)}
+                                className="px-3 py-1 rounded-lg border border-line text-ink/70 hover:bg-surface"
+                              >
+                                Hủy
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setExtendPeriod(period.periodNo)}
+                              className="px-3 py-1 rounded-lg border border-primary text-primary-strong font-bold hover:bg-primary/10 transition-colors"
+                            >
+                              Gia hạn thanh toán
+                            </button>
+                          ))}
                         {period.status !== "PAID" && isTenant && (
                           <button
                             onClick={() => handlePayRent(period.periodNo)}
@@ -631,22 +688,26 @@ function ContractDetailContent({ id }: { id: string }) {
         {activeTab === "hoan-coc" && (
           <section className="bg-surface/40 rounded-card border border-line p-6 sm:p-8 space-y-8">
             <div className="space-y-1">
-              <h2 className="text-lg sm:text-xl font-bold text-ink">
-                Hoàn cọc, Khấu trừ & Xử lý tranh chấp
-              </h2>
+              <h2 className="text-lg sm:text-xl font-bold text-ink">Hoàn cọc, Khấu trừ & Xử lý tranh chấp</h2>
               <p className="text-xs sm:text-sm text-ink/70">
-                Tiền cọc chỉ giải ngân khi có sự đồng thuận từ cả hai phía. Hệ thống RentFlow không tự ý quyết định thay bạn.
+                Tiền cọc chỉ giải ngân khi có sự đồng thuận từ cả hai phía. Hệ thống RentFlow không tự ý quyết
+                định thay bạn.
               </p>
             </div>
 
             {/* Dispute Locked Alert if active dispute */}
             {isDisputed && (
-              <div role="alert" className="p-4 sm:p-5 rounded-panel bg-brick/15 border-2 border-brick/40 space-y-2">
+              <div
+                role="alert"
+                className="p-4 sm:p-5 rounded-panel bg-brick/15 border-2 border-brick/40 space-y-2"
+              >
                 <div className="flex items-center gap-2 text-brick font-extrabold text-sm sm:text-base">
                   <span>🚨</span> TIỀN CỌC ĐANG BỊ KHÓA DO TRANH CHẤP
                 </div>
                 <p className="text-xs sm:text-sm text-brick-ink leading-relaxed">
-                  Hai bên chưa đạt được thỏa thuận về số tiền khấu trừ hoặc hoàn trả. Tiền cọc được bảo chứng an toàn và khóa chặt trong contract. Hệ thống <strong>không tự giải ngân</strong> cho bất kỳ bên nào khi chưa có sự xác nhận thống nhất từ cả hai bên.
+                  Hai bên chưa đạt được thỏa thuận về số tiền khấu trừ hoặc hoàn trả. Tiền cọc được bảo chứng
+                  an toàn và khóa chặt trong contract. Hệ thống <strong>không tự giải ngân</strong> cho bất kỳ
+                  bên nào khi chưa có sự xác nhận thống nhất từ cả hai bên.
                 </p>
               </div>
             )}
@@ -751,10 +812,7 @@ function ContractDetailContent({ id }: { id: string }) {
 
               {/* Landlord Form to propose new deduction */}
               {isLandlord && contract.status === "ACTIVE" && (
-                <form
-                  onSubmit={handleProposeDeduction}
-                  className="pt-3 border-t border-line space-y-3"
-                >
+                <form onSubmit={handleProposeDeduction} className="pt-3 border-t border-line space-y-3">
                   <h4 className="text-xs font-bold text-ink uppercase tracking-wider">
                     Tạo đề xuất khấu trừ mới (Chủ nhà):
                   </h4>
@@ -850,7 +908,8 @@ function ContractDetailContent({ id }: { id: string }) {
                     </button>
                   </div>
                   <p className="text-[11px] text-ink/50">
-                    Khi cả hai bên nhập cùng một số tiền, hợp đồng sẽ tự động mở khóa và giải ngân hoàn cọc theo số tiền đã thống nhất.
+                    Khi cả hai bên nhập cùng một số tiền, hợp đồng sẽ tự động mở khóa và giải ngân hoàn cọc
+                    theo số tiền đã thống nhất.
                   </p>
                 </div>
               )}
@@ -880,7 +939,9 @@ function ContractDetailContent({ id }: { id: string }) {
                 <span>🛡️</span> Nguyên tắc bảo vệ dữ liệu cá nhân
               </div>
               <p className="text-[11px] text-ink/80 leading-relaxed">
-                Không có tên, SĐT, CCCD, địa chỉ, ảnh, hay nội dung văn bản hợp đồng nào được đưa lên blockchain. On-chain chỉ ghi nhận mã định danh hợp đồng nội bộ, mã băm SHA-256 có salt và các trạng thái chuyển đổi.
+                Không có tên, SĐT, CCCD, địa chỉ, ảnh, hay nội dung văn bản hợp đồng nào được đưa lên
+                blockchain. On-chain chỉ ghi nhận mã định danh hợp đồng nội bộ, mã băm SHA-256 có salt và các
+                trạng thái chuyển đổi.
               </p>
             </div>
 
@@ -921,9 +982,7 @@ function ContractDetailContent({ id }: { id: string }) {
                         <td className="py-3 px-3 font-mono text-ink/70">
                           {tx.txHash ? `${tx.txHash.slice(0, 10)}…${tx.txHash.slice(-6)}` : "—"}
                         </td>
-                        <td className="py-3 px-3 text-ink/60">
-                          {formatDateTime(tx.createdAt)}
-                        </td>
+                        <td className="py-3 px-3 text-ink/60">{formatDateTime(tx.createdAt)}</td>
                         <td className="py-3 px-3 text-right">
                           {tx.explorerUrl ? (
                             <a
@@ -987,6 +1046,11 @@ function ContractDetailContent({ id }: { id: string }) {
 function ResolvedContractDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   return <ContractDetailContent id={id} />;
+}
+
+/** Ngày mai theo định dạng YYYY-MM-DD, dùng làm ngày nhỏ nhất khi gia hạn thanh toán. */
+function tomorrowIso(): string {
+  return new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 }
 
 export default function ContractDetailPage({ params }: { params: Promise<{ id: string }> }) {

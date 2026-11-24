@@ -91,7 +91,10 @@ class ApiClient {
   }
 
   // Payments
-  async createDepositPayment(contractId: string, provider: "PAYOS" | "SIMULATED" = "SIMULATED"): Promise<PaymentDto> {
+  async createDepositPayment(
+    contractId: string,
+    provider: "PAYOS" | "SIMULATED" = "SIMULATED",
+  ): Promise<PaymentDto> {
     if (isMockEnabled()) {
       return mockService.createPayment(contractId, "DEPOSIT");
     }
@@ -178,6 +181,25 @@ class ApiClient {
     });
   }
 
+  async extendDue(
+    contractId: string,
+    periodNo: number,
+    newDueDate: string,
+    stepUpToken?: string,
+  ): Promise<ContractDetailDto> {
+    if (isMockEnabled()) {
+      const mockDetail = mockService.getContractById(contractId, "LANDLORD");
+      if (!mockDetail) throw new Error("Không tìm thấy hợp đồng mẫu");
+      return mockDetail;
+    }
+    await this.request(`/api/contracts/${contractId}/rent/${periodNo}/extend`, {
+      method: "POST",
+      headers: stepUpToken ? { "x-step-up-token": stepUpToken } : {},
+      body: JSON.stringify({ newDueDate }),
+    });
+    return await this.getContractById(contractId);
+  }
+
   async proposeDeduction(contractId: string, amount: string, reasonText: string): Promise<ContractDetailDto> {
     if (isMockEnabled()) {
       return mockService.proposeDeduction(contractId, amount, reasonText);
@@ -189,7 +211,11 @@ class ApiClient {
     return await this.getContractById(contractId);
   }
 
-  async respondDeduction(deductionId: string, accept: boolean, stepUpToken?: string): Promise<ContractDetailDto> {
+  async respondDeduction(
+    deductionId: string,
+    accept: boolean,
+    stepUpToken?: string,
+  ): Promise<ContractDetailDto> {
     if (isMockEnabled()) {
       return mockService.respondDeduction(deductionId, accept);
     }
@@ -288,7 +314,7 @@ class ApiClient {
       mockService.seedDemo();
       return;
     }
-    await this.request("/api/demo/seed", { method: "POST" });
+    await this.request("/api/demo/prepare", { method: "POST" });
   }
 
   async resetDemo(): Promise<void> {
@@ -296,7 +322,7 @@ class ApiClient {
       mockService.resetDemo();
       return;
     }
-    await this.request("/api/demo/reset", { method: "POST" });
+    await this.request("/api/demo/prepare", { method: "POST" });
   }
 
   getPaymentMode(): "payos" | "simulated" | "both" {

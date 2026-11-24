@@ -51,10 +51,17 @@ async function scheduleBackgroundFlush(): Promise<void> {
         const admin = createAdminSupabase();
         // Mỗi vòng chỉ xử lý giao dịch đầu hàng của từng hợp đồng (giữ đúng thứ tự), nên lặp lại
         // đến khi không còn tiến triển. Có giới hạn số vòng để không chạy vô hạn.
-        for (let round = 0; round < 12; round++) {
+        for (let round = 0; round < 24; round++) {
           const { confirmed, failed } = await flushOnchain(admin, { limit: 5, pollTimeoutMs: 8000 });
-          if (confirmed === 0 && failed === 0) break;
           if (failed > 0) break; // giao dịch lỗi chặn các giao dịch sau, chờ thử lại thủ công
+          if (confirmed > 0) continue;
+          // Không có tiến triển: chỉ chờ tiếp nếu vẫn còn giao dịch đang gửi hoặc đang chờ
+          const { count } = await admin
+            .from("onchain_txs")
+            .select("id", { count: "exact", head: true })
+            .in("status", ["PENDING", "SUBMITTED"]);
+          if (!count) break;
+          await new Promise((resolve) => setTimeout(resolve, 5000));
         }
       } catch {
         // Route /api/jobs/flush-onchain hoặc nút thử lại sẽ xử lý tiếp
@@ -363,6 +370,24 @@ export async function flushOnchain(
         failed++;
         continue;
       }
+      // Giao dịch hết hạn (timeBounds 60s) mà ledger không hề có: nó đã bị rơi và không bao giờ được xử lý.
+      // Đặt lại PENDING để gửi giao dịch mới, tránh kẹt hàng đợi vĩnh viễn (có giới hạn số lần thử).
+      const submittedAt = Date.parse(head.updated_at ?? head.created_at);
+      if (
+        checkRes.status === "NOT_FOUND" &&
+        Number.isFinite(submittedAt) &&
+        Date.now() - submittedAt > 90_000
+      ) {
+        await updateRecord(head.id, {
+          status: "PENDING",
+          tx_hash: null,
+          retry_count: head.retry_count + 1,
+          error: null,
+          locked_at: null,
+          locked_by: null,
+        });
+        continue;
+      }
       // Vẫn đang PENDING trên ledger: poll có giới hạn thời gian phù hợp Vercel
       const pollRes = await client.pollTransaction(head.tx_hash, pollTimeout, 1000);
       if (pollRes.status === "SUCCESS") {
@@ -448,7 +473,7 @@ export async function flushOnchain(
 
       try {
         // Quản lý Sequence của PLATFORM account: khóa mutex tránh đụng sequence khi chạy đồng thời
-        const subRes = await platformSequenceMutex.run(async () => {
+        const subOutcome = await platformSequenceMutex.run(async () => {
           const fullArgs = await completeAbiArgs(db, {
             action: head.action,
             args: head.args,
@@ -506,8 +531,16 @@ export async function flushOnchain(
             }
           }
 
-          return await client.submitTransaction(txToSubmit);
+          const submitted = await client.submitTransaction(txToSubmit);
+          if (submitted.status === "FAILED" || !submitted.txHash) return { submitted, polled: null };
+
+          // Ghi tx_hash ngay khi gửi để mất tiến trình giữa chừng vẫn đối soát được, không gửi lại mù.
+          await updateRecord(head.id, { tx_hash: submitted.txHash, status: "SUBMITTED" });
+          // Giữ khóa đến khi giao dịch vào ledger: giao dịch kế tiếp mới lấy đúng sequence của PLATFORM.
+          const polled = await client.pollTransaction(submitted.txHash, pollTimeout, 1000);
+          return { submitted, polled };
         });
+        const subRes = subOutcome.submitted;
 
         if (subRes.status === "FAILED") {
           await updateRecord(head.id, {
@@ -520,11 +553,7 @@ export async function flushOnchain(
           continue;
         }
 
-        const txHash = subRes.txHash;
-        await updateRecord(head.id, { tx_hash: txHash, status: "SUBMITTED" });
-
-        // Poll có giới hạn thời gian phù hợp với serverless
-        const pollRes = await client.pollTransaction(txHash, pollTimeout, 1000);
+        const pollRes = subOutcome.polled ?? { status: "PENDING" as const };
         if (pollRes.status === "SUCCESS") {
           await updateRecord(head.id, { status: "CONFIRMED", error: null, locked_at: null, locked_by: null });
           confirmed++;

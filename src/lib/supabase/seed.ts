@@ -37,10 +37,9 @@ function assertSafeTestEnvironment(): void {
   }
 }
 
-export async function seedDemoData(admin: SupabaseClient) {
+/** Tạo (hoặc cập nhật) các tài khoản demo cố định cùng ví custody. Idempotent. */
+export async function seedDemoUsers(admin: SupabaseClient) {
   assertSafeTestEnvironment();
-
-  // 1. Ensure Auth Users and Profiles
   for (const user of Object.values(DEMO_USERS)) {
     await admin.rpc("seed_demo_user", {
       p_id: user.id,
@@ -49,10 +48,32 @@ export async function seedDemoData(admin: SupabaseClient) {
       p_full_name: user.fullName,
       p_role: user.role,
     });
-
-    // Ensure custody wallet exists
     await createCustodyWallet(admin, user.id);
   }
+}
+
+/** Xóa toàn bộ dữ liệu nghiệp vụ demo, giữ lại tài khoản và ví. */
+export async function wipeDemoData(admin: SupabaseClient) {
+  assertSafeTestEnvironment();
+  const zero = "00000000-0000-0000-0000-000000000000";
+  await admin.from("deduction_requests").delete().neq("id", zero);
+  await admin.from("disputes").delete().neq("contract_id", zero);
+  await admin.from("rent_periods").delete().neq("id", zero);
+  await admin.from("payments").delete().neq("id", zero);
+  await admin.from("payment_events").delete().neq("id", zero);
+  await admin.from("onchain_txs").delete().neq("id", zero);
+  await admin.from("deposits").delete().neq("contract_id", zero);
+  await admin.from("rental_contracts").delete().neq("id", zero);
+  await admin.from("notifications").delete().neq("id", zero);
+  await admin.from("audit_logs").delete().neq("id", zero);
+  await admin.from("recovery_requests").delete().neq("id", zero);
+}
+
+export async function seedDemoData(admin: SupabaseClient) {
+  assertSafeTestEnvironment();
+
+  // 1. Ensure Auth Users and Profiles
+  await seedDemoUsers(admin);
 
   // 2. Contract 1: PENDING_CONFIRMATION (Chờ xác nhận)
   await admin.from("rental_contracts").upsert({
@@ -184,20 +205,6 @@ export async function seedDemoData(admin: SupabaseClient) {
 }
 
 export async function resetDemoData(admin: SupabaseClient) {
-  assertSafeTestEnvironment();
-
-  // Clear non-core tables
-  await admin.from("deduction_requests").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await admin.from("disputes").delete().neq("contract_id", "00000000-0000-0000-0000-000000000000");
-  await admin.from("rent_periods").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await admin.from("payments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await admin.from("payment_events").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await admin.from("onchain_txs").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await admin.from("deposits").delete().neq("contract_id", "00000000-0000-0000-0000-000000000000");
-  await admin.from("rental_contracts").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await admin.from("notifications").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await admin.from("audit_logs").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await admin.from("recovery_requests").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-
+  await wipeDemoData(admin);
   return await seedDemoData(admin);
 }

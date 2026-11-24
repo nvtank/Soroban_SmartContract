@@ -59,7 +59,7 @@ export default function AdminDemoPage() {
     setMessage(null);
     try {
       await apiClient.seedDemo();
-      setMessage("Đã nạp thành công 3 hợp đồng mẫu ở các trạng thái khác nhau.");
+      setMessage("Đã chuẩn bị 3 hợp đồng demo. Các giao dịch đang được ghi lên Stellar Testnet trong nền, mở tab Bằng chứng on-chain để theo dõi.");
       await loadData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Nạp dữ liệu mẫu thất bại");

@@ -99,21 +99,36 @@ export class SorobanRpcClient implements StellarRpcClient {
 
   async submitTransaction(tx: Transaction | FeeBumpTransaction): Promise<SubmitResult> {
     try {
-      const response = await this.server.sendTransaction(tx);
-      const txHash = response.hash;
+      // Mạng chỉ nhận một giao dịch chờ cho mỗi tài khoản nguồn. Khi đang bận, RPC trả TRY_AGAIN_LATER:
+      // giao dịch KHÔNG được nhận và sẽ không bao giờ lên ledger, nên phải gửi lại chứ không được coi là đã gửi.
+      const MAX_ATTEMPTS = 8;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        const response = await this.server.sendTransaction(tx);
+        const txHash = response.hash;
+        const status = response.status as string;
 
-      if (response.status === "ERROR") {
-        return {
-          txHash,
-          status: "FAILED",
-          error: sanitizeError(response.errorResult?.toXDR("hex") || "Submission error"),
-        };
+        if (status === "ERROR") {
+          return {
+            txHash,
+            status: "FAILED",
+            error: sanitizeError(response.errorResult?.toXDR("hex") || "Submission error"),
+          };
+        }
+        if (status === "TRY_AGAIN_LATER") {
+          if (attempt === MAX_ATTEMPTS) {
+            return {
+              txHash: "",
+              status: "FAILED",
+              error: "Mạng Stellar đang bận, giao dịch chưa được nhận. Vui lòng thử lại.",
+            };
+          }
+          await new Promise((resolve) => setTimeout(resolve, 2500));
+          continue;
+        }
+        // PENDING (đã nhận), DUPLICATE (đã nhận trước đó) hoặc SUCCESS
+        return { txHash, status: status === "SUCCESS" ? "SUCCESS" : "PENDING" };
       }
-
-      return {
-        txHash,
-        status: (response.status as string) === "SUCCESS" ? "SUCCESS" : "PENDING",
-      };
+      return { txHash: "", status: "FAILED", error: "Không gửi được giao dịch." };
     } catch (err) {
       return {
         txHash: "",

@@ -63,7 +63,7 @@ Thành công: `{ "data": ... }`. Lỗi: `{ "error": { "code": "VALIDATION_ERROR"
 
 ## 6. ABI Soroban (bản thiết kế, chưa deploy)
 
-`Contract ID (Testnet):` _chưa có_
+`Contract ID (Testnet):` `CCDNF4D4HRIDYSHBEOV2IYC2XQSTD7VPSFZ4NSGCT2QVDPJ7RX4UBVXU` (deploy từ commit `dbadfbf`, constructor `__constructor(admin, oracle)`; ABI chi tiết ở `docs/ABI.md`)
 
 ```text
 init(admin: Address, oracle: Address)

@@ -135,7 +135,9 @@ type ProfileRow = {
 /**
  * Adapter bọc Supabase client thành DomainRepository.
  */
-export function createSupabaseDomainRepository(supabase: SupabaseClient): DomainRepository & { db: SupabaseClient } {
+export function createSupabaseDomainRepository(
+  supabase: SupabaseClient,
+): DomainRepository & { db: SupabaseClient } {
   return {
     db: supabase,
     contracts: {
@@ -284,6 +286,7 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
       ): Promise<RentPeriodEntity> => {
         const row: Record<string, unknown> = {};
         if (updates.status !== undefined) row.status = updates.status;
+        if (updates.due_date !== undefined) row.due_date = updates.due_date;
         if (updates.amount_paid !== undefined) row.amount_paid = updates.amount_paid.toString();
         if (updates.late_days !== undefined) row.late_days = updates.late_days;
         if (updates.late_fee !== undefined) row.late_fee = updates.late_fee.toString();
@@ -325,7 +328,11 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
         return (data as DeductionRow[]).map(mapDeductionRow);
       },
       findById: async (id: string): Promise<DeductionEntity | null> => {
-        const { data, error } = await supabase.from("deduction_requests").select("*").eq("id", id).maybeSingle();
+        const { data, error } = await supabase
+          .from("deduction_requests")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
         if (error || !data) return null;
         return mapDeductionRow(data as DeductionRow);
       },
@@ -347,7 +354,12 @@ export function createSupabaseDomainRepository(supabase: SupabaseClient): Domain
         const row: Record<string, unknown> = {};
         if (updates.status !== undefined) row.status = updates.status;
 
-        const { data, error } = await supabase.from("deduction_requests").update(row).eq("id", id).select().single();
+        const { data, error } = await supabase
+          .from("deduction_requests")
+          .update(row)
+          .eq("id", id)
+          .select()
+          .single();
         if (error) throw error;
         return mapDeductionRow(data as DeductionRow);
       },

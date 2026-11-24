@@ -207,7 +207,7 @@ export async function settlePayment(
   const dispute = await repo.disputes.findByContractId(payment.contract_id);
   const disputeStatus = dispute?.status ?? "NONE";
 
-  if (payment.status === "CONFIRMED") {
+  if (payment.status === "CONFIRMED" || payment.status === "OVERPAID") {
     if (payment.kind === "DEPOSIT") {
       const deposit = await repo.deposits.findByContractId(payment.contract_id);
       if (deposit && deposit.status === "UNPAID") {

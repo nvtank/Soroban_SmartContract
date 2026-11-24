@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppNavbar } from "@/components/app/app-navbar";
 import { useSession } from "@/components/app/session-context";
+import { PasskeySetup } from "@/components/app/passkey-setup";
 import { apiClient } from "@/components/app/api-client";
 import { LoadingSkeleton, EmptyState, ErrorState } from "@/components/app/ui-state";
 import { JourneyStepper, StatusBadge, MoneyAmount, MockBadge } from "@/components/shared";
@@ -59,7 +60,8 @@ export default function DashboardPage() {
   const filteredContracts = contracts.filter((c) => {
     if (filter === "ACTIVE" && c.status !== "ACTIVE") return false;
     if (filter === "PENDING" && c.status !== "PENDING_CONFIRMATION") return false;
-    if (filter === "DISPUTE" && c.depositStatus !== "PENDING_DISPUTE" && c.disputeStatus === "NONE") return false;
+    if (filter === "DISPUTE" && c.depositStatus !== "PENDING_DISPUTE" && c.disputeStatus === "NONE")
+      return false;
     if (filter === "ENDED" && c.status !== "ENDED") return false;
 
     if (search.trim()) {
@@ -154,7 +156,10 @@ export default function DashboardPage() {
 
         {/* To-Do / Action Items Callout */}
         {actionItems.length > 0 && (
-          <section aria-labelledby="todo-heading" className="p-5 sm:p-6 rounded-card bg-amber/15 border border-amber/40 space-y-3">
+          <section
+            aria-labelledby="todo-heading"
+            className="p-5 sm:p-6 rounded-card bg-amber/15 border border-amber/40 space-y-3"
+          >
             <div className="flex items-center justify-between">
               <h2 id="todo-heading" className="text-base font-bold text-amber-ink flex items-center gap-2">
                 <span>⚠️</span> Việc cần làm ngay ({actionItems.length})
@@ -178,6 +183,8 @@ export default function DashboardPage() {
           </section>
         )}
 
+        {process.env.NEXT_PUBLIC_UI_MOCK !== "true" && <PasskeySetup />}
+
         {/* Contract list section */}
         <section className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -199,7 +206,9 @@ export default function DashboardPage() {
                 <button
                   onClick={() => setFilter("ACTIVE")}
                   className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                    filter === "ACTIVE" ? "bg-paper text-primary font-bold shadow-xs" : "text-ink/60 hover:text-ink"
+                    filter === "ACTIVE"
+                      ? "bg-paper text-primary font-bold shadow-xs"
+                      : "text-ink/60 hover:text-ink"
                   }`}
                 >
                   Hiệu lực
@@ -207,7 +216,9 @@ export default function DashboardPage() {
                 <button
                   onClick={() => setFilter("PENDING")}
                   className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                    filter === "PENDING" ? "bg-paper text-amber-ink font-bold shadow-xs" : "text-ink/60 hover:text-ink"
+                    filter === "PENDING"
+                      ? "bg-paper text-amber-ink font-bold shadow-xs"
+                      : "text-ink/60 hover:text-ink"
                   }`}
                 >
                   Chờ ký
@@ -215,7 +226,9 @@ export default function DashboardPage() {
                 <button
                   onClick={() => setFilter("DISPUTE")}
                   className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                    filter === "DISPUTE" ? "bg-paper text-brick font-bold shadow-xs" : "text-ink/60 hover:text-ink"
+                    filter === "DISPUTE"
+                      ? "bg-paper text-brick font-bold shadow-xs"
+                      : "text-ink/60 hover:text-ink"
                   }`}
                 >
                   Tranh chấp
@@ -293,7 +306,9 @@ export default function DashboardPage() {
 
                   {/* Card footer */}
                   <div className="pt-3 border-t border-line flex items-center justify-between text-xs">
-                    <span className="text-ink/50">Hạn: {formatDate(c.startDate)} → {formatDate(c.endDate)}</span>
+                    <span className="text-ink/50">
+                      Hạn: {formatDate(c.startDate)} → {formatDate(c.endDate)}
+                    </span>
                     <Link
                       href={`/app/hop-dong/${c.id}`}
                       className="px-3.5 py-1.5 rounded-lg bg-primary/10 text-primary font-bold hover:bg-primary hover:text-paper transition-colors"

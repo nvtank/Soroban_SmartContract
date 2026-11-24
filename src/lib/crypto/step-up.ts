@@ -7,7 +7,8 @@ export type StepUpAction =
   | "SIGN_CONTRACT"
   | "APPROVE_REFUND"
   | "RESPOND_DEDUCTION"
-  | "RESOLVE_DISPUTE";
+  | "RESOLVE_DISPUTE"
+  | "EXTEND_DUE";
 
 export async function createStepUpSession(
   db: SupabaseClient,

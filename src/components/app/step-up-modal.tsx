@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { MockBadge } from "@/components/shared";
 
 export interface StepUpModalProps {
-  action: "SIGN_CONTRACT" | "APPROVE_REFUND" | "RESPOND_DEDUCTION" | "RESOLVE_DISPUTE";
+  action: "SIGN_CONTRACT" | "APPROVE_REFUND" | "RESPOND_DEDUCTION" | "RESOLVE_DISPUTE" | "EXTEND_DUE";
   title?: string;
   description?: string;
   onSuccess: (stepUpToken: string) => void | Promise<void>;
@@ -27,40 +27,47 @@ export function StepUpModal({
     setLoading(true);
     setError(null);
     try {
-      if (method === "passkey") {
-        if (typeof window !== "undefined" && window.PublicKeyCredential) {
-          try {
-            const optRes = await fetch("/api/auth/passkey/auth/options", { method: "POST" });
-            const optJson = await optRes.json().catch(() => ({}));
-            if (optRes.ok && optJson.data) {
-              const { startAuthentication } = await import("@simplewebauthn/browser");
-              const authResponse = await startAuthentication({ optionsJSON: optJson.data });
-              const verifyRes = await fetch("/api/auth/passkey/auth/verify", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(authResponse),
-              });
-              if (verifyRes.ok) {
-                await onSuccess("demo-step-up");
-                return;
-              }
-            }
-          } catch {
-            // In headless/demo browser environment without registered passkey, fallback gracefully
-          }
-        }
-        // Fallback for demo environments
-        await new Promise((resolve) => setTimeout(resolve, 400));
-        await onSuccess("demo-step-up");
-      } else {
-        if (otp.length < 6) {
-          setError("Vui lòng nhập đủ 6 chữ số mã OTP.");
-          setLoading(false);
-          return;
-        }
+      // Chế độ xem trước giao diện (dữ liệu mẫu): không có máy chủ để cấp mã
+      if (process.env.NEXT_PUBLIC_UI_MOCK === "true") {
         await new Promise((resolve) => setTimeout(resolve, 300));
         await onSuccess("demo-step-up");
+        return;
       }
+
+      let credential: unknown = undefined;
+      if (method === "passkey") {
+        if (typeof window === "undefined" || !window.PublicKeyCredential) {
+          throw new Error("Trình duyệt này không hỗ trợ Passkey. Hãy dùng OTP mô phỏng.");
+        }
+        const optRes = await fetch("/api/auth/passkey/auth/options", { method: "POST" });
+        const optJson = await optRes.json().catch(() => ({}));
+        if (!optRes.ok || !optJson.data) {
+          throw new Error(optJson.error?.message || "Chưa thể bắt đầu xác thực Passkey.");
+        }
+        try {
+          const { startAuthentication } = await import("@simplewebauthn/browser");
+          credential = await startAuthentication({ optionsJSON: optJson.data });
+        } catch {
+          throw new Error(
+            "Không xác thực được Passkey (chưa đăng ký hoặc bạn đã hủy). Bạn có thể đăng ký Passkey ở trang đăng nhập hoặc dùng OTP mô phỏng.",
+          );
+        }
+      } else if (otp.length < 6) {
+        throw new Error("Vui lòng nhập đủ 6 chữ số mã OTP.");
+      }
+
+      const res = await fetch("/api/auth/step-up", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          method === "passkey" ? { method, action, credential } : { method, action, code: otp },
+        ),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.data?.stepUpToken) {
+        throw new Error(json.error?.message || "Xác thực không thành công. Vui lòng thử lại.");
+      }
+      await onSuccess(json.data.stepUpToken);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Xác thực không thành công. Vui lòng thử lại.");
     } finally {
@@ -82,7 +89,7 @@ export function StepUpModal({
             <h3 id="step-up-title" className="text-lg font-bold text-ink">
               {title}
             </h3>
-            <MockBadge label="BẢO MẬT" />
+            {method === "otp" && <MockBadge />}
           </div>
           <button
             onClick={onCancel}
@@ -101,7 +108,9 @@ export function StepUpModal({
             type="button"
             onClick={() => setMethod("passkey")}
             className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              method === "passkey" ? "bg-paper text-primary shadow-xs font-bold" : "text-ink/60 hover:text-ink"
+              method === "passkey"
+                ? "bg-paper text-primary shadow-xs font-bold"
+                : "text-ink/60 hover:text-ink"
             }`}
           >
             🔑 Passkey (Khuyên dùng)
@@ -113,7 +122,7 @@ export function StepUpModal({
               method === "otp" ? "bg-paper text-primary shadow-xs font-bold" : "text-ink/60 hover:text-ink"
             }`}
           >
-            📱 Mã OTP SMS
+            📱 OTP (mô phỏng)
           </button>
         </div>
 
@@ -129,7 +138,9 @@ export function StepUpModal({
           </div>
         ) : (
           <div className="space-y-2">
-            <label className="text-xs font-medium text-ink/80 block">Nhập mã OTP 6 số:</label>
+            <label className="text-xs font-medium text-ink/80 block">
+              Nhập mã OTP 6 số (mô phỏng, chưa gửi SMS thật; mã thử nghiệm 123456):
+            </label>
             <input
               type="text"
               value={otp}
@@ -145,7 +156,10 @@ export function StepUpModal({
         )}
 
         {error && (
-          <div role="alert" className="p-2.5 rounded-lg bg-brick/10 border border-brick/30 text-xs text-brick text-center font-medium">
+          <div
+            role="alert"
+            className="p-2.5 rounded-lg bg-brick/10 border border-brick/30 text-xs text-brick text-center font-medium"
+          >
             ⚠️ {error}
           </div>
         )}

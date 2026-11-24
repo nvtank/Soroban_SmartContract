@@ -44,7 +44,6 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
-  const [passkeyRegistered, setPasskeyRegistered] = useState(false);
 
   // Quick login handler
   const executeLogin = useCallback(
@@ -179,46 +178,6 @@ function LoginContent() {
     }
   };
 
-  const handleRegisterPasskey = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (typeof window === "undefined" || !window.PublicKeyCredential) {
-        throw new Error("Trình duyệt không hỗ trợ xác thực Passkey WebAuthn");
-      }
-
-      // Fetch options from server
-      const optRes = await fetch("/api/auth/passkey/register/options", {
-        method: "POST",
-      });
-      const optJson = await optRes.json().catch(() => ({}));
-      if (!optRes.ok || optJson.error) {
-        throw new Error(optJson.error?.message || "Chưa thể khởi tạo đăng ký Passkey lúc này");
-      }
-
-      const { startRegistration } = await import("@simplewebauthn/browser");
-      const regResponse = await startRegistration({ optionsJSON: optJson.data });
-
-      const verifyRes = await fetch("/api/auth/passkey/register/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(regResponse),
-      });
-
-      const verifyJson = await verifyRes.json().catch(() => ({}));
-      if (!verifyRes.ok || verifyJson.error) {
-        throw new Error(verifyJson.error?.message || "Xác thực đăng ký Passkey thất bại");
-      }
-
-      setPasskeyRegistered(true);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Đăng ký Passkey không thành công";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <main className="min-h-screen bg-paper flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
@@ -248,9 +207,7 @@ function LoginContent() {
                 setStep("phone");
               }}
               className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer ${
-                role === "LANDLORD"
-                  ? "bg-primary text-paper shadow-xs"
-                  : "text-ink/60 hover:text-ink"
+                role === "LANDLORD" ? "bg-primary text-paper shadow-xs" : "text-ink/60 hover:text-ink"
               }`}
             >
               Chủ nhà
@@ -263,9 +220,7 @@ function LoginContent() {
                 setStep("phone");
               }}
               className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer ${
-                role === "TENANT"
-                  ? "bg-primary text-paper shadow-xs"
-                  : "text-ink/60 hover:text-ink"
+                role === "TENANT" ? "bg-primary text-paper shadow-xs" : "text-ink/60 hover:text-ink"
               }`}
             >
               Người thuê
@@ -273,13 +228,19 @@ function LoginContent() {
           </div>
 
           {infoMessage && (
-            <div role="status" className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-medium">
+            <div
+              role="status"
+              className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-medium"
+            >
               {infoMessage}
             </div>
           )}
 
           {error && (
-            <div role="alert" className="p-3 rounded-lg bg-brick/10 border border-brick/30 text-brick text-xs font-medium">
+            <div
+              role="alert"
+              className="p-3 rounded-lg bg-brick/10 border border-brick/30 text-brick text-xs font-medium"
+            >
               {error}
             </div>
           )}
@@ -313,9 +274,7 @@ function LoginContent() {
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div>
                 <div className="flex justify-between items-center mb-1.5">
-                  <label className="text-xs sm:text-sm font-semibold text-ink">
-                    Mã xác thực OTP
-                  </label>
+                  <label className="text-xs sm:text-sm font-semibold text-ink">Mã xác thực OTP</label>
                   <button
                     type="button"
                     onClick={() => setStep("phone")}
@@ -349,29 +308,9 @@ function LoginContent() {
           )}
 
           {/* Passkey registration callout */}
-          <div className="p-3.5 rounded-xl bg-paper border border-line text-xs space-y-2">
-            <div className="flex items-center justify-between font-semibold text-ink">
-              <span>Thiết lập chữ ký Passkey</span>
-              <MockBadge label="KHUYÊN DÙNG" />
-            </div>
-            <p className="text-ink/70 text-[11px]">
-              Ký hợp đồng và xác nhận giải ngân an toàn không cần mật khẩu với công nghệ WebAuthn.
-            </p>
-            {passkeyRegistered ? (
-              <div className="text-primary font-bold text-xs flex items-center gap-1">
-                <span>✓</span> Đã kích hoạt Passkey trên thiết bị này
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleRegisterPasskey}
-                disabled={loading}
-                className="w-full py-1.5 rounded-lg bg-surface hover:bg-line/20 text-ink font-semibold border border-line transition-colors cursor-pointer text-xs disabled:opacity-50"
-              >
-                {loading ? "Đang xử lý…" : "Đăng ký Passkey cho tài khoản"}
-              </button>
-            )}
-          </div>
+          <p className="text-xs text-ink/60">
+            Sau khi đăng nhập, bạn có thể thiết lập Passkey ở bảng điều khiển để ký các thao tác quan trọng.
+          </p>
 
           {/* Quick Demo Login section for competition judges */}
           <div className="border-t border-line pt-5 space-y-3">
@@ -447,7 +386,11 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-sm text-ink/50">Đang tải…</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-sm text-ink/50">Đang tải…</div>
+      }
+    >
       <LoginContent />
     </Suspense>
   );

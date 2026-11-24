@@ -13,9 +13,13 @@ export function buildFeeBumpTx(
   networkPassphrase: string = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET,
   baseFee: string = "200",
 ): FeeBumpTransaction {
+  // Giao dịch Soroban có phí tài nguyên lớn trong innerTx.fee; phí fee-bump phải không thấp hơn mức này.
+  const innerRate = BigInt(innerTx.fee) / BigInt(Math.max(innerTx.operations.length, 1));
+  const effectiveBaseFee = BigInt(baseFee) >= innerRate ? baseFee : (innerRate + 1000n).toString();
+
   const feeBump = TransactionBuilder.buildFeeBumpTransaction(
     feeSourceKeypair.publicKey(),
-    baseFee,
+    effectiveBaseFee,
     innerTx,
     networkPassphrase,
   );
