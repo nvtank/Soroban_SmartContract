@@ -1,47 +1,55 @@
 import { ApiError } from "@/lib/api/http";
-import type { SessionUser, UserRole } from "@/domain/dto";
+import type { SessionUser } from "@/domain/dto";
+import {
+  requireUser as defaultRequireUser,
+  getOptionalUser as defaultGetOptionalUser,
+} from "@/lib/supabase/session";
+
+export interface AuthDeps {
+  requireUser?: () => Promise<SessionUser>;
+  getOptionalUser?: () => Promise<SessionUser | null>;
+}
+
+let injectedAuth: AuthDeps | null = null;
 
 /**
- * Trợ giúp lấy thông tin người dùng từ phiên đăng nhập.
- * Theo CONTRACTS mục 7: requireUser() ném ApiError("UNAUTHENTICATED").
+ * Dependency injection dành riêng cho kiểm thử tự động (Unit / Integration test).
+ * Giúp tiêm danh tính người dùng mà không phụ thuộc vào header giả.
+ */
+export function setInjectedAuth(deps: AuthDeps | null): void {
+  injectedAuth = deps;
+}
+
+/**
+ * Lấy thông tin người dùng từ phiên đăng nhập Supabase.
+ *
+ * P0 BẢO MẬT (TASK mục 1):
+ * - TUYỆT ĐỐI KHÔNG đọc danh tính từ bất kỳ request header nào (x-user-id, x-user-role, ...).
+ * - CHỈ tin tưởng requireUser() / getOptionalUser() từ @/lib/supabase/session.
+ * - Hỗ trợ dependency injection qua setInjectedAuth() cho kiểm thử.
  */
 export async function getSessionUser(
-  request?: Request,
+  _request?: Request,
   required = true,
+  deps?: AuthDeps,
 ): Promise<SessionUser | null> {
-  try {
-    const serverMod = await import("@/lib/supabase/session");
-    if (required && typeof serverMod.requireUser === "function") {
-      return await serverMod.requireUser();
-    }
-    if (typeof serverMod.getOptionalUser === "function") {
-      return await serverMod.getOptionalUser();
-    }
-  } catch (error) {
-    if (error instanceof ApiError && error.code === "UNAUTHENTICATED") {
-      if (required) throw error;
-      return null;
-    }
-    // Nếu module chưa sẵn sàng hoặc lỗi import, tiếp tục fallback
-  }
-
-  // Fallback qua header cho kiểm thử / môi trường test
-  if (request) {
-    const userId = request.headers.get("x-user-id");
-    const userRole = (request.headers.get("x-user-role") as UserRole) || "TENANT";
-    if (userId) {
-      return {
-        id: userId,
-        role: userRole,
-        fullName: request.headers.get("x-user-name") || "Người dùng thử nghiệm",
-        phone: request.headers.get("x-user-phone") || "0900000000",
-      };
-    }
-  }
+  const activeAuth = deps ?? injectedAuth;
+  const requireUserFn = activeAuth?.requireUser ?? defaultRequireUser;
+  const getOptionalUserFn = activeAuth?.getOptionalUser ?? defaultGetOptionalUser;
 
   if (required) {
-    throw new ApiError("UNAUTHENTICATED", undefined, "Vui lòng đăng nhập để tiếp tục.");
+    try {
+      return await requireUserFn();
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError("UNAUTHENTICATED", undefined, "Vui lòng đăng nhập để tiếp tục.");
+    }
   }
 
-  return null;
+  try {
+    return await getOptionalUserFn();
+  } catch {
+    return null;
+  }
 }
+

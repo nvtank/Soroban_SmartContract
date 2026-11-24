@@ -56,19 +56,27 @@ export async function createDepositPayment(
     throw new ApiError("INVALID_TRANSITION", undefined, "Hợp đồng đã kết thúc hoặc bị hủy");
   }
 
-  // Kiểm tra quyền: Người thuê thanh toán cọc, hoặc chủ nhà / Admin demo hỗ trợ
-  if (
-    input.user &&
-    input.user.role !== "ADMIN_DEMO" &&
-    input.user.id !== contract.tenant_id &&
-    input.user.id !== contract.landlord_id
-  ) {
-    throw new ApiError("FORBIDDEN", undefined, "Bạn không có quyền thanh toán cọc cho hợp đồng này");
+  // Kiểm tra quyền (TASK mục 5): Chỉ người thuê của hợp đồng tạo thanh toán
+  if (!input.user) {
+    throw new ApiError("UNAUTHENTICATED", undefined, "Vui lòng đăng nhập để tạo thanh toán cọc");
+  }
+
+  if (input.user.role !== "ADMIN_DEMO" && input.user.id !== contract.tenant_id) {
+    throw new ApiError("FORBIDDEN", undefined, "Chỉ người thuê của hợp đồng mới có quyền tạo thanh toán");
   }
 
   const deposit = await repo.getDeposit(input.contractId);
+  if (deposit && deposit.status === "RECORDED") {
+    throw new ApiError("INVALID_TRANSITION", undefined, "Tiền cọc đã được ghi nhận trước đó");
+  }
   if (deposit && (deposit.status === "REFUNDED" || deposit.status === "DEDUCTED")) {
     throw new ApiError("INVALID_TRANSITION", undefined, "Tiền cọc đã được giải ngân hoặc khấu trừ");
+  }
+
+  // Kiểm tra tạo trùng khi đang có payment PENDING (TASK mục 6)
+  const existingPending = await repo.getPendingPayment(contract.id, "DEPOSIT");
+  if (existingPending) {
+    return paymentRowToDto(existingPending);
   }
 
   const mode = getPaymentMode();
@@ -162,13 +170,13 @@ export async function createRentPayment(
     throw new ApiError("INVALID_TRANSITION", undefined, "Hợp đồng đã kết thúc hoặc bị hủy");
   }
 
-  if (
-    input.user &&
-    input.user.role !== "ADMIN_DEMO" &&
-    input.user.id !== contract.tenant_id &&
-    input.user.id !== contract.landlord_id
-  ) {
-    throw new ApiError("FORBIDDEN", undefined, "Bạn không có quyền thanh toán tiền thuê cho hợp đồng này");
+  // Kiểm tra quyền (TASK mục 5): Chỉ người thuê của hợp đồng tạo thanh toán
+  if (!input.user) {
+    throw new ApiError("UNAUTHENTICATED", undefined, "Vui lòng đăng nhập để tạo thanh toán tiền thuê");
+  }
+
+  if (input.user.role !== "ADMIN_DEMO" && input.user.id !== contract.tenant_id) {
+    throw new ApiError("FORBIDDEN", undefined, "Chỉ người thuê của hợp đồng mới có quyền tạo thanh toán");
   }
 
   const period = await repo.getRentPeriod(input.contractId, input.periodNo);
@@ -178,6 +186,12 @@ export async function createRentPayment(
 
   if (period.status === "PAID") {
     throw new ApiError("INVALID_TRANSITION", undefined, `Kỳ thuê số ${input.periodNo} đã được thanh toán đủ`);
+  }
+
+  // Kiểm tra tạo trùng khi đang có payment PENDING (TASK mục 6)
+  const existingPending = await repo.getPendingPayment(contract.id, "RENT", input.periodNo);
+  if (existingPending) {
+    return paymentRowToDto(existingPending);
   }
 
   const mode = getPaymentMode();
@@ -312,11 +326,12 @@ export async function processPayOSWebhook(
   });
 
   if (!isRecorded) {
-    // Đã xử lý sự kiện này trước đó, trả về kết quả thành công và bỏ qua
+    // Đã xử lý sự kiện này trước đó, lấy trạng thái mới nhất từ DB
+    const latestPayment = (await repo.getPaymentByOrderCode(verifiedData.orderCode)) ?? payment;
     return {
       success: true,
       alreadyProcessed: true,
-      payment: paymentRowToDto(payment),
+      payment: paymentRowToDto(latestPayment),
       message: "Webhook đã được xử lý trước đó (idempotent)",
     };
   }
@@ -341,7 +356,20 @@ export async function processPayOSWebhook(
   });
 
   // Gọi settlePayment của Agent C sau khi đã xác định trạng thái
-  await callSettlePayment(repo.getUnderlyingDb(), payment.id, options?.settlePaymentFn);
+  // P0 TRUNG THỰC (TASK mục 2): Không nuốt lỗi; nếu settle lỗi thì xóa event_key và ném lỗi để webhook retry
+  try {
+    await callSettlePayment(repo.getUnderlyingDb(), payment.id, options?.settlePaymentFn);
+  } catch (settleError) {
+    await repo.deletePaymentEvent("PAYOS", eventKey);
+    console.error("[payments] SettlePayment failed in processPayOSWebhook:", settleError);
+    throw new ApiError(
+      "INTERNAL_ERROR",
+      undefined,
+      `Quyết toán thanh toán thất bại, webhook sẽ được thử lại: ${
+        settleError instanceof Error ? settleError.message : String(settleError)
+      }`,
+    );
+  }
 
   return {
     success: true,
@@ -372,9 +400,15 @@ export async function simulatePaymentConfirm(
   }
 
   const contract = await repo.getContract(payment.contract_id);
+  if (!contract) {
+    throw new ApiError("NOT_FOUND", undefined, "Hợp đồng không tồn tại");
+  }
+
+  if (!input.user) {
+    throw new ApiError("UNAUTHENTICATED", undefined, "Vui lòng đăng nhập để thực hiện mô phỏng");
+  }
+
   if (
-    input.user &&
-    contract &&
     input.user.role !== "ADMIN_DEMO" &&
     input.user.id !== contract.tenant_id &&
     input.user.id !== contract.landlord_id
@@ -438,9 +472,15 @@ export async function simulatePaymentFail(
   }
 
   const contract = await repo.getContract(payment.contract_id);
+  if (!contract) {
+    throw new ApiError("NOT_FOUND", undefined, "Hợp đồng không tồn tại");
+  }
+
+  if (!input.user) {
+    throw new ApiError("UNAUTHENTICATED", undefined, "Vui lòng đăng nhập để thực hiện mô phỏng");
+  }
+
   if (
-    input.user &&
-    contract &&
     input.user.role !== "ADMIN_DEMO" &&
     input.user.id !== contract.tenant_id &&
     input.user.id !== contract.landlord_id
@@ -467,7 +507,8 @@ export async function simulatePaymentFail(
 
 /**
  * "Kiểm tra lại": Đối soát trực tiếp qua API payOS (paymentRequests.get).
- * Sử dụng khi thanh toán đã hoàn thành nhưng webhook chưa tới.
+ * Sử dụng khi thanh toán đã hoàn thành nhưng webhook chưa tới (TASK mục 1 & 6).
+ * Hỗ trợ thử lại quyết toán nếu trước đó bị lỗi (TASK mục 2).
  */
 export async function recheckPayment(
   paymentId: string,
@@ -480,13 +521,30 @@ export async function recheckPayment(
     throw new ApiError("NOT_FOUND", undefined, "Không tìm thấy thông tin giao dịch thanh toán");
   }
 
-  // Nếu giao dịch đã hoàn tất hoặc kết thúc, trả về thông tin hiện tại
-  if (
-    payment.status === "CONFIRMED" ||
-    payment.status === "OVERPAID" ||
-    payment.status === "FAILED" ||
-    payment.status === "EXPIRED"
-  ) {
+  // Nếu giao dịch đã thất bại hoặc hết hạn:
+  if (payment.status === "FAILED" || payment.status === "EXPIRED") {
+    return paymentRowToDto(payment);
+  }
+
+  // Nếu giao dịch đã CONFIRMED hoặc OVERPAID nhưng phát hiện settlement trước đó bị lỗi
+  // (ví dụ: deposit vẫn UNPAID, hoặc rent period chưa PAID): thử quyết toán lại!
+  if (payment.status === "CONFIRMED" || payment.status === "OVERPAID") {
+    let needsSettle = false;
+    if (payment.kind === "DEPOSIT") {
+      const deposit = await repo.getDeposit(payment.contract_id);
+      if (deposit && deposit.status === "UNPAID") {
+        needsSettle = true;
+      }
+    } else if (payment.kind === "RENT" && payment.period_no !== null) {
+      const period = await repo.getRentPeriod(payment.contract_id, payment.period_no);
+      if (period && period.status !== "PAID") {
+        needsSettle = true;
+      }
+    }
+
+    if (needsSettle) {
+      await callSettlePayment(repo.getUnderlyingDb(), payment.id, options?.settlePaymentFn);
+    }
     return paymentRowToDto(payment);
   }
 

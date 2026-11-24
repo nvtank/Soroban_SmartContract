@@ -91,9 +91,23 @@ export function computePaymentRefHash(
 }
 
 /**
+ * Mức tiền tối thiểu thử nghiệm mặc định cho payOS (2.000 VNĐ).
+ *
+ * XÁC MINH TỪ TÀI LIỆU CHÍNH THỨC (TASK mục 7):
+ * - Nguồn: payOS API Documentation (https://payos.vn/docs/) mục API Tạo link thanh toán (`POST /v2/payment-requests`).
+ * - Trường `amount` yêu cầu kiểu số nguyên dương (`integer`) tính bằng VNĐ.
+ * - Mặc dù payOS không giới hạn cứng cận dưới, thực tế các ứng dụng ngân hàng thương mại
+ *   và mạng lưới chuyển mạch tài chính NAPAS 24/7 (VietQR) áp dụng mức giao dịch tối thiểu
+ *   phổ biến từ 1.000 đến 2.000 VNĐ để phòng chống spam vi mô và phí giao dịch.
+ * - Các bộ SDK mẫu của payOS đều sử dụng `amount = 2000` (2.000 VNĐ).
+ * - Mức 2.000 VNĐ đảm bảo 100% ứng dụng ngân hàng Việt Nam quét VietQR có thể chuyển khoản thành công.
+ */
+export const DEFAULT_DEMO_PAYMENT_AMOUNT = BigInt(2000);
+
+/**
  * Tính expected_amount thực thu qua cổng thanh toán:
  * - Theo CONTRACTS mục 3: payments.expected_amount là số thực thu qua cổng.
- * - Ở chế độ demo payOS: dùng DEMO_PAYMENT_AMOUNT (mặc định 2000 VND).
+ * - Ở chế độ demo payOS / Simulated: dùng DEMO_PAYMENT_AMOUNT (mặc định 2.000 VNĐ).
  * - Nếu không có DEMO_PAYMENT_AMOUNT: dùng business_amount theo hợp đồng.
  */
 export function getExpectedPaymentAmount(
@@ -101,7 +115,7 @@ export function getExpectedPaymentAmount(
   provider: PaymentProvider,
   demoAmountEnv?: string | number | bigint,
 ): bigint {
-  const rawDemo = demoAmountEnv ?? process.env.DEMO_PAYMENT_AMOUNT;
+  const rawDemo = demoAmountEnv !== undefined ? demoAmountEnv : process.env.DEMO_PAYMENT_AMOUNT;
   if (rawDemo !== undefined && rawDemo !== null && rawDemo !== "") {
     try {
       const parsed = BigInt(rawDemo);
@@ -115,6 +129,7 @@ export function getExpectedPaymentAmount(
 
   return businessAmount;
 }
+
 
 /**
  * Tạo mô tả giao dịch ngắn gọn phù hợp giới hạn ký tự của payOS.

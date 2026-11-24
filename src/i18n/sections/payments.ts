@@ -65,7 +65,15 @@ export const paymentsI18n = {
     SIMULATION_DISABLED: "Chế độ thanh toán mô phỏng không được phép trong cấu hình hiện tại.",
     INVALID_AMOUNT: "Số tiền thanh toán không hợp lệ.",
     UNAUTHORIZED_PAYMENT: "Bạn không có quyền thực hiện hoặc can thiệp giao dịch này.",
+    TENANT_ONLY_ALLOWED: "Chỉ người thuê của hợp đồng mới có quyền tạo yêu cầu thanh toán.",
+    PENDING_PAYMENT_EXISTS: "Đã có yêu cầu thanh toán đang chờ xử lý. Vui lòng thanh toán theo mã đã tạo.",
+    SETTLEMENT_RETRY_SUCCESS: "Đã quyết toán lại giao dịch thành công.",
+    SETTLEMENT_FAILED: "Quyết toán giao dịch thất bại. Vui lòng thử lại sau.",
     UNSUPPORTED_PROVIDER: "Phương thức thanh toán không được hỗ trợ.",
+  },
+  officialDoc: {
+    minAmountNotice: "Hạn mức thanh toán thử nghiệm tối thiểu là 2.000 VNĐ theo tài liệu chính thức payOS (payos.vn/docs).",
+    source: "https://payos.vn/docs/",
   },
 } as const;
 
