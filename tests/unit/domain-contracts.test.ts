@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   confirmContract,
   createContract,
+  generateRentPeriods,
   getContractDetail,
   listContracts,
 } from "@/domain/contracts/service";
@@ -174,5 +175,23 @@ describe("domain contracts service", () => {
 
     const strangerList = await listContracts(repo, stranger);
     expect(strangerList.length).toBe(0);
+  });
+
+  it("handles due_day = 31 correctly across short months without spilling", () => {
+    const periods = generateRentPeriods(
+      "contract-31",
+      "2026-01-01",
+      "2026-06-30",
+      31,
+      5000000n,
+      new Date().toISOString(),
+    );
+    expect(periods.length).toBe(6);
+    expect(periods[0].due_date).toBe("2026-01-31");
+    expect(periods[1].due_date).toBe("2026-02-28"); // Feb capped at 28
+    expect(periods[2].due_date).toBe("2026-03-31");
+    expect(periods[3].due_date).toBe("2026-04-30"); // Apr capped at 30
+    expect(periods[4].due_date).toBe("2026-05-31");
+    expect(periods[5].due_date).toBe("2026-06-30"); // Jun capped at 30
   });
 });

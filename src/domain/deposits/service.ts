@@ -157,6 +157,152 @@ export async function approveRefund(
   const currentLandlordAmount = isLandlord ? submittedAmount : deposit.landlord_refund_amount;
   const currentTenantAmount = isTenant ? submittedAmount : deposit.tenant_refund_amount;
 
+  // Hỗ trợ RPC nguyên tử khi kết nối Supabase thật nhằm tránh tranh chấp đồng thời (hai bên cùng duyệt không giải ngân 2 lần)
+  const supabaseClient =
+    "db" in repo && typeof (repo as Record<string, unknown>).db === "object"
+      ? ((repo as Record<string, unknown>).db as {
+          rpc?: (fn: string, args: Record<string, unknown>) => Promise<{ data: Record<string, unknown> | null; error: unknown }>;
+        })
+      : null;
+
+  if (supabaseClient && typeof supabaseClient.rpc === "function") {
+    const { data, error } = await supabaseClient.rpc("approve_refund_atomic", {
+      p_contract_id: contractId,
+      p_user_id: user.id,
+      p_role: user.role,
+      p_refund_amount: Number(submittedAmount),
+    });
+
+    if (error) {
+      console.error("[deposits] approve_refund_atomic error:", error);
+      throw error;
+    }
+    if (!data || data.error) {
+      if (data?.error === "CONTRACT_NOT_FOUND") throw new ApiError("NOT_FOUND", undefined, domainI18n.contracts.notFound);
+      if (data?.error === "DEPOSIT_NOT_FOUND") throw new ApiError("NOT_FOUND", undefined, domainI18n.deposits.notRecorded);
+      if (data?.error === "DISPUTE_LOCKED") throw new ApiError("DISPUTE_LOCKED", undefined, domainI18n.disputes.locked);
+      if (data?.error === "INVALID_AMOUNT") throw new ApiError("VALIDATION_ERROR", undefined, "Số tiền hoàn trả không hợp lệ");
+      throw new Error(`Refund RPC failed: ${data?.error}`);
+    }
+
+    const updatedDeposit = await repo.deposits.findByContractId(contractId);
+    if (!updatedDeposit) throw new ApiError("NOT_FOUND");
+
+    if (data.action_taken === "ALREADY_REFUNDED") {
+      // Đã được xử lý hoàn cọc bởi request đồng thời trước đó -> không giải ngân lần 2
+      return formatDepositDto(updatedDeposit);
+    }
+
+    if (data.action_taken === "COMPLETED") {
+      await repo.auditLogs.create({
+        id: randomUUID(),
+        actor_id: user.id,
+        action: "REFUND_COMPLETED",
+        entity: "deposits",
+        entity_id: contractId,
+        meta: { agreedAmount: input.refundAmount },
+        created_at: now,
+      });
+
+      for (const uid of [contract.landlord_id, contract.tenant_id].filter(Boolean) as string[]) {
+        await repo.notifications.create({
+          id: randomUUID(),
+          user_id: uid,
+          type: "REFUND_COMPLETED",
+          title: "Hoàn cọc thành công",
+          body: `Đã thống nhất hoàn trả cọc số tiền ${input.refundAmount} ₫. Hợp đồng kết thúc.`,
+          read_at: null,
+          created_at: now,
+        });
+      }
+
+      if (deps?.enqueueOnchain) {
+        try {
+          await deps.enqueueOnchain(repo, {
+            contractId,
+            action: "approve_refund",
+            args: [contractId, input.refundAmount],
+            signer: { kind: "USER", userId: user.id },
+          });
+        } catch (err) {
+          console.error("[domain] Failed to enqueue approve_refund onchain:", err);
+        }
+      }
+
+      return formatDepositDto(updatedDeposit);
+    }
+
+    if (data.action_taken === "DISPUTED") {
+      await repo.auditLogs.create({
+        id: randomUUID(),
+        actor_id: user.id,
+        action: "DISPUTE_OPENED_DUE_TO_MISMATCH",
+        entity: "deposits",
+        entity_id: contractId,
+        meta: {
+          landlordAmount: currentLandlordAmount?.toString() ?? "",
+          tenantAmount: currentTenantAmount?.toString() ?? "",
+        },
+        created_at: now,
+      });
+
+      if (deps?.enqueueOnchain) {
+        try {
+          await deps.enqueueOnchain(repo, {
+            contractId,
+            action: "open_dispute",
+            args: [contractId],
+            signer: { kind: "USER", userId: user.id },
+          });
+        } catch (err) {
+          console.error("[domain] Failed to enqueue open_dispute onchain:", err);
+        }
+      }
+
+      return formatDepositDto(updatedDeposit);
+    }
+
+    if (data.action_taken === "WAITING_OTHER_PARTY") {
+      await repo.auditLogs.create({
+        id: randomUUID(),
+        actor_id: user.id,
+        action: "REFUND_APPROVED_ONE_PARTY",
+        entity: "deposits",
+        entity_id: contractId,
+        meta: { party: isLandlord ? "LANDLORD" : "TENANT", amount: input.refundAmount },
+        created_at: now,
+      });
+
+      const otherPartyId = isLandlord ? contract.tenant_id : contract.landlord_id;
+      if (otherPartyId) {
+        await repo.notifications.create({
+          id: randomUUID(),
+          user_id: otherPartyId,
+          type: "REFUND_AWAITING_APPROVAL",
+          title: "Chờ xác nhận số tiền hoàn cọc",
+          body: `Bên kia đã đề xuất số tiền hoàn cọc ${input.refundAmount} ₫. Vui lòng xác nhận để hoàn tất.`,
+          read_at: null,
+          created_at: now,
+        });
+      }
+
+      if (deps?.enqueueOnchain) {
+        try {
+          await deps.enqueueOnchain(repo, {
+            contractId,
+            action: "approve_refund",
+            args: [contractId, input.refundAmount],
+            signer: { kind: "USER", userId: user.id },
+          });
+        } catch (err) {
+          console.error("[domain] Failed to enqueue approve_refund onchain:", err);
+        }
+      }
+
+      return formatDepositDto(updatedDeposit);
+    }
+  }
+
   // Trường hợp 1: Cả hai bên đã gửi và CÙNG SỐ TIỀN
   if (currentLandlordAmount !== null && currentTenantAmount !== null) {
     if (currentLandlordAmount === currentTenantAmount) {

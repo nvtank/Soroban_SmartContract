@@ -39,7 +39,7 @@ export type ContractEntity = {
   status: ContractStatus;
   onchain_ref: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 };
 
 export type DepositEntity = {
@@ -51,7 +51,7 @@ export type DepositEntity = {
   landlord_refund_amount: bigint | null;
   tenant_refund_amount: bigint | null;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 };
 
 export type RentPeriodEntity = {
@@ -64,7 +64,7 @@ export type RentPeriodEntity = {
   late_fee: bigint;
   status: RentStatus;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 };
 
 export type DeductionEntity = {
@@ -76,7 +76,7 @@ export type DeductionEntity = {
   reason_hash: string;
   status: DeductionStatus;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 };
 
 export type DisputeEntity = {
@@ -87,7 +87,7 @@ export type DisputeEntity = {
   landlord_agreed_amount: bigint | null;
   tenant_agreed_amount: bigint | null;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 };
 
 export type PaymentEntity = {
@@ -121,7 +121,7 @@ export type NotificationEntity = {
 
 export type AuditLogEntity = {
   id: string;
-  actor_id: string;
+  actor_id: string | null;
   action: string;
   entity: string;
   entity_id: string;

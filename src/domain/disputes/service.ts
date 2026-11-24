@@ -172,6 +172,135 @@ export async function resolveDispute(
   const currentLandlord = isLandlord ? submittedAmount : dispute.landlord_agreed_amount;
   const currentTenant = isTenant ? submittedAmount : dispute.tenant_agreed_amount;
 
+  // Hỗ trợ RPC nguyên tử khi kết nối Supabase thật
+  const supabaseClient =
+    "db" in repo && typeof (repo as Record<string, unknown>).db === "object"
+      ? ((repo as Record<string, unknown>).db as {
+          rpc?: (fn: string, args: Record<string, unknown>) => Promise<{ data: Record<string, unknown> | null; error: unknown }>;
+        })
+      : null;
+
+  if (supabaseClient && typeof supabaseClient.rpc === "function") {
+    const { data, error } = await supabaseClient.rpc("resolve_dispute_atomic", {
+      p_contract_id: contractId,
+      p_user_id: user.id,
+      p_role: user.role,
+      p_agreed_amount: Number(submittedAmount),
+    });
+
+    if (error) {
+      console.error("[disputes] resolve_dispute_atomic error:", error);
+      throw error;
+    }
+    if (!data || data.error) {
+      if (data?.error === "CONTRACT_NOT_FOUND") throw new ApiError("NOT_FOUND", undefined, domainI18n.contracts.notFound);
+      if (data?.error === "DEPOSIT_NOT_FOUND") throw new ApiError("NOT_FOUND", undefined, domainI18n.deposits.notRecorded);
+      if (data?.error === "INVALID_DISPUTE_STATE")
+        throw new ApiError("INVALID_TRANSITION", undefined, "Tranh chấp không ở trạng thái có thể giải quyết.");
+      if (data?.error === "INVALID_AMOUNT") throw new ApiError("VALIDATION_ERROR", undefined, "Số tiền thống nhất không hợp lệ.");
+      throw new Error(`Resolve dispute RPC failed: ${data?.error}`);
+    }
+
+    const updatedDispute = await repo.disputes.findByContractId(contractId);
+    if (!updatedDispute) throw new ApiError("NOT_FOUND");
+
+    if (data.action_taken === "RESOLVED") {
+      await repo.auditLogs.create({
+        id: randomUUID(),
+        actor_id: user.id,
+        action: "DISPUTE_RESOLVED",
+        entity: "disputes",
+        entity_id: contractId,
+        meta: { agreedAmount: input.agreedAmount },
+        created_at: now,
+      });
+
+      for (const uid of [contract.landlord_id, contract.tenant_id].filter(Boolean) as string[]) {
+        await repo.notifications.create({
+          id: randomUUID(),
+          user_id: uid,
+          type: "DISPUTE_RESOLVED",
+          title: "Tranh chấp đã được giải quyết",
+          body: `Hai bên đã thống nhất giải quyết tranh chấp với số tiền ${input.agreedAmount} ₫.`,
+          read_at: null,
+          created_at: now,
+        });
+      }
+
+      if (deps?.enqueueOnchain) {
+        try {
+          await deps.enqueueOnchain(repo, {
+            contractId,
+            action: "resolve_dispute",
+            args: [contractId, input.agreedAmount],
+            signer: { kind: "USER", userId: user.id },
+          });
+        } catch (err) {
+          console.error("[domain] Failed to enqueue resolve_dispute onchain:", err);
+        }
+      }
+
+      return formatDisputeDto(updatedDispute);
+    }
+
+    if (data.action_taken === "MISMATCH") {
+      await repo.auditLogs.create({
+        id: randomUUID(),
+        actor_id: user.id,
+        action: "DISPUTE_RESOLUTION_MISMATCH",
+        entity: "disputes",
+        entity_id: contractId,
+        meta: {
+          landlordAgreedAmount: currentLandlord?.toString() ?? "",
+          tenantAgreedAmount: currentTenant?.toString() ?? "",
+        },
+        created_at: now,
+      });
+
+      return formatDisputeDto(updatedDispute);
+    }
+
+    if (data.action_taken === "AWAITING_CONFIRMATION") {
+      await repo.auditLogs.create({
+        id: randomUUID(),
+        actor_id: user.id,
+        action: "DISPUTE_RESOLUTION_SUBMITTED_ONE_PARTY",
+        entity: "disputes",
+        entity_id: contractId,
+        meta: { party: isLandlord ? "LANDLORD" : "TENANT", amount: input.agreedAmount },
+        created_at: now,
+      });
+
+      const otherPartyId = isLandlord ? contract.tenant_id : contract.landlord_id;
+      if (otherPartyId) {
+        await repo.notifications.create({
+          id: randomUUID(),
+          user_id: otherPartyId,
+          type: "DISPUTE_AWAITING_CONFIRMATION",
+          title: "Chờ xác nhận thỏa thuận tranh chấp",
+          body: `Bên kia đã đề xuất số tiền thỏa thuận ${input.agreedAmount} ₫. Vui lòng xác nhận nếu đồng ý.`,
+          read_at: null,
+          created_at: now,
+        });
+      }
+
+      if (deps?.enqueueOnchain) {
+        try {
+          await deps.enqueueOnchain(repo, {
+            contractId,
+            action: "resolve_dispute",
+            args: [contractId, input.agreedAmount],
+            signer: { kind: "USER", userId: user.id },
+          });
+        } catch (err) {
+          console.error("[domain] Failed to enqueue resolve_dispute onchain:", err);
+        }
+      }
+
+      return formatDisputeDto(updatedDispute);
+    }
+  }
+
   // Nếu cả hai bên đã gửi số tiền
   if (currentLandlord !== null && currentTenant !== null) {
     if (currentLandlord === currentTenant) {
