@@ -1,5 +1,8 @@
 #![cfg(test)]
 
+extern crate std;
+use std::format;
+
 use super::*;
 use soroban_sdk::{
     testutils::{Address as _, Events},
@@ -585,4 +588,591 @@ fn test_regression_review2_open_dispute_clears_proposal_and_approvals() {
     let res_app = client.try_approve_refund(&id, &tenant, &deposit);
     assert_eq!(res_app, Err(Ok(Error::InvalidTransition)));
 }
+
+// ==================== ROUND 2 HARDENING & ADVERSARIAL TESTS ====================
+
+fn count_release_authorized(env: &Env) -> usize {
+    env.events()
+        .all()
+        .events()
+        .iter()
+        .filter(|e| format!("{:?}", e).contains("release_authorized"))
+        .count()
+}
+
+#[test]
+fn test_adversarial_calls_after_ended_state() {
+    let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+
+    let id = sample_id(&env, 20);
+    let deposit = 5_000_000i128;
+    let rent = 3_000_000i128;
+
+    client.create_contract(&id, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &rent, &5, &50);
+    client.tenant_confirm(&id, &tenant);
+    client.record_deposit_paid(&id, &sample_hash(&env, 2), &deposit);
+
+    // End contract via approve_refund
+    client.approve_refund(&id, &landlord, &deposit);
+    client.approve_refund(&id, &tenant, &deposit);
+
+    let contract = client.get_contract(&id);
+    assert_eq!(contract.status, ContractStatus::Ended);
+    assert_eq!(contract.deposit_status, DepositStatus::Refunded);
+
+    // Every function called after ended must be rejected with InvalidTransition
+    let dummy_hash = sample_hash(&env, 99);
+    assert_eq!(client.try_tenant_confirm(&id, &tenant), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_record_deposit_paid(&id, &dummy_hash, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_record_rent_paid(&id, &1, &rent, &dummy_hash), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_mark_overdue(&id, &1, &5), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_extend_due(&id, &1, &1770000000), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_request_refund(&id, &landlord), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_request_refund(&id, &tenant), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_approve_refund(&id, &landlord, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_approve_refund(&id, &tenant, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_propose_deduction(&id, &landlord, &1_000_000, &dummy_hash), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_respond_deduction(&id, &tenant, &true), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_respond_deduction(&id, &tenant, &false), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_open_dispute(&id, &landlord), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_open_dispute(&id, &tenant), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_resolve_dispute(&id, &landlord, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_resolve_dispute(&id, &tenant, &deposit), Err(Ok(Error::InvalidTransition)));
+
+    // Contract state remains strictly Ended and unchanged
+    let contract_after = client.get_contract(&id);
+    assert_eq!(contract_after.status, ContractStatus::Ended);
+    assert_eq!(contract_after.deposit_status, DepositStatus::Refunded);
+    assert_eq!(contract_after.refund_amount, deposit);
+    assert_eq!(contract_after.deducted_amount, 0);
+}
+
+#[test]
+fn test_adversarial_calls_after_ended_via_deduction_and_dispute() {
+    let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+
+    // Contract 21: ended via deduction accepted
+    let id_deduct = sample_id(&env, 21);
+    let deposit = 5_000_000i128;
+    client.create_contract(&id_deduct, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &3_000_000, &5, &50);
+    client.tenant_confirm(&id_deduct, &tenant);
+    client.record_deposit_paid(&id_deduct, &sample_hash(&env, 2), &deposit);
+    client.propose_deduction(&id_deduct, &landlord, &2_000_000, &sample_hash(&env, 3));
+    client.respond_deduction(&id_deduct, &tenant, &true);
+
+    let c21 = client.get_contract(&id_deduct);
+    assert_eq!(c21.status, ContractStatus::Ended);
+    assert_eq!(c21.deposit_status, DepositStatus::Deducted);
+    assert_eq!(c21.refund_amount, 3_000_000);
+    assert_eq!(c21.deducted_amount, 2_000_000);
+
+    assert_eq!(client.try_approve_refund(&id_deduct, &tenant, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_resolve_dispute(&id_deduct, &tenant, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_record_rent_paid(&id_deduct, &1, &1_000_000, &sample_hash(&env, 99)), Err(Ok(Error::InvalidTransition)));
+
+    // Contract 22: ended via dispute resolved
+    let id_disp = sample_id(&env, 22);
+    client.create_contract(&id_disp, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &3_000_000, &5, &50);
+    client.tenant_confirm(&id_disp, &tenant);
+    client.record_deposit_paid(&id_disp, &sample_hash(&env, 2), &deposit);
+    client.open_dispute(&id_disp, &tenant);
+    client.resolve_dispute(&id_disp, &landlord, &2_500_000);
+    client.resolve_dispute(&id_disp, &tenant, &2_500_000);
+
+    let c22 = client.get_contract(&id_disp);
+    assert_eq!(c22.status, ContractStatus::Ended);
+    assert_eq!(c22.dispute_status, DisputeStatus::Resolved);
+    assert_eq!(c22.refund_amount, 2_500_000);
+    assert_eq!(c22.deducted_amount, 2_500_000);
+
+    assert_eq!(client.try_approve_refund(&id_disp, &landlord, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_respond_deduction(&id_disp, &tenant, &true), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_resolve_dispute(&id_disp, &landlord, &2_500_000), Err(Ok(Error::InvalidTransition)));
+}
+
+#[test]
+fn test_adversarial_unauthorized_all_functions() {
+    let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+    let stranger = Address::generate(&env);
+
+    let id = sample_id(&env, 23);
+    let deposit = 5_000_000i128;
+    let rent = 3_000_000i128;
+
+    client.create_contract(&id, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &rent, &5, &50);
+
+    // Stranger tries to confirm tenant's contract
+    assert_eq!(client.try_tenant_confirm(&id, &stranger), Err(Ok(Error::Unauthorized)));
+    assert_eq!(client.try_tenant_confirm(&id, &landlord), Err(Ok(Error::Unauthorized)));
+
+    // Confirm legitimately
+    client.tenant_confirm(&id, &tenant);
+    client.record_deposit_paid(&id, &sample_hash(&env, 2), &deposit);
+
+    // Stranger tries refund request and approval
+    assert_eq!(client.try_request_refund(&id, &stranger), Err(Ok(Error::Unauthorized)));
+    assert_eq!(client.try_approve_refund(&id, &stranger, &deposit), Err(Ok(Error::Unauthorized)));
+
+    // Tenant or stranger tries to propose deduction (only landlord can)
+    assert_eq!(client.try_propose_deduction(&id, &stranger, &1_000_000, &sample_hash(&env, 3)), Err(Ok(Error::Unauthorized)));
+    assert_eq!(client.try_propose_deduction(&id, &tenant, &1_000_000, &sample_hash(&env, 3)), Err(Ok(Error::Unauthorized)));
+
+    // Propose legitimately
+    client.propose_deduction(&id, &landlord, &1_000_000, &sample_hash(&env, 3));
+
+    // Landlord or stranger tries to respond to deduction (only tenant can)
+    assert_eq!(client.try_respond_deduction(&id, &stranger, &true), Err(Ok(Error::Unauthorized)));
+    assert_eq!(client.try_respond_deduction(&id, &landlord, &true), Err(Ok(Error::Unauthorized)));
+
+    // Stranger tries to open dispute
+    assert_eq!(client.try_open_dispute(&id, &stranger), Err(Ok(Error::Unauthorized)));
+
+    // Reject deduction to move to dispute
+    client.respond_deduction(&id, &tenant, &false);
+
+    // Stranger tries to resolve dispute
+    assert_eq!(client.try_resolve_dispute(&id, &stranger, &2_000_000), Err(Ok(Error::Unauthorized)));
+}
+
+#[test]
+fn test_adversarial_stale_approvals() {
+    let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+
+    let id = sample_id(&env, 24);
+    let deposit = 5_000_000i128;
+    let rent = 3_000_000i128;
+
+    client.create_contract(&id, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &rent, &5, &50);
+    client.tenant_confirm(&id, &tenant);
+    client.record_deposit_paid(&id, &sample_hash(&env, 2), &deposit);
+
+    // Landlord approves 5M refund
+    client.approve_refund(&id, &landlord, &deposit);
+
+    // Landlord proposes deduction of 1M -> clears landlord's approval
+    client.propose_deduction(&id, &landlord, &1_000_000, &sample_hash(&env, 3));
+
+    // Tenant cannot approve refund while proposal is active
+    assert_eq!(client.try_approve_refund(&id, &tenant, &deposit), Err(Ok(Error::InvalidTransition)));
+
+    // Opening dispute clears any proposal and refund approvals
+    client.open_dispute(&id, &tenant);
+
+    // In dispute: approving refund must fail with InvalidTransition (deposit is in PendingDispute)
+    assert_eq!(client.try_approve_refund(&id, &landlord, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(client.try_approve_refund(&id, &tenant, &deposit), Err(Ok(Error::InvalidTransition)));
+
+    // Tenant submits 2M in dispute; landlord submits 3M -> mismatch resets to InProgress and clears both
+    client.resolve_dispute(&id, &tenant, &2_000_000);
+    assert_eq!(client.get_contract(&id).dispute_status, DisputeStatus::AwaitingConfirmation);
+
+    // Landlord mismatch
+    let res = client.try_resolve_dispute(&id, &landlord, &3_000_000);
+    assert!(res.is_ok());
+    assert_eq!(client.get_contract(&id).dispute_status, DisputeStatus::InProgress);
+
+    // Both previous entries were cleared; submitting again moves to AwaitingConfirmation
+    client.resolve_dispute(&id, &landlord, &4_000_000);
+    assert_eq!(client.get_contract(&id).dispute_status, DisputeStatus::AwaitingConfirmation);
+
+    // Tenant matches 4M -> Resolved!
+    client.resolve_dispute(&id, &tenant, &4_000_000);
+    let c = client.get_contract(&id);
+    assert_eq!(c.dispute_status, DisputeStatus::Resolved);
+    assert_eq!(c.deposit_status, DepositStatus::Deducted);
+    assert_eq!(c.refund_amount, 4_000_000);
+    assert_eq!(c.deducted_amount, 1_000_000);
+    assert_eq!(c.status, ContractStatus::Ended);
+}
+
+#[test]
+fn test_adversarial_replay_payment_ref_hash() {
+    let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+
+    let id = sample_id(&env, 25);
+    let deposit = 5_000_000i128;
+    let rent = 3_000_000i128;
+
+    client.create_contract(&id, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &rent, &5, &50);
+    client.tenant_confirm(&id, &tenant);
+
+    let shared_ref = sample_hash(&env, 88);
+
+    // Record deposit paid with shared_ref
+    client.record_deposit_paid(&id, &shared_ref, &deposit);
+
+    // Replay attempt 1: Replaying deposit's payment_ref_hash for rent payment must fail
+    let res1 = client.try_record_rent_paid(&id, &1u32, &rent, &shared_ref);
+    assert_eq!(res1, Err(Ok(Error::DuplicatePaymentRef)));
+
+    // Replay attempt 2: Rent payment ref replayed for next period on same contract
+    let rent_ref_1 = sample_hash(&env, 89);
+    client.record_rent_paid(&id, &1u32, &rent, &rent_ref_1);
+
+    let res2 = client.try_record_rent_paid(&id, &2u32, &rent, &rent_ref_1);
+    assert_eq!(res2, Err(Ok(Error::DuplicatePaymentRef)));
+
+    // Replay attempt 3: Rent payment ref replayed for deposit on another contract where rent was paid first?
+    // Contract 26: rent paid first, then deposit tries to reuse rent's ref
+    let id2 = sample_id(&env, 26);
+    client.create_contract(&id2, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &rent, &5, &50);
+    client.tenant_confirm(&id2, &tenant);
+
+    let cross_ref = sample_hash(&env, 90);
+    client.record_rent_paid(&id2, &1u32, &rent, &cross_ref);
+
+    let res3 = client.try_record_deposit_paid(&id2, &cross_ref, &deposit);
+    assert_eq!(res3, Err(Ok(Error::DuplicatePaymentRef)));
+}
+
+#[test]
+fn test_adversarial_overflow() {
+    let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+
+    let id = sample_id(&env, 27);
+    let deposit = 5_000_000i128;
+    let rent = 3_000_000i128;
+
+    client.create_contract(&id, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &rent, &5, &50);
+    client.tenant_confirm(&id, &tenant);
+
+    // Initial partial payment
+    client.record_rent_paid(&id, &1u32, &1_000_000i128, &sample_hash(&env, 1));
+
+    // Overflows period_rec.amount_paid when adding i128::MAX
+    let res = client.try_record_rent_paid(&id, &1u32, &i128::MAX, &sample_hash(&env, 2));
+    assert_eq!(res, Err(Ok(Error::Overflow)));
+
+    // Late fee overflow check: rent * bps * days_late overflows i128
+    let id_huge = sample_id(&env, 28);
+    let huge_rent = i128::MAX / 2;
+    client.create_contract(&id_huge, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &huge_rent, &5, &10000);
+    client.tenant_confirm(&id_huge, &tenant);
+
+    let fee_overflow = client.try_calc_late_fee(&id_huge, &1u32, &100);
+    assert_eq!(fee_overflow, Err(Ok(Error::Overflow)));
+
+    let overdue_overflow = client.try_mark_overdue(&id_huge, &1u32, &100);
+    assert_eq!(overdue_overflow, Err(Ok(Error::Overflow)));
+}
+
+#[test]
+fn test_adversarial_period_zero() {
+    let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+
+    let id = sample_id(&env, 29);
+    let deposit = 5_000_000i128;
+    let rent = 3_000_000i128;
+
+    client.create_contract(&id, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &rent, &5, &50);
+    client.tenant_confirm(&id, &tenant);
+
+    // All functions taking period must reject period = 0 with PeriodNotFound
+    assert_eq!(client.try_record_rent_paid(&id, &0u32, &rent, &sample_hash(&env, 1)), Err(Ok(Error::PeriodNotFound)));
+    assert_eq!(client.try_mark_overdue(&id, &0u32, &5), Err(Ok(Error::PeriodNotFound)));
+    assert_eq!(client.try_calc_late_fee(&id, &0u32, &5), Err(Ok(Error::PeriodNotFound)));
+    assert_eq!(client.try_extend_due(&id, &0u32, &1770000000u64), Err(Ok(Error::PeriodNotFound)));
+    assert_eq!(client.try_get_rent_period(&id, &0u32), Err(Ok(Error::PeriodNotFound)));
+}
+
+#[test]
+fn test_adversarial_negative_and_invalid_amounts() {
+    let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+
+    let id = sample_id(&env, 30);
+    let doc = sample_hash(&env, 1);
+
+    // Negative / zero deposit in create_contract
+    assert_eq!(client.try_create_contract(&id, &landlord, &tenant, &doc, &-1, &3_000_000, &5, &50), Err(Ok(Error::InvalidAmount)));
+    assert_eq!(client.try_create_contract(&id, &landlord, &tenant, &doc, &0, &3_000_000, &5, &50), Err(Ok(Error::InvalidAmount)));
+
+    // Negative / zero rent in create_contract
+    assert_eq!(client.try_create_contract(&id, &landlord, &tenant, &doc, &5_000_000, &-1, &5, &50), Err(Ok(Error::InvalidAmount)));
+    assert_eq!(client.try_create_contract(&id, &landlord, &tenant, &doc, &5_000_000, &0, &5, &50), Err(Ok(Error::InvalidAmount)));
+
+    // Valid create
+    client.create_contract(&id, &landlord, &tenant, &doc, &5_000_000, &3_000_000, &5, &50);
+    client.tenant_confirm(&id, &tenant);
+
+    // Negative deposit payment
+    assert_eq!(client.try_record_deposit_paid(&id, &sample_hash(&env, 2), &-5_000_000), Err(Ok(Error::DepositMismatch)));
+
+    // Legitimate deposit payment
+    client.record_deposit_paid(&id, &sample_hash(&env, 2), &5_000_000);
+
+    // Negative / zero rent payment
+    assert_eq!(client.try_record_rent_paid(&id, &1u32, &-1, &sample_hash(&env, 3)), Err(Ok(Error::InvalidAmount)));
+    assert_eq!(client.try_record_rent_paid(&id, &1u32, &0, &sample_hash(&env, 3)), Err(Ok(Error::InvalidAmount)));
+
+    // Negative refund approval or exceeds deposit
+    assert_eq!(client.try_approve_refund(&id, &landlord, &-1), Err(Ok(Error::InvalidAmount)));
+    assert_eq!(client.try_approve_refund(&id, &landlord, &5_000_001), Err(Ok(Error::InvalidAmount)));
+
+    // Negative / zero deduction proposal or exceeds deposit
+    assert_eq!(client.try_propose_deduction(&id, &landlord, &-1, &sample_hash(&env, 4)), Err(Ok(Error::InvalidAmount)));
+    assert_eq!(client.try_propose_deduction(&id, &landlord, &0, &sample_hash(&env, 4)), Err(Ok(Error::InvalidAmount)));
+    assert_eq!(client.try_propose_deduction(&id, &landlord, &5_000_001, &sample_hash(&env, 4)), Err(Ok(Error::DeductionExceedsDeposit)));
+
+    // In dispute: negative or exceeds deposit agreed amount
+    client.open_dispute(&id, &tenant);
+    assert_eq!(client.try_resolve_dispute(&id, &landlord, &-1), Err(Ok(Error::InvalidAmount)));
+    assert_eq!(client.try_resolve_dispute(&id, &landlord, &5_000_001), Err(Ok(Error::InvalidAmount)));
+}
+
+#[test]
+fn test_adversarial_release_authorized_never_emitted_twice() {
+    let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+
+    // Test Case A: Finalized via approve_refund
+    let id_a = sample_id(&env, 31);
+    let deposit = 5_000_000i128;
+    client.create_contract(&id_a, &landlord, &tenant, &sample_hash(&env, 1), &deposit, &3_000_000, &5, &50);
+    client.tenant_confirm(&id_a, &tenant);
+    client.record_deposit_paid(&id_a, &sample_hash(&env, 2), &deposit);
+
+    assert_eq!(count_release_authorized(&env), 0);
+
+    // Landlord approves refund: release_authorized must NOT be emitted yet
+    client.approve_refund(&id_a, &landlord, &deposit);
+    assert_eq!(count_release_authorized(&env), 0);
+
+    // Tenant approves matching refund: release_authorized emitted EXACTLY ONCE
+    client.approve_refund(&id_a, &tenant, &deposit);
+    assert_eq!(count_release_authorized(&env), 1);
+
+    // Repeated attempts to approve, deduct, or dispute must fail and emit 0 release_authorized events
+    assert_eq!(client.try_approve_refund(&id_a, &landlord, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(count_release_authorized(&env), 0);
+    assert_eq!(client.try_approve_refund(&id_a, &tenant, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(count_release_authorized(&env), 0);
+    assert_eq!(client.try_propose_deduction(&id_a, &landlord, &1000, &sample_hash(&env, 3)), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(count_release_authorized(&env), 0);
+    assert_eq!(client.try_respond_deduction(&id_a, &tenant, &true), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(count_release_authorized(&env), 0);
+    assert_eq!(client.try_resolve_dispute(&id_a, &landlord, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(count_release_authorized(&env), 0);
+
+    // Test Case B: Finalized via respond_deduction
+    let (env_b, client_b, _admin_b, _oracle_b, landlord_b, tenant_b) = setup_env();
+    let id_b = sample_id(&env_b, 32);
+    client_b.create_contract(&id_b, &landlord_b, &tenant_b, &sample_hash(&env_b, 1), &deposit, &3_000_000, &5, &50);
+    client_b.tenant_confirm(&id_b, &tenant_b);
+    client_b.record_deposit_paid(&id_b, &sample_hash(&env_b, 2), &deposit);
+
+    client_b.propose_deduction(&id_b, &landlord_b, &1_500_000, &sample_hash(&env_b, 4));
+    assert_eq!(count_release_authorized(&env_b), 0);
+
+    // Tenant accepts: release_authorized emitted EXACTLY ONCE
+    client_b.respond_deduction(&id_b, &tenant_b, &true);
+    assert_eq!(count_release_authorized(&env_b), 1);
+
+    // Repeated responses or approvals fail and emit 0 events
+    assert_eq!(client_b.try_respond_deduction(&id_b, &tenant_b, &true), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(count_release_authorized(&env_b), 0);
+    assert_eq!(client_b.try_approve_refund(&id_b, &tenant_b, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(count_release_authorized(&env_b), 0);
+
+    // Test Case C: Finalized via resolve_dispute
+    let (env_c, client_c, _admin_c, _oracle_c, landlord_c, tenant_c) = setup_env();
+    let id_c = sample_id(&env_c, 33);
+    client_c.create_contract(&id_c, &landlord_c, &tenant_c, &sample_hash(&env_c, 1), &deposit, &3_000_000, &5, &50);
+    client_c.tenant_confirm(&id_c, &tenant_c);
+    client_c.record_deposit_paid(&id_c, &sample_hash(&env_c, 2), &deposit);
+    client_c.open_dispute(&id_c, &tenant_c);
+
+    client_c.resolve_dispute(&id_c, &landlord_c, &3_000_000);
+    assert_eq!(count_release_authorized(&env_c), 0);
+
+    client_c.resolve_dispute(&id_c, &tenant_c, &3_000_000);
+    assert_eq!(count_release_authorized(&env_c), 1);
+
+    assert_eq!(client_c.try_resolve_dispute(&id_c, &tenant_c, &3_000_000), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(count_release_authorized(&env_c), 0);
+    assert_eq!(client_c.try_approve_refund(&id_c, &tenant_c, &deposit), Err(Ok(Error::InvalidTransition)));
+    assert_eq!(count_release_authorized(&env_c), 0);
+}
+
+// ==================== RANDOM COMMAND SEQUENCE PROPERTY INVARIANT TESTS ====================
+
+struct SimpleLcg {
+    state: u64,
+}
+
+impl SimpleLcg {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        // Standard 64-bit Linear Congruential Generator
+        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.state
+    }
+
+    fn next_range(&mut self, min: u64, max: u64) -> u64 {
+        if min >= max {
+            return min;
+        }
+        min + (self.next_u64() % (max - min + 1))
+    }
+
+    fn next_bool(&mut self) -> bool {
+        (self.next_u64() & 1) == 1
+    }
+}
+
+#[test]
+fn test_random_command_sequence_invariants() {
+    let mut rng = SimpleLcg::new(0xCAFE_BABE_1234_5678);
+
+    for run in 0..10 {
+        let (env, client, _admin, _oracle, landlord, tenant) = setup_env();
+        let stranger = Address::generate(&env);
+
+        let id = sample_id(&env, 100 + run as u8);
+        let deposit = (rng.next_range(1, 10) * 1_000_000) as i128;
+        let rent = (rng.next_range(1, 5) * 1_000_000) as i128;
+        let doc_hash = sample_hash(&env, run as u8);
+
+        let mut contract_created = false;
+        let mut was_ended = false;
+        let mut total_release_authorized = 0;
+
+        let total_steps = 150;
+        for step in 0..total_steps {
+            let action = rng.next_range(0, 11);
+            let actor_choice = rng.next_range(0, 3);
+            let actor = match actor_choice {
+                0 => landlord.clone(),
+                1 => tenant.clone(),
+                _ => stranger.clone(),
+            };
+
+            let random_amount = (rng.next_range(0, 12) * 500_000) as i128;
+            let period = rng.next_range(0, 4) as u32;
+            let random_hash = sample_hash(&env, (step % 255) as u8);
+
+            match action {
+                0 => {
+                    // create_contract
+                    let due_day = rng.next_range(1, 31) as u32;
+                    let bps = rng.next_range(1, 100) as u32;
+                    let res = client.try_create_contract(&id, &landlord, &tenant, &doc_hash, &deposit, &rent, &due_day, &bps);
+                    if res.is_ok() {
+                        contract_created = true;
+                    }
+                }
+                1 => {
+                    // tenant_confirm
+                    let _ = client.try_tenant_confirm(&id, &actor);
+                }
+                2 => {
+                    // record_deposit_paid
+                    let _ = client.try_record_deposit_paid(&id, &random_hash, &random_amount);
+                }
+                3 => {
+                    // record_rent_paid
+                    let _ = client.try_record_rent_paid(&id, &period, &random_amount, &random_hash);
+                }
+                4 => {
+                    // mark_overdue
+                    let days = rng.next_range(0, 30) as u32;
+                    let _ = client.try_mark_overdue(&id, &period, &days);
+                }
+                5 => {
+                    // extend_due
+                    let ts = 1770000000u64 + step as u64;
+                    let _ = client.try_extend_due(&id, &period, &ts);
+                }
+                6 => {
+                    // request_refund
+                    let _ = client.try_request_refund(&id, &actor);
+                }
+                7 => {
+                    // approve_refund
+                    let _ = client.try_approve_refund(&id, &actor, &random_amount);
+                }
+                8 => {
+                    // propose_deduction
+                    let _ = client.try_propose_deduction(&id, &actor, &random_amount, &random_hash);
+                }
+                9 => {
+                    // respond_deduction
+                    let accept = rng.next_bool();
+                    let _ = client.try_respond_deduction(&id, &actor, &accept);
+                }
+                10 => {
+                    // open_dispute
+                    let _ = client.try_open_dispute(&id, &actor);
+                }
+                11 => {
+                    // resolve_dispute
+                    let _ = client.try_resolve_dispute(&id, &actor, &random_amount);
+                }
+                _ => {}
+            }
+
+            total_release_authorized += count_release_authorized(&env);
+
+            // ==================== INVARIANT CHECKS AT EVERY STEP ====================
+            if contract_created {
+                let contract = client.get_contract(&id);
+
+                // INVARIANT 1: Terminal state idempotency & conservation:
+                // Once Ended, refund_amount + deducted_amount == deposit_amount,
+                // and contract status never reverts from Ended.
+                if contract.status == ContractStatus::Ended {
+                    assert_eq!(
+                        contract.refund_amount + contract.deducted_amount,
+                        contract.deposit_amount,
+                        "Invariant violation: refund ({}) + deducted ({}) != deposit ({}) at step {}",
+                        contract.refund_amount, contract.deducted_amount, contract.deposit_amount, step
+                    );
+                    assert!(
+                        contract.deposit_status == DepositStatus::Refunded || contract.deposit_status == DepositStatus::Deducted,
+                        "Ended contract must have deposit status Refunded or Deducted, got {:?}",
+                        contract.deposit_status
+                    );
+                    assert!(contract.refund_amount >= 0 && contract.deducted_amount >= 0);
+                    was_ended = true;
+                } else if was_ended {
+                    panic!("Invariant violation: contract status changed from Ended back to {:?}", contract.status);
+                }
+
+                // INVARIANT 2: No release while in dispute
+                if contract.dispute_status == DisputeStatus::InProgress
+                    || contract.dispute_status == DisputeStatus::AwaitingConfirmation
+                {
+                    assert_eq!(
+                        contract.deposit_status,
+                        DepositStatus::PendingDispute,
+                        "Deposit status cannot be finalized while dispute is active, got {:?}",
+                        contract.deposit_status
+                    );
+                    assert_ne!(
+                        contract.status,
+                        ContractStatus::Ended,
+                        "Contract cannot be Ended while dispute is still active"
+                    );
+                }
+
+                // INVARIANT 3: release_authorized event emitted at most once
+                if contract.status == ContractStatus::Ended {
+                    assert_eq!(
+                        total_release_authorized, 1,
+                        "Ended contract must have exactly 1 total release_authorized event, got {} at step {}",
+                        total_release_authorized, step
+                    );
+                } else {
+                    assert_eq!(
+                        total_release_authorized, 0,
+                        "Non-ended contract must have 0 total release_authorized events, got {} at step {}",
+                        total_release_authorized, step
+                    );
+                }
+            }
+        }
+    }
+}
+
 
