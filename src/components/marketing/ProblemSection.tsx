@@ -66,8 +66,7 @@ export function ProblemSection() {
     return () => st.kill();
   }, []);
 
-  // 2. 3D Card tilt: Cache rect khi hover, dùng quickTo, không có will-change hay transition-all
-  const activeRectRef = useRef<DOMRect | null>(null);
+  // 2. 3D Card tilt: Không đọc getBoundingClientRect() mỗi khi hover để loại bỏ forced layout
   const rotateXQuickRef = useRef<((v: number) => void) | null>(null);
   const rotateYQuickRef = useRef<((v: number) => void) | null>(null);
 
@@ -79,19 +78,21 @@ export function ProblemSection() {
       return;
     }
     const card = e.currentTarget;
-    activeRectRef.current = card.getBoundingClientRect();
     rotateXQuickRef.current = gsap.quickTo(card, "rotationX", { duration: 0.25, ease: "power2.out" });
     rotateYQuickRef.current = gsap.quickTo(card, "rotationY", { duration: 0.25, ease: "power2.out" });
   };
 
   const handleCardMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    const rect = activeRectRef.current;
-    if (!rect || !rotateXQuickRef.current || !rotateYQuickRef.current) return;
+    if (!rotateXQuickRef.current || !rotateYQuickRef.current) return;
+    const card = e.currentTarget;
+    const width = card.offsetWidth;
+    const height = card.offsetHeight;
+    if (!width || !height) return;
 
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
+    const x = e.nativeEvent.offsetX;
+    const y = e.nativeEvent.offsetY;
+    const centerX = width / 2;
+    const centerY = height / 2;
     const rotX = ((y - centerY) / centerY) * -6;
     const rotY = ((x - centerX) / centerX) * 6;
 
@@ -100,7 +101,6 @@ export function ProblemSection() {
   };
 
   const handleCardMouseLeave = (e: MouseEvent<HTMLDivElement>) => {
-    activeRectRef.current = null;
     rotateXQuickRef.current = null;
     rotateYQuickRef.current = null;
     const card = e.currentTarget;
