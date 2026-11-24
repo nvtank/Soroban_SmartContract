@@ -1,0 +1,25 @@
+import { defineConfig } from "@playwright/test";
+
+/**
+ * E2E bấm chuột thật trên giao diện ở chế độ không mock, cần app đang chạy và Supabase local.
+ * Chạy: pnpm e2e   (đặt E2E_VIDEO=1 để quay video dự phòng cho buổi trình diễn)
+ * Dùng localhost để Passkey khớp tên miền. PLAYWRIGHT_CHROME_PATH để chỉ định trình duyệt Chrome có sẵn.
+ */
+export default defineConfig({
+  testDir: "tests/e2e",
+  timeout: 300_000,
+  expect: { timeout: 20_000 },
+  workers: 1,
+  fullyParallel: false,
+  reporter: [["list"]],
+  outputDir: "test-results",
+  use: {
+    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3112",
+    viewport: { width: 1366, height: 820 },
+    video: process.env.E2E_VIDEO === "1" ? { mode: "on", size: { width: 1366, height: 820 } } : "off",
+    launchOptions: {
+      executablePath: process.env.PLAYWRIGHT_CHROME_PATH || undefined,
+      slowMo: Number(process.env.E2E_SLOWMO ?? 0),
+    },
+  },
+});
