@@ -3,32 +3,25 @@
 /**
  * scripts/verify-onchain.mjs
  * Công cụ kiểm chứng tính toàn vẹn on-chain độc lập cho hợp đồng RentFlow.
- * 
+ *
  * Cách dùng:
  *   node scripts/verify-onchain.mjs [contractId]
  *   node scripts/verify-onchain.mjs --all
  *   node scripts/verify-onchain.mjs --list
- * 
+ *
  * Quy trình:
  * 1. Đọc dữ liệu hợp đồng & muối từ Supabase local (.env.local).
  * 2. Tính lại doc_hash bằng chuẩn hóa Canonical JSON + SHA-256 có salt (src/lib/stellar/hash.ts).
  * 3. Đọc trạng thái và doc_hash trên Stellar Testnet qua Soroban RPC (chỉ simulate view get_contract).
  * 4. So sánh đối chiếu 3 nguồn: Tính lại, Database, On-chain.
- * 5. Thoát mã 0 nếu khớp 100%, thoát mã 1 nếu có bất kỳ sai lệch nào.
+ * 5. Thoát mã 0 nếu khớp hoàn toàn, mã 2 nếu chưa có lệch thật nhưng hàng đợi on-chain còn giao dịch chưa xác nhận (chạy lại sau), mã 1 nếu có sai lệch thật.
  */
 
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import {
-  rpc,
-  Contract,
-  TransactionBuilder,
-  Account,
-  xdr,
-  scValToNative,
-} from "@stellar/stellar-sdk";
+import { rpc, Contract, TransactionBuilder, Account, xdr, scValToNative } from "@stellar/stellar-sdk";
 
 // Polyfill WebSocket cho Node.js 20 nếu cần
 if (typeof globalThis.WebSocket === "undefined") {
@@ -84,7 +77,9 @@ if (!contractIdOnChain) {
 
 // 2. Quy tắc chuẩn hóa và tính hash theo src/lib/stellar/hash.ts
 function normalizeString(val) {
-  return String(val ?? "").normalize("NFC").replace(/\r\n|\r/g, "\n");
+  return String(val ?? "")
+    .normalize("NFC")
+    .replace(/\r\n|\r/g, "\n");
 }
 
 function canonicalizeContract(input) {
@@ -118,14 +113,7 @@ function saltedHash(saltHex, dataString) {
 
 // 3. Mapping enum theo src/domain/states.ts và contracts/rentflow/src/types.rs
 const CONTRACT_STATUSES = ["PENDING_CONFIRMATION", "ACTIVE", "ENDED", "CANCELLED"];
-const DEPOSIT_STATUSES = [
-  "UNPAID",
-  "RECORDED",
-  "PENDING_REFUND",
-  "PENDING_DISPUTE",
-  "REFUNDED",
-  "DEDUCTED",
-];
+const DEPOSIT_STATUSES = ["UNPAID", "RECORDED", "PENDING_REFUND", "PENDING_DISPUTE", "REFUNDED", "DEDUCTED"];
 const DISPUTE_STATUSES = ["NONE", "AWAITING_CONFIRMATION", "IN_PROGRESS", "RESOLVED"];
 
 // Khởi tạo client
@@ -198,9 +186,7 @@ function printComparisonTable(results) {
     "On-chain (Stellar)".padEnd(30),
     "Trạng thái",
   ];
-  console.log(
-    headers[0] + " | " + headers[1] + " | " + headers[2] + " | " + headers[3] + " | " + headers[4]
-  );
+  console.log(headers[0] + " | " + headers[1] + " | " + headers[2] + " | " + headers[3] + " | " + headers[4]);
   console.log("-".repeat(125));
 
   for (const row of results.rows) {
@@ -212,6 +198,17 @@ function printComparisonTable(results) {
     console.log(`${name} | ${computed} | ${database} | ${onchain} | ${match}`);
   }
   console.log("=".repeat(125));
+}
+
+/** Số giao dịch on-chain của hợp đồng chưa được xác nhận (đang chờ, đang gửi hoặc lỗi chờ thử lại). */
+async function unconfirmedTxCount(contractId) {
+  const { data, error } = await db
+    .from("onchain_txs")
+    .select("status")
+    .eq("contract_id", contractId)
+    .in("status", ["PENDING", "SUBMITTED", "FAILED"]);
+  if (error || !data) return 0;
+  return data.length;
 }
 
 async function verifyContract(contractRecord) {
@@ -226,7 +223,10 @@ async function verifyContract(contractRecord) {
     .maybeSingle();
 
   if (depositError) {
-    console.warn(`⚠️ Cảnh báo: Không thể đọc bảng deposits cho contract ${contractId}:`, depositError.message);
+    console.warn(
+      `⚠️ Cảnh báo: Không thể đọc bảng deposits cho contract ${contractId}:`,
+      depositError.message,
+    );
   }
 
   // 2. Tính lại doc_hash
@@ -305,22 +305,38 @@ async function verifyContract(contractRecord) {
 
   const isAllMatched = hashMatch && contractStatusMatch && depositStatusMatch;
 
+  // Trạng thái lệch nhưng hàng đợi vẫn còn giao dịch chưa xác nhận: chain chưa đuổi kịp database, chưa phải lệch thật.
+  // Mã băm lệch luôn là lệch thật.
+  const queued = isAllMatched ? 0 : await unconfirmedTxCount(contractId);
+  if (!isAllMatched && hashMatch && queued > 0) {
+    console.warn(
+      `⏳ HỢP ĐỒNG ${contractId}: chain chưa đồng bộ, còn ${queued} giao dịch chưa xác nhận trong hàng đợi (không phải lệch thật).`,
+    );
+    return "UNSYNCED";
+  }
+
   if (isAllMatched) {
     console.log(`✅ HỢP ĐỒNG ${contractId}: TÍNH TOÀN VẸN ĐẠT 100%!`);
   } else {
     console.error(`🚨 HỢP ĐỒNG ${contractId}: PHÁT HIỆN SAI LỆCH TOÀN VẸN!`);
     if (!hashMatch) {
-      console.error(`   - Hash lệch: Computed=${recomputedHash} vs DB=${dbHash} vs OnChain=${onchainData.doc_hash}`);
+      console.error(
+        `   - Hash lệch: Computed=${recomputedHash} vs DB=${dbHash} vs OnChain=${onchainData.doc_hash}`,
+      );
     }
     if (!contractStatusMatch) {
-      console.error(`   - Trạng thái hợp đồng lệch: DB=${contractRecord.status} vs OnChain=${onchainData.status}`);
+      console.error(
+        `   - Trạng thái hợp đồng lệch: DB=${contractRecord.status} vs OnChain=${onchainData.status}`,
+      );
     }
     if (!depositStatusMatch) {
-      console.error(`   - Trạng thái cọc lệch: DB=${dbDepositStatus} vs OnChain=${onchainData.deposit_status}`);
+      console.error(
+        `   - Trạng thái cọc lệch: DB=${dbDepositStatus} vs OnChain=${onchainData.deposit_status}`,
+      );
     }
   }
 
-  return isAllMatched;
+  return isAllMatched ? "OK" : "MISMATCH";
 }
 
 async function main() {
@@ -381,27 +397,43 @@ async function main() {
     contractsToVerify = list;
   }
 
-  let allSucceeded = true;
+  const results = { OK: 0, UNSYNCED: 0, MISMATCH: 0 };
   for (const contract of contractsToVerify) {
     try {
-      const ok = await verifyContract(contract);
-      if (!ok) allSucceeded = false;
+      results[await verifyContract(contract)]++;
     } catch (err) {
-      console.error(`❌ Lỗi khi kiểm chứng hợp đồng ${contract.id}:`, err.message);
-      allSucceeded = false;
+      // Hợp đồng chưa có trên chain: nếu hàng đợi còn giao dịch chưa xác nhận thì chỉ là chưa đồng bộ
+      const queued = await unconfirmedTxCount(contract.id);
+      if (queued > 0) {
+        console.warn(
+          `⏳ Hợp đồng ${contract.id}: chưa có trên chain, còn ${queued} giao dịch chưa xác nhận (${err.message}).`,
+        );
+        results.UNSYNCED++;
+      } else {
+        console.error(`❌ Lỗi khi kiểm chứng hợp đồng ${contract.id}:`, err.message);
+        results.MISMATCH++;
+      }
     }
   }
 
   console.log("\n" + "=".repeat(60));
-  if (allSucceeded) {
-    console.log("🎉 TẤT CẢ HỢP ĐỒNG ĐÃ ĐƯỢC KIỂM CHỨNG TOÀN VẸN THÀNH CÔNG!");
-    console.log("   - Mã băm tính lại = Mã băm trong DB = Mã băm trên Stellar");
-    console.log("   - Trạng thái hợp đồng và cọc khớp tuyệt đối 1-1.");
-    process.exit(0);
-  } else {
+  console.log(
+    `Kết quả: ${results.OK} khớp, ${results.UNSYNCED} chưa đồng bộ (hàng đợi đang chạy), ${results.MISMATCH} lệch thật.`,
+  );
+  if (results.MISMATCH > 0) {
     console.error("🚨 CÓ HỢP ĐỒNG KHÔNG VƯỢT QUA KIỂM TRA TÍNH TOÀN VẸN!");
     process.exit(1);
   }
+  if (results.UNSYNCED > 0) {
+    console.warn(
+      "⏳ Chưa có lệch thật, nhưng có hợp đồng chưa đồng bộ xong. Chạy lại sau khi hàng đợi on-chain trống.",
+    );
+    process.exit(2);
+  }
+  console.log("🎉 TẤT CẢ HỢP ĐỒNG ĐÃ ĐƯỢC KIỂM CHỨNG TOÀN VẸN THÀNH CÔNG!");
+  console.log("   - Mã băm tính lại = Mã băm trong DB = Mã băm trên Stellar");
+  console.log("   - Trạng thái hợp đồng và cọc khớp tuyệt đối 1-1.");
+  process.exit(0);
 }
 
 main().catch((err) => {
