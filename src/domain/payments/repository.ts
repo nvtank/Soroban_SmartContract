@@ -374,7 +374,7 @@ export async function getDefaultPaymentRepository(injectedDb?: unknown): Promise
   }
 
   try {
-    const serverMod = await import("@/lib/supabase/server");
+    const serverMod = await import("@/lib/supabase/admin");
     if (typeof serverMod.createAdminSupabase === "function") {
       return new SupabasePaymentRepository(serverMod.createAdminSupabase());
     }

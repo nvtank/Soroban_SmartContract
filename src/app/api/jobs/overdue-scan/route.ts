@@ -1,12 +1,11 @@
 import { z } from "zod";
 import { ApiError, ok, parseJson, withApi } from "@/lib/api/http";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { getOptionalUser } from "@/lib/supabase/server";
+import { getOptionalUser } from "@/lib/supabase/session";
 import { enqueueOnchain } from "@/lib/stellar/outbox";
 import { scanOverdue } from "@/domain/jobs/overdue-scan";
 import { createSupabaseDomainRepository } from "@/domain/supabase-repository";
 
-export const dynamic = "force-dynamic";
 
 const overdueScanSchema = z.object({
   asOfDate: z

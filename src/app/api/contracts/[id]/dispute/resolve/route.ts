@@ -1,13 +1,12 @@
 import { z } from "zod";
 import { ok, parseJson, withApi } from "@/lib/api/http";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { requireUser } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/session";
 import { requireStepUp } from "@/lib/crypto/step-up";
 import { enqueueOnchain } from "@/lib/stellar/outbox";
 import { resolveDispute } from "@/domain/disputes/service";
 import { createSupabaseDomainRepository } from "@/domain/supabase-repository";
 
-export const dynamic = "force-dynamic";
 
 const resolveDisputeSchema = z.object({
   agreedAmount: z.string().regex(/^\d+$/),

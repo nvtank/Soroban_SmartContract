@@ -1,12 +1,11 @@
 import { ok, withApi } from "@/lib/api/http";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { requireUser } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/session";
 import { requireStepUp } from "@/lib/crypto/step-up";
 import { enqueueOnchain } from "@/lib/stellar/outbox";
 import { confirmContract } from "@/domain/contracts/service";
 import { createSupabaseDomainRepository } from "@/domain/supabase-repository";
 
-export const dynamic = "force-dynamic";
 
 export const POST = withApi(async (request: Request, context: { params: Promise<{ id: string }> }) => {
   const { id } = await context.params;

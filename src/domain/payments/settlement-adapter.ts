@@ -24,7 +24,7 @@ export async function callSettlePayment(
   try {
     const mod = await import("@/domain/contracts/settlement");
     if (typeof mod.settlePayment === "function") {
-      await mod.settlePayment(db, paymentId);
+      await mod.settlePayment(db as Parameters<typeof mod.settlePayment>[0], paymentId);
     }
   } catch (error: unknown) {
     const err = error as { code?: string; message?: string };

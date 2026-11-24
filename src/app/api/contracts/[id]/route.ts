@@ -1,10 +1,9 @@
 import { ok, withApi } from "@/lib/api/http";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { requireUser } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/session";
 import { getContractDetail } from "@/domain/contracts/service";
 import { createSupabaseDomainRepository } from "@/domain/supabase-repository";
 
-export const dynamic = "force-dynamic";
 
 export const GET = withApi(async (_request: Request, context: { params: Promise<{ id: string }> }) => {
   const { id } = await context.params;

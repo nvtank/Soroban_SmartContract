@@ -10,7 +10,7 @@ export async function getSessionUser(
   required = true,
 ): Promise<SessionUser | null> {
   try {
-    const serverMod = await import("@/lib/supabase/server");
+    const serverMod = await import("@/lib/supabase/session");
     if (required && typeof serverMod.requireUser === "function") {
       return await serverMod.requireUser();
     }
