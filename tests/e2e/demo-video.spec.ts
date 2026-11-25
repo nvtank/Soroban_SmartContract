@@ -102,8 +102,6 @@ test.describe("Kịch bản trình diễn Video dự phòng (5 bước theo docs
       // -------------------------------------------------------------
       await page.goto("/");
       await page.waitForTimeout(1000);
-      const banner = page.locator('[role="note"]');
-      await expect(banner).toBeVisible();
       await page.goto("/minh-bach");
       await page.waitForTimeout(1000);
 

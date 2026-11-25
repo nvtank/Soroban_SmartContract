@@ -237,7 +237,7 @@ function NavbarInner() {
   return (
     <div
       className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-3"
-      style={{ top: "calc(var(--demo-banner-h, 1.75rem) + 0.625rem)" }}
+      style={{ top: "0.625rem" }}
     >
       <div ref={islandRef} className="pointer-events-auto relative max-w-full">
         <header className="flex items-center gap-1 rounded-full bg-white p-1.5 text-black shadow-[0_14px_36px_-18px_rgba(0,0,0,0.28)] ring-1 ring-black/10">

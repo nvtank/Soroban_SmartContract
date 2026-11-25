@@ -452,6 +452,9 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        // Khi đang hướng dẫn, Esc thuộc về hướng dẫn: không để hộp ký/thanh toán đang mở tự đóng theo,
+        // nếu không bấm "Tiếp tục xem" sẽ mất phần tử đích và hướng dẫn bị kẹt.
+        e.stopImmediatePropagation();
         if (status === "confirm-exit") {
           setStatus(previousStatusBeforeExit);
         } else {

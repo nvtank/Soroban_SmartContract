@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 const TENANT1 = "0900000002";
 const JARGON_REGEX = /\bxlm\b|\bgas\b|seed\s*phrase/i;
-const SIMULATION_BANNER_TEXT = /ngân hàng và giải ngân là mô phỏng|Bản demo/i;
+// Không còn dải banner trên cùng; nhãn "mô phỏng" vẫn phải xuất hiện ở nội dung hoặc footer của mỗi trang.
+const SIMULATION_LABEL = /mô phỏng/i;
 
 async function loginViaUi(page: Page, phone: string) {
   await page.goto("/dang-nhap");
@@ -24,18 +25,17 @@ async function loginViaUi(page: Page, phone: string) {
   await expect(page).toHaveURL(/\/app/);
 }
 
-test.describe("E2E: Banner mô phỏng và không có thuật ngữ Web3 ngoài ngăn bằng chứng", () => {
+test.describe("E2E: Nhãn mô phỏng và không có thuật ngữ Web3 ngoài ngăn bằng chứng", () => {
   const allAppPages = ["/", "/dang-nhap", "/app", "/bang-chung", "/minh-bach"];
 
   for (const path of allAppPages) {
-    test(`mọi trang (${path}) đều có banner mô phỏng`, async ({ page }) => {
+    test(`mọi trang (${path}) vẫn ghi rõ phần mô phỏng`, async ({ page }) => {
       if (path === "/app") {
         await loginViaUi(page, TENANT1);
       }
       await page.goto(path);
-      const banner = page.locator('[role="note"]');
-      await expect(banner).toBeVisible();
-      await expect(banner).toHaveText(SIMULATION_BANNER_TEXT);
+      await expect(page.locator('[role="note"]')).toHaveCount(0);
+      await expect(page.locator("body")).toContainText(SIMULATION_LABEL);
     });
   }
 
@@ -58,10 +58,8 @@ test.describe("E2E: Banner mô phỏng và không có thuật ngữ Web3 ngoài 
     await link.click();
     await expect(page).toHaveURL(/\/app\/hop-dong\//);
 
-    // Banner mô phỏng trên trang chi tiết hợp đồng
-    const banner = page.locator('[role="note"]');
-    await expect(banner).toBeVisible();
-    await expect(banner).toHaveText(SIMULATION_BANNER_TEXT);
+    // Trang chi tiết hợp đồng vẫn ghi rõ phần mô phỏng
+    await expect(page.locator("body")).toContainText(SIMULATION_LABEL);
 
     // Tab Tổng quan: không có XLM, gas, seed phrase
     await page.getByRole("button", { name: /Tổng quan/ }).first().click();

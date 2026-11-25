@@ -41,6 +41,7 @@ export function AppNavbar() {
   const [panel, setPanel] = useState<Panel>(null);
 
   const barRef = useRef<HTMLDivElement>(null);
+  const hoverRef = useRef<HTMLSpanElement>(null);
   const bellRef = useRef<HTMLSpanElement>(null);
   const badgeRef = useRef<HTMLSpanElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -183,11 +184,34 @@ export function AppNavbar() {
     </Link>
   );
 
+  // Viên nền trượt theo liên kết đang trỏ (chỉ transform/opacity của một phần tử nhỏ)
+  const moveHover = (target: HTMLElement) => {
+    const pill = hoverRef.current;
+    if (!pill || window.matchMedia(REDUCED).matches) return;
+    gsap.to(pill, {
+      x: target.offsetLeft,
+      width: target.offsetWidth,
+      opacity: 1,
+      duration: 0.35,
+      ease: "power3.out",
+      overwrite: "auto",
+    });
+  };
+  const hideHover = () => {
+    if (hoverRef.current) gsap.to(hoverRef.current, { opacity: 0, duration: 0.25, overwrite: "auto" });
+  };
+
+  const NAV_LINKS = [
+    {
+      href: "/app",
+      label: "Bảng điều khiển",
+      active: pathname === "/app" || pathname.startsWith("/app/hop-dong"),
+    },
+    { href: "/bang-chung", label: "Bằng chứng", active: pathname === "/bang-chung" },
+  ];
+
   return (
-    <header
-      className="sticky z-40 w-full px-3 pb-1 pt-2.5 sm:px-6"
-      style={{ top: "var(--demo-banner-h, 1.75rem)" }}
-    >
+    <header className="sticky z-40 w-full px-3 pb-1 pt-2.5 sm:px-6" style={{ top: 0 }}>
       <div
         ref={barRef}
         className="mx-auto flex max-w-6xl items-center justify-between gap-2 rounded-full bg-white p-1.5 pl-2 text-black shadow-[0_14px_36px_-18px_rgba(0,0,0,0.28)] ring-1 ring-black/10"
@@ -211,6 +235,36 @@ export function AppNavbar() {
             {roleLabel}
           </span>
         </div>
+
+        {/* Giữa: điều hướng chính (máy tính); trên điện thoại nằm trong menu tài khoản */}
+        <nav
+          onMouseLeave={hideHover}
+          className="relative hidden items-center md:flex"
+          aria-label="Điều hướng ứng dụng"
+        >
+          <span
+            ref={hoverRef}
+            className="pointer-events-none absolute inset-y-0 left-0 w-0 rounded-full bg-black/[0.06] opacity-0"
+            aria-hidden="true"
+          />
+          {NAV_LINKS.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              onMouseEnter={(e) => moveHover(e.currentTarget)}
+              aria-current={l.active ? "page" : undefined}
+              className={`relative z-10 flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-colors ${
+                l.active ? "text-black" : "text-black/60 hover:text-black"
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full bg-primary transition-transform duration-300 ${l.active ? "scale-100" : "scale-0"}`}
+                aria-hidden="true"
+              />
+              <RollText>{l.label}</RollText>
+            </Link>
+          ))}
+        </nav>
 
         {/* Phải: hướng dẫn, thông báo, tài khoản */}
         <div className="flex shrink-0 items-center gap-1">

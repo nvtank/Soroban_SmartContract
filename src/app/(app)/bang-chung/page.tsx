@@ -79,6 +79,9 @@ export default function PublicProofPage() {
           <p className="text-xs sm:text-sm text-ink/70">
             Toàn bộ lịch sử cam kết tiền cọc, thu tiền thuê và xử lý tranh chấp được bảo chứng bất biến trên sổ cái phân tán Stellar Testnet qua Smart Contract Soroban.
           </p>
+          <p className="text-xs text-ink/55">
+            Giao dịch on-chain là thật trên Testnet; ngân hàng, VietQR và giải ngân tiền VND là mô phỏng.
+          </p>
         </div>
 
         {/* Non-PII Banner */}
