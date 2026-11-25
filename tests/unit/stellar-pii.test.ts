@@ -102,3 +102,34 @@ describe("Stellar PII Guard & Sanitizer", () => {
     });
   });
 });
+
+describe("số tiền 9 hoặc 12 chữ số không bị nhầm là CMND/CCCD", () => {
+  const id = "d21590a2-6848-469e-ad77-83850ebcd16b";
+  const hash = "90defc9c9d555df2116aa2e2346cfb42bf9d679c1b789a5d9f2f6c1630b6ece1";
+
+  it("create_contract với cọc 622.500.000 và tiền thuê 1.000.000.000 đi qua được", () => {
+    expect(() => assertNoPii([id, hash, "622500000", "1000000000", 5, 50], "create_contract")).not.toThrow();
+  });
+
+  it("các hàm có số tiền 9 hoặc 12 chữ số đi qua được", () => {
+    expect(() => assertNoPii([id, hash, "622500000"], "record_deposit_paid")).not.toThrow();
+    expect(() => assertNoPii([id, 3, "150000000", hash], "record_rent_paid")).not.toThrow();
+    expect(() => assertNoPii([id, "999999999"], "approve_refund")).not.toThrow();
+    expect(() => assertNoPii([id, "123456789012"], "resolve_dispute")).not.toThrow();
+    expect(() => assertNoPii([id, "300000000", hash], "propose_deduction")).not.toThrow();
+  });
+
+  it("chuỗi giống CMND/CCCD ở vị trí không phải số tiền vẫn bị chặn", () => {
+    expect(() => assertNoPii([id, "079123456789", "500000", "4000000", 5, 50], "create_contract")).toThrow();
+    expect(() => assertNoPii(["123456789"], "tenant_confirm")).toThrow();
+    expect(() => assertNoPii([id, "622500000"], "open_dispute")).toThrow();
+  });
+
+  it("số điện thoại ở vị trí số tiền vẫn bị chặn vì không phải toàn chữ số hợp lệ của số tiền", () => {
+    expect(() => assertNoPii([id, hash, "+84912345678", "1000000", 5, 50], "create_contract")).toThrow();
+  });
+
+  it("không có tên hàm thì vẫn kiểm tra toàn bộ như cũ", () => {
+    expect(() => assertNoPii(["622500000"])).toThrow();
+  });
+});

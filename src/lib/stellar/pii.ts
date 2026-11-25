@@ -123,8 +123,69 @@ export function containsPii(value: unknown, keyName?: string): { hasPii: boolean
 /**
  * Ném ngoại lệ ApiError("VALIDATION_ERROR") nếu payload có PII.
  */
+/**
+ * Vị trí tham số là SỐ (i128 số tiền, u32, u64) của từng hàm contract, ở dạng tham số nghiệp vụ
+ * lúc đưa vào hàng đợi (trước khi chèn địa chỉ ví, xem resolve-args.ts). Ví dụ create_contract
+ * nghiệp vụ = [id, doc_hash, deposit, rent, due_day, late_fee_bps] nên số ở vị trí 2..5.
+ * Số tiền 9 hoặc 12 chữ số (100 triệu đến dưới 1 tỷ, hoặc từ 100 tỷ) trông giống CMND/CCCD;
+ * chỉ ở các vị trí này và chỉ khi toàn chữ số thì mới không áp luật CCCD và số điện thoại.
+ */
+export const NUMERIC_ARG_POSITIONS: Readonly<Record<string, readonly number[]>> = {
+  create_contract: [2, 3, 4, 5],
+  record_deposit_paid: [2],
+  record_rent_paid: [1, 2],
+  mark_overdue: [1, 2],
+  calc_late_fee: [1, 2],
+  extend_due: [1, 2],
+  approve_refund: [1],
+  propose_deduction: [1],
+  resolve_dispute: [1],
+};
+
+/** Tên khóa số khi tham số truyền dạng object. */
+const NUMERIC_ARG_KEYS = new Set([
+  "deposit",
+  "rent",
+  "amount",
+  "refundamount",
+  "agreedamount",
+  "dueday",
+  "latefeebps",
+  "latefeebpsperday",
+  "period",
+  "dayslate",
+  "newduets",
+]);
+
+const DIGITS_ONLY = /^\d+$/;
+
+/** Bỏ các tham số số (đúng vị trí, toàn chữ số) ra khỏi payload trước khi quét dữ liệu cá nhân. */
+function withoutNumericArgs(payload: unknown, action?: string): unknown {
+  if (!action) return payload;
+  if (Array.isArray(payload)) {
+    const positions = NUMERIC_ARG_POSITIONS[action] ?? [];
+    return payload.filter(
+      (v, i) =>
+        !(positions.includes(i) && (typeof v === "number" || (typeof v === "string" && DIGITS_ONLY.test(v)))),
+    );
+  }
+  if (payload && typeof payload === "object") {
+    return Object.fromEntries(
+      Object.entries(payload as Record<string, unknown>).filter(
+        ([k, v]) =>
+          !(
+            NUMERIC_ARG_KEYS.has(k.toLowerCase().replace(/[_-]/g, "")) &&
+            (typeof v === "number" || (typeof v === "string" && DIGITS_ONLY.test(v)))
+          ),
+      ),
+    );
+  }
+  return payload;
+}
+
 export function assertNoPii(payload: unknown, context?: string): void {
-  const result = containsPii(payload);
+  // context là tên hàm contract khi gọi từ hàng đợi on-chain
+  const result = containsPii(withoutNumericArgs(payload, context));
   if (result.hasPii) {
     const ctxMsg = context ? ` [${context}]` : "";
     throw new ApiError(
