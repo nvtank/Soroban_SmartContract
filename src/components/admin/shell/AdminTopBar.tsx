@@ -62,7 +62,7 @@ export function AdminTopBar({ title, onOpenNav }: { title: string; onOpenNav: ()
   }
 
   return (
-    <header className="sticky top-(--demo-banner-h) z-30 flex min-h-16 min-w-0 items-center justify-between gap-2 border-b border-line bg-white/95 px-3 backdrop-blur-sm sm:gap-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex min-h-16 min-w-0 items-center justify-between gap-2 border-b border-line bg-white/95 px-3 backdrop-blur-sm sm:gap-4 sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         <button
           type="button"

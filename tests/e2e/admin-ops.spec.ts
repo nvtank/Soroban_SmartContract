@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { loginAdmin } from "./helpers/admin-login";
 import { expect, test } from "@playwright/test";
 
 const fixtureUrl = "http://localhost:3125";
@@ -10,22 +10,13 @@ const pages = [
 ];
 
 test.describe("Admin operations (fixtures)", () => {
-  test.skip(process.env.E2E_BASE_URL !== fixtureUrl, "Chỉ chạy ở máy chủ fixtures local cổng 3125.");
+  test.skip(
+    process.env.NEXT_PUBLIC_ADMIN_FIXTURES !== "1" && process.env.E2E_BASE_URL !== fixtureUrl,
+    "Chỉ chạy khi máy chủ ở chế độ dữ liệu mẫu (NEXT_PUBLIC_ADMIN_FIXTURES=1).",
+  );
 
-  test.beforeEach(async ({ page }) => {
-    const env = readFileSync(".env.local", "utf8");
-    expect(env.match(/^NEXT_PUBLIC_SUPABASE_URL=(.*)$/m)?.[1]?.trim()).toBe("http://127.0.0.1:54421");
-    const code = env
-      .match(/^DEMO_ADMIN_OTP=(.*)$/m)?.[1]
-      ?.trim()
-      .replace(/^["']|["']$/g, "");
-    expect(Boolean(code), "DEMO_ADMIN_OTP phải được cấu hình").toBe(true);
-
-    const login = await page.request.post(`${fixtureUrl}/api/auth/otp/verify`, {
-      headers: { origin: fixtureUrl },
-      data: { phone: "0900000004", code },
-    });
-    expect(login.ok(), `Đăng nhập admin local: HTTP ${login.status()}`).toBe(true);
+  test.beforeEach(async ({ page }, testInfo) => {
+    await loginAdmin(page, testInfo);
   });
 
   test("bộ đếm lọc giao dịch và hiện chi tiết lỗi", async ({ page }) => {
@@ -150,7 +141,7 @@ test.describe("Admin operations (fixtures)", () => {
 
   test("đường dẫn quản trị cũ chuyển sang trang khôi phục", async ({ page }) => {
     await page.goto("/app/admin-demo");
-    await expect(page).toHaveURL(`${fixtureUrl}/admin/khoi-phuc`);
+    await expect(page).toHaveURL(/\/admin\/khoi-phuc$/);
     await expect(page.getByRole("heading", { name: "Yêu cầu chờ duyệt" })).toBeVisible();
   });
 

@@ -73,7 +73,7 @@ function AdminWorkspace({ children, segment }: { children: ReactNode; segment: s
       >
         Bỏ qua điều hướng
       </a>
-      <aside className="sticky top-(--demo-banner-h) hidden h-[calc(100dvh-var(--demo-banner-h,0px))] flex-col self-start border-r border-line bg-white lg:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col self-start border-r border-line bg-white lg:flex">
         <div className="px-4 py-5">
           <AdminSidebarBrand compact={compact} />
         </div>
@@ -119,7 +119,7 @@ function AdminWorkspace({ children, segment }: { children: ReactNode; segment: s
         onClick={(event) => {
           if (event.target === event.currentTarget) closeDrawer();
         }}
-        className="fixed inset-0 top-(--demo-banner-h) m-0 h-[calc(100dvh-var(--demo-banner-h,0px))] max-h-none w-screen max-w-none overflow-hidden bg-ink/40 backdrop:bg-transparent lg:hidden"
+        className="fixed inset-0 top-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden bg-ink/40 backdrop:bg-transparent lg:hidden"
       >
         <div
           ref={drawerRef}

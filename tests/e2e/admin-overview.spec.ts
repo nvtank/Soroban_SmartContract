@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { loginAdmin } from "./helpers/admin-login";
 
 /**
  * E2E cho trang Tổng quan (/admin) và Trực tiếp (/admin/truc-tiep) ở chế độ fixtures
@@ -7,6 +8,10 @@ import { expect, test } from "@playwright/test";
  */
 
 test.describe("Admin Overview & Live Dashboard (fixtures)", () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    await loginAdmin(page, testInfo);
+  });
+
   test("1. Trang /admin hiển thị đủ KPI, biểu đồ SVG có aria-label, và tooltip khi rê chuột", async ({
     page,
   }) => {
@@ -54,9 +59,7 @@ test.describe("Admin Overview & Live Dashboard (fixtures)", () => {
     expect(tooltipBox!.x + tooltipBox!.width).toBeLessThanOrEqual(box!.x + box!.width + 4);
   });
 
-  test("2. Trang /admin/truc-tiep cập nhật sự kiện mới sau 6 giây và có nút Tạm dừng", async ({
-    page,
-  }) => {
+  test("2. Trang /admin/truc-tiep cập nhật sự kiện mới sau 6 giây và có nút Tạm dừng", async ({ page }) => {
     await page.goto("/admin/truc-tiep");
 
     await expect(page.getByRole("heading", { name: "Theo dõi trực tiếp" })).toBeVisible();
@@ -69,9 +72,7 @@ test.describe("Admin Overview & Live Dashboard (fixtures)", () => {
       ),
     ).toBeVisible();
     await expect(
-      page.locator(
-        'svg[aria-label="Biểu đồ đường trực tiếp số sự kiện theo phút trong 60 phút gần nhất"]',
-      ),
+      page.locator('svg[aria-label="Biểu đồ đường trực tiếp số sự kiện theo phút trong 60 phút gần nhất"]'),
     ).toBeVisible();
 
     const stream = page.getByTestId("live-event-stream");
@@ -96,9 +97,7 @@ test.describe("Admin Overview & Live Dashboard (fixtures)", () => {
     await expect(page.getByRole("button", { name: "Tiếp tục" })).toBeVisible();
   });
 
-  test("3. Khung điện thoại 390px không tràn ngang ở /admin và /admin/truc-tiep", async ({
-    page,
-  }) => {
+  test("3. Khung điện thoại 390px không tràn ngang ở /admin và /admin/truc-tiep", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
 
     await page.goto("/admin");

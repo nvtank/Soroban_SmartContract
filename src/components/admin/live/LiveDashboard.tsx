@@ -80,6 +80,16 @@ function roleLabel(role: AdminEvent["actorRole"]): string {
   return "Hệ thống";
 }
 
+/** Sự kiện trong hôm nay chỉ hiện giờ; sự kiện ngày khác hiện kèm ngày để không trông như bị đảo thứ tự. */
+function eventTimeLabel(at: string): string {
+  const d = new Date(at);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  if (sameDay) return formatTimeSecondsVi(at);
+  const day = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+  const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${day} ${time}`;
+}
+
 export function LiveDashboard() {
   const [live, setLive] = useState<AdminLiveDto | null>(null);
   const [events, setEvents] = useState<AdminEvent[]>([]);
@@ -234,7 +244,7 @@ export function LiveDashboard() {
   const isRunning = !paused && !tabHidden;
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
       {/* Tiêu đề trang đơn giản */}
       <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
@@ -490,7 +500,7 @@ export function LiveDashboard() {
                     dateTime={ev.at}
                     className="tabular shrink-0 text-xs font-medium text-ink/55 sm:text-right"
                   >
-                    {formatTimeSecondsVi(ev.at)}
+                    {eventTimeLabel(ev.at)}
                   </time>
                 </li>
               );
@@ -498,6 +508,6 @@ export function LiveDashboard() {
           </ul>
         )}
       </ChartCard>
-    </main>
+    </div>
   );
 }

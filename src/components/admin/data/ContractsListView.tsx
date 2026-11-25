@@ -14,7 +14,7 @@ import {
   type ColumnDef,
   type FilterOption,
 } from "@/components/admin/table";
-import { AdminPageHeader } from "./AdminPageHeader";
+import { AdminPageHeader } from "@/components/admin/shell/AdminPageHeader";
 import { sortRows } from "./formatters";
 
 const STATUS_OPTIONS: FilterOption[] = [
@@ -174,7 +174,7 @@ export function ContractsListView() {
     <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
       <AdminPageHeader
         title="Hợp đồng"
-        subtitle="Chế độ chỉ xem; mọi số tiền thuê và tiền cọc đều là dữ liệu mô phỏng."
+        description="Chế độ chỉ xem; mọi số tiền thuê và tiền cọc đều là dữ liệu mô phỏng."
       />
 
       <DataTableFilterBar

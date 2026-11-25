@@ -9,7 +9,7 @@ import type {
 } from "@/domain/admin/dto";
 import { adminApi, formatVnd } from "@/lib/admin/api-client";
 import { AdminStatusPill, DataTable, type ColumnDef } from "@/components/admin/table";
-import { AdminPageHeader } from "./AdminPageHeader";
+import { AdminPageHeader } from "@/components/admin/shell/AdminPageHeader";
 import { DetailSkeleton } from "./DetailSkeleton";
 import { EventTimeline } from "./EventTimeline";
 import {
@@ -246,7 +246,7 @@ export function ContractDetailView({ params }: { params: Promise<{ id: string }>
     <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <AdminPageHeader
         title={contract.roomLabel}
-        subtitle="Chế độ chỉ xem; mọi khoản tiền trong bản demo đều là mô phỏng."
+        description="Chế độ chỉ xem; mọi khoản tiền trong bản demo đều là mô phỏng."
         backHref="/admin/hop-dong"
         backLabel="Quay lại danh sách hợp đồng"
         badge={<AdminStatusPill kind="contract" status={contract.status} />}

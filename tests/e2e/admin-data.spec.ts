@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { loginAdmin } from "./helpers/admin-login";
 
 const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3124";
 
@@ -25,6 +26,10 @@ async function assertAdminInvariants(page: Page) {
 }
 
 test.describe("Admin Data Pages (Fixtures Mode)", () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    await loginAdmin(page, testInfo);
+  });
+
   test("Người dùng: bảng có dữ liệu, lọc đổi URL, tìm kiếm giảm dòng, phân trang, mở chi tiết", async ({
     page,
   }) => {
@@ -37,7 +42,12 @@ test.describe("Admin Data Pages (Fixtures Mode)", () => {
     expect(initialCount).toBe(20);
 
     // Số điện thoại đã che và không có SĐT 10 số liền
-    await expect(page.locator("table tbody").getByText(/09\d\*\*\*\d{4}/).first()).toBeVisible();
+    await expect(
+      page
+        .locator("table tbody")
+        .getByText(/09\d\*\*\*\d{4}/)
+        .first(),
+    ).toBeVisible();
     await assertAdminInvariants(page);
 
     // Phân trang sang trang 2
@@ -78,9 +88,7 @@ test.describe("Admin Data Pages (Fixtures Mode)", () => {
     await assertAdminInvariants(page);
   });
 
-  test("Hợp đồng: bảng có dữ liệu, lọc trạng thái, tìm kiếm, mở chi tiết chỉ xem", async ({
-    page,
-  }) => {
+  test("Hợp đồng: bảng có dữ liệu, lọc trạng thái, tìm kiếm, mở chi tiết chỉ xem", async ({ page }) => {
     await page.goto("/admin/hop-dong");
     await expect(page.getByRole("heading", { name: "Hợp đồng" })).toBeVisible();
 
@@ -110,9 +118,7 @@ test.describe("Admin Data Pages (Fixtures Mode)", () => {
     await desktopRows.first().locator("a").first().click();
     await expect(page).toHaveURL(/\/admin\/hop-dong\/[0-9a-f-]+/i);
     await expect(
-      page.getByText(
-        "Admin không phân xử tranh chấp. Tranh chấp chỉ kết thúc khi hai bên cùng đồng ý.",
-      ),
+      page.getByText("Admin không phân xử tranh chấp. Tranh chấp chỉ kết thúc khi hai bên cùng đồng ý."),
     ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Các kỳ thuê" })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Lịch sử thanh toán/i })).toBeVisible();
@@ -144,9 +150,7 @@ test.describe("Admin Data Pages (Fixtures Mode)", () => {
     await expect(desktopRows.first()).toBeVisible();
   });
 
-  test("Giao diện điện thoại 390px không tràn ngang trên tất cả trang admin data", async ({
-    page,
-  }) => {
+  test("Giao diện điện thoại 390px không tràn ngang trên tất cả trang admin data", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
 
     const routes = [

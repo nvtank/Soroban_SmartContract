@@ -6,7 +6,7 @@ import { RotateCcw } from "lucide-react";
 import type { AdminContractRow, AdminUserDetailDto } from "@/domain/admin/dto";
 import { adminApi, formatVnd } from "@/lib/admin/api-client";
 import { AdminStatusPill, DataTable, type ColumnDef } from "@/components/admin/table";
-import { AdminPageHeader } from "./AdminPageHeader";
+import { AdminPageHeader } from "@/components/admin/shell/AdminPageHeader";
 import { ActivityBarChart } from "./ActivityBarChart";
 import { DetailSkeleton } from "./DetailSkeleton";
 import { EventTimeline } from "./EventTimeline";
@@ -136,7 +136,7 @@ export function UserDetailView({ params }: { params: Promise<{ id: string }> }) 
     <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <AdminPageHeader
         title={user.fullName ?? "Người dùng chưa đặt tên"}
-        subtitle="Chế độ chỉ xem hồ sơ cơ bản; không hiển thị giấy tờ tùy thân hay khóa bí mật."
+        description="Chế độ chỉ xem hồ sơ cơ bản; không hiển thị giấy tờ tùy thân hay khóa bí mật."
         backHref="/admin/nguoi-dung"
         backLabel="Quay lại danh sách người dùng"
         badge={<AdminStatusPill kind="role" status={user.role} />}

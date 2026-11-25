@@ -33,7 +33,6 @@ async function submitCode(page: Page, code: string) {
 async function expectAdminPage(page: Page, path = "/admin") {
   await expect(page).toHaveURL((url) => url.pathname + url.search === path);
   await expect(page.locator("#admin-content:visible")).toBeVisible();
-  await expect(page.getByRole("note")).toContainText("mô phỏng");
 }
 
 async function capture(page: Page, label: string) {
@@ -47,7 +46,6 @@ test("khách được chuyển đến trang đăng nhập admin và giữ lại 
   await expect(page).toHaveURL((url) => url.pathname === LOGIN && url.searchParams.get("next") === "/admin");
   await expect(page.getByRole("heading", { name: "Đăng nhập quản trị" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Điều hướng quản trị" })).toHaveCount(0);
-  await expect(page.getByRole("note")).toContainText("mô phỏng");
   await capture(page, "login-desktop");
 
   await page.goto("/admin/nguoi-dung/chi-tiet?tab=activity");

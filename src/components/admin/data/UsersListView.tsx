@@ -13,7 +13,7 @@ import {
   type ColumnDef,
   type FilterOption,
 } from "@/components/admin/table";
-import { AdminPageHeader } from "./AdminPageHeader";
+import { AdminPageHeader } from "@/components/admin/shell/AdminPageHeader";
 import { formatDate, formatRelativeTime, maskPhoneSafety, sortRows } from "./formatters";
 
 const ROLE_OPTIONS: FilterOption[] = [
@@ -141,7 +141,7 @@ export function UsersListView() {
     <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
       <AdminPageHeader
         title="Người dùng"
-        subtitle="Danh sách tài khoản chủ nhà và người thuê; số điện thoại luôn được che bớt."
+        description="Danh sách tài khoản chủ nhà và người thuê; số điện thoại luôn được che bớt."
       />
 
       <DataTableFilterBar

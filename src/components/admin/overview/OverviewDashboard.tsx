@@ -183,7 +183,7 @@ export function OverviewDashboard() {
     : 0;
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
       {/* Tiêu đề trang đơn giản (Manager sẽ thay bằng AdminPageHeader khi gộp) */}
       <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
@@ -486,6 +486,6 @@ export function OverviewDashboard() {
           </section>
         </div>
       ) : null}
-    </main>
+    </div>
   );
 }

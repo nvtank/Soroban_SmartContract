@@ -15,7 +15,7 @@ import {
   type ColumnDef,
   type FilterOption,
 } from "@/components/admin/table";
-import { AdminPageHeader } from "./AdminPageHeader";
+import { AdminPageHeader } from "@/components/admin/shell/AdminPageHeader";
 import { formatDateTime, sortRows } from "./formatters";
 
 const STATUS_OPTIONS: FilterOption[] = [
@@ -155,7 +155,7 @@ export function PaymentsListView() {
     <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
       <AdminPageHeader
         title="Thanh toán (mô phỏng)"
-        subtitle="Theo dõi các lệnh thanh toán tiền cọc và tiền thuê; số tiền là dữ liệu mô phỏng, hợp đồng thông minh không giữ VND."
+        description="Theo dõi các lệnh thanh toán tiền cọc và tiền thuê; số tiền là dữ liệu mô phỏng, hợp đồng thông minh không giữ VND."
         badge={<MockBadge label="Tiền mô phỏng" />}
       />
 

@@ -113,7 +113,8 @@ export function toEvent(row: AuditRecord): AdminEvent {
     id: row.id,
     at: row.created_at,
     action,
-    actorLabel: shortName(row.actor?.full_name ?? null),
+    // Rút gọn họ tên người dùng; tài khoản quản trị luôn hiện "Quản trị viên"
+    actorLabel: row.actor?.role === "ADMIN_DEMO" ? "Quản trị viên" : shortName(row.actor?.full_name ?? null),
     actorRole: row.actor?.role ?? "SYSTEM",
     actorId: row.actor_id,
     target: targetFor(row),

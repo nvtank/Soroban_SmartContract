@@ -19,8 +19,9 @@ function envLocal(name: string): string {
  * Dọn bộ đếm giới hạn trước mỗi lần chạy. Chỉ làm với database localhost.
  */
 export default async function globalSetup() {
-  const url = envLocal("NEXT_PUBLIC_SUPABASE_URL");
-  const key = envLocal("SUPABASE_SERVICE_ROLE_KEY");
+  // Ưu tiên biến môi trường của lần chạy (ví dụ đang trỏ Supabase local), rồi mới tới .env.local
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || envLocal("NEXT_PUBLIC_SUPABASE_URL");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || envLocal("SUPABASE_SERVICE_ROLE_KEY");
   if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url) || !key) return;
   const db = createClient(url, key);
   for (const prefix of ["otp:%", "rec:%"]) {
