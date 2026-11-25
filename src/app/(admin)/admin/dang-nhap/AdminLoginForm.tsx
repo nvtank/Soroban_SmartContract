@@ -26,8 +26,11 @@ function adminDestination(next: string | null) {
   return target.pathname + target.search + target.hash;
 }
 
-async function postOtp(endpoint: "request" | "verify", payload: { phone: string; code?: string }) {
-  const response = await fetch(`/api/auth/otp/${endpoint}`, {
+async function authenticate(
+  endpoint: "otp/request" | "otp/verify" | "admin/password",
+  payload: Record<string, string>,
+) {
+  const response = await fetch(`/api/auth/${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -43,12 +46,14 @@ async function postOtp(endpoint: "request" | "verify", payload: { phone: string;
 const fieldClass =
   "mt-2 w-full rounded-xl border border-line bg-paper px-4 py-3 text-base text-ink focus:border-primary aria-invalid:border-brick";
 
-export function AdminLoginForm() {
+export function AdminLoginForm({ passwordEnabled }: { passwordEnabled: boolean }) {
   const searchParams = useSearchParams();
   const cardRef = useRef<HTMLElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   const otpRef = useRef<HTMLInputElement>(null);
   const submittingRef = useRef(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"phone" | "otp">("phone");
@@ -85,14 +90,16 @@ export function AdminLoginForm() {
     let redirecting = false;
 
     try {
-      if (!enterOtp) {
-        await postOtp("request", { phone });
+      if (!passwordEnabled && !enterOtp) {
+        await authenticate("otp/request", { phone });
         setStep("otp");
         requestAnimationFrame(() => otpRef.current?.focus());
         return;
       }
 
-      const result = await postOtp("verify", { phone, code });
+      const result = passwordEnabled
+        ? await authenticate("admin/password", { username, password })
+        : await authenticate("otp/verify", { phone, code });
       if (result?.user?.role !== "ADMIN_DEMO") {
         setError("Tài khoản này không có quyền quản trị");
         setCode("");
@@ -129,14 +136,48 @@ export function AdminLoginForm() {
         <h1 id="admin-login-heading" className="text-2xl font-bold tracking-tight sm:text-3xl">
           Đăng nhập quản trị
         </h1>
-        <p className="mt-2 text-sm leading-relaxed text-ink/70">
-          {enterOtp
-            ? "Nhập mã OTP để xác minh quyền truy cập."
-            : "Xác minh số điện thoại của tài khoản quản trị."}
-        </p>
+        {!passwordEnabled && (
+          <p className="mt-2 text-sm leading-relaxed text-ink/70">
+            {enterOtp
+              ? "Nhập mã OTP để xác minh quyền truy cập."
+              : "Xác minh số điện thoại của tài khoản quản trị."}
+          </p>
+        )}
 
-        <form className="mt-7" onSubmit={submit} aria-busy={pending}>
-          {enterOtp ? (
+        <form className="mt-7" method="post" onSubmit={submit} aria-busy={pending}>
+          {passwordEnabled ? (
+            <div className="space-y-4">
+              <label className="block text-sm font-semibold">
+                Tên tài khoản
+                <input
+                  name="username"
+                  className={fieldClass}
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  maxLength={64}
+                  required
+                  readOnly={pending}
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                />
+              </label>
+              <label className="block text-sm font-semibold">
+                Mật khẩu
+                <input
+                  name="password"
+                  type="password"
+                  className={fieldClass}
+                  autoComplete="current-password"
+                  maxLength={128}
+                  required
+                  readOnly={pending}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </label>
+            </div>
+          ) : enterOtp ? (
             <>
               <label htmlFor="admin-otp" className="block text-sm font-semibold">
                 Mã OTP
@@ -196,7 +237,13 @@ export function AdminLoginForm() {
             disabled={pending}
             className="mt-5 flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary-strong px-4 py-3 text-sm font-semibold text-white hover:bg-ink disabled:cursor-wait disabled:opacity-70"
           >
-            {pending ? "Đang xác minh…" : enterOtp ? "Xác nhận đăng nhập" : "Yêu cầu mã OTP"}
+            {pending
+              ? "Đang xác minh…"
+              : passwordEnabled
+                ? "Đăng nhập"
+                : enterOtp
+                  ? "Xác nhận đăng nhập"
+                  : "Yêu cầu mã OTP"}
             {!pending && <ArrowRight size={16} aria-hidden="true" />}
           </button>
           {enterOtp && (
