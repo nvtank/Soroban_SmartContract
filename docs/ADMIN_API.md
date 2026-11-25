@@ -18,7 +18,7 @@ Kiểu dữ liệu: `src/domain/admin/dto.ts`. Bộ gọi API phía giao diện:
 
 ## Đăng nhập admin
 
-Trang `/admin/dang-nhap`: số `0900000004` và mã OTP bí mật `DEMO_ADMIN_OTP` (đã có ở `/api/auth/otp/verify`). Không hiển thị gợi ý mã. Không có nút đăng nhập nhanh.
+Trang `/admin/dang-nhap` dùng tài khoản `admin` và mật khẩu khi bật `DEMO_MODE` và cấu hình `DEMO_ADMIN_PASSWORD_HASH`. `POST /api/auth/admin/password` xác thực ở máy chủ và cấp phiên cho hồ sơ `ADMIN_DEMO` có số `0900000004`. Khi không cấu hình hash, trang dùng số `0900000004` và mã OTP bí mật `DEMO_ADMIN_OTP` qua `/api/auth/otp/verify`.
 
 ## Các trang
 
