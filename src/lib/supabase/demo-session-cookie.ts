@@ -1,11 +1,13 @@
 import { cookies } from "next/headers";
 import type { UserRole } from "@/domain/dto";
+import { auditSession } from "@/lib/admin/server/activity";
 import {
   DEMO_SESSION_COOKIE,
   LEGACY_DEMO_COOKIES,
   createDemoSessionToken,
   createSessionToken,
   demoSessionCookieOptions,
+  verifyDemoSessionToken,
 } from "./demo-session";
 
 async function writeSessionCookie(token: string | null): Promise<boolean> {
@@ -37,8 +39,10 @@ export async function setDemoSessionCookie(userId: string): Promise<boolean> {
 export async function clearDemoSessionCookie(): Promise<void> {
   try {
     const store = await cookies();
+    const session = verifyDemoSessionToken(store.get(DEMO_SESSION_COOKIE)?.value);
     store.delete(DEMO_SESSION_COOKIE);
     for (const legacy of LEGACY_DEMO_COOKIES) store.delete(legacy);
+    if (session) await auditSession(session.uid, "LOGOUT");
   } catch {
     // Ngoài ngữ cảnh request
   }

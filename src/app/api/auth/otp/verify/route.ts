@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { safeEqual } from "@/lib/demo/auth";
 import { setSessionCookie } from "@/lib/supabase/demo-session-cookie";
+import { auditSession } from "@/lib/admin/server/activity";
 import { withApi, parseJson, ok, ApiError } from "@/lib/api/http";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createCustodyWallet } from "@/lib/crypto/custody";
@@ -174,7 +175,7 @@ export const POST = withApi(async (request: Request) => {
   await createCustodyWallet(admin, user.id);
 
   // Phiên đăng nhập là cookie httpOnly do server ký, client không sửa được uid hay role.
-  await setSessionCookie(user.id, user.role);
+  if (await setSessionCookie(user.id, user.role)) await auditSession(user.id, "LOGIN");
 
   return ok({ user, isDemo });
 });
