@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import type { SessionUser } from "@/domain/dto";
 import { ApiError } from "@/lib/api/http";
+import { touchActivity } from "@/lib/admin/server/activity";
 import { createServerSupabase } from "./server";
 import { createAdminSupabase } from "./admin";
 import { DEMO_SESSION_COOKIE, verifyDemoSessionToken } from "./demo-session";
@@ -78,5 +79,6 @@ export async function requireUser(): Promise<SessionUser> {
   if (!user) {
     throw new ApiError("UNAUTHENTICATED");
   }
+  await touchActivity(user.id);
   return user;
 }
