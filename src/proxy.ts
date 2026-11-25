@@ -83,6 +83,21 @@ export function proxy(request: NextRequest) {
     }
   }
 
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    const session = verifySessionToken(request.cookies.get(DEMO_SESSION_COOKIE)?.value);
+    const isAdmin = session?.role === "ADMIN_DEMO";
+
+    if (pathname === "/admin/dang-nhap") {
+      return isAdmin ? NextResponse.redirect(new URL("/admin", request.url)) : NextResponse.next();
+    }
+
+    if (!isAdmin) {
+      const loginUrl = new URL("/admin/dang-nhap", request.url);
+      loginUrl.searchParams.set("next", pathname + request.nextUrl.search);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
   // 2. Protect /app/admin-demo: ONLY ADMIN_DEMO when DEMO_MODE=true
   if (pathname.startsWith("/app/admin-demo")) {
     if (!isDemo) {

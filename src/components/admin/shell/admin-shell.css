@@ -1,0 +1,3 @@
+body:has([data-admin-area]) > :is(.custom-cursor-follower, .custom-cursor-dot) {
+  display: none;
+}
