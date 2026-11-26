@@ -9,6 +9,7 @@ vi.mock("@/lib/supabase/demo-session-cookie", () => ({
   },
 }));
 import { POST } from "@/app/api/auth/admin/password/route";
+import { normalizeHashValue } from "@/lib/admin/server/password";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 const PASSWORD = "test-only-Strong#Pass9";
@@ -65,5 +66,16 @@ describe("đăng nhập admin bằng mật khẩu", () => {
       statuses.push((await POST(req({ username: "admin", password: `x${i}` }, "10.55.0.9"), {})).status);
     expect(statuses.slice(0, 10).every((s) => s === 401)).toBe(true);
     expect(statuses[10]).toBe(429);
+  });
+
+  it("chấp nhận giá trị dán kèm dấu nháy, dấu cách, xuống dòng hoặc cả tên biến", async () => {
+    const h = hashFor(PASSWORD);
+    for (const raw of [`"${h}"`, ` ${h}\n`, `DEMO_ADMIN_PASSWORD_HASH=${h}`, `'${h}'\r\n`]) {
+      expect(normalizeHashValue(raw)).toBe(h);
+      process.env.DEMO_ADMIN_PASSWORD_HASH = raw;
+      expect(
+        (await POST(req({ username: "admin", password: PASSWORD }, `10.56.0.${raw.length}`), {})).status,
+      ).toBe(200);
+    }
   });
 });
